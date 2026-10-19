@@ -49,7 +49,7 @@ PROTOCOL = """Respondé SIEMPRE con este formato exacto de etiquetas, sin nada f
 <next>{ids}  (id del agente al que le pasás la palabra{end})</next>
 <reason>por qué elegís a ese agente, en una frase</reason>"""
 
-JUDGE_SYSTEM = """Sos el JUEZ neutral de AGENT ARENA, un experimento donde modelos de IA de distintas empresas debatieron en vivo.
+JUDGE_SYSTEM = """Sos el JUEZ neutral de TABLY TEAM, un experimento donde modelos de IA de distintas empresas debatieron en vivo.
 No participaste del debate (aunque corras sobre {model}): sé imparcial, incluso si el ganador es de tu misma empresa.
 Los agentes ya votaron. Tu trabajo: explicarle al público, de forma clara y con gancho para redes, POR QUÉ ganó {winner}.
 Basate en evidencia concreta de la transcripción (citá ideas o frases cortas, mencioná turnos) y en los votos.
@@ -87,7 +87,7 @@ Si aprobás sin cambios, dejá la lista vacía. Máximo 8 ítems, concretos y ac
 <stance>propose</stance>
 <confidence>0-100</confidence>"""
 
-COUNCIL_SYSTEM = """Sos el PRESIDENTE del consejo de revisión pre-producción de AGENT ARENA (corrés sobre {model}; sé imparcial).
+COUNCIL_SYSTEM = """Sos el PRESIDENTE del consejo de revisión pre-producción de TABLY TEAM (corrés sobre {model}; sé imparcial).
 Los roles del equipo revisaron el proyecto construido y debatieron en vivo; cada uno dio su veredicto final.
 Tu trabajo: consolidar UNA lista de cambios para el constructor (el agente que escribe el código), sin repetir ítems, y decir si el producto
 está listo para producción o no. Mantené la atribución del rol que lo pidió. Idioma: {language}. Respondé SOLO con:
@@ -303,7 +303,7 @@ class Session:
             context
             + f"Sos {agent.name}, un agente de IA que corre sobre {agent.model} ({PROVIDERS[agent.provider].label}).\n"
             f"Personalidad: {agent.persona or 'libre'}\n{role_txt}\n"
-            f"Estás en AGENT ARENA, un experimento en vivo donde modelos de distintas empresas conversan entre sí "
+            f"Estás en TABLY TEAM, un experimento en vivo donde modelos de distintas empresas conversan entre sí "
             f"y todo se transmite en pantalla. Idioma: {self.config.language}. Sé conciso, concreto y con carácter; "
             f"podés discrepar con fuerza. No repitas lo que ya se dijo.\n\n"
             f"Los otros participantes:\n{roster}\n\n{protocol}"
@@ -425,7 +425,7 @@ class Session:
         cfg = self.config
         self.status = "running"
         ids = [a.id for a in cfg.agents]
-        tags = ["agent-arena", cfg.mode] + sorted({a.provider for a in cfg.agents})
+        tags = ["tablyteam", cfg.mode] + sorted({a.provider for a in cfg.agents})
         title = cfg.title or cfg.topic
         try:
             with obs.session_trace(self.id, self.owner.email, f"arena · {title}", tags, {"mode": cfg.mode, "agents": ",".join(f"{a.name}:{a.model}" for a in cfg.agents)}, cfg.model_dump()) as root:

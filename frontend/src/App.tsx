@@ -184,7 +184,7 @@ function AppInner() {
         unsub()
         const blob = await rec.stop()
         useBuild.getState().set({ recording: false })
-        downloadBlob(blob, `agent-arena-construccion-${slug(title)}.${rec.mime.includes('mp4') ? 'mp4' : 'webm'}`)
+        downloadBlob(blob, `tablyteam-construccion-${slug(title)}.${rec.mime.includes('mp4') ? 'mp4' : 'webm'}`)
       }
       // stop ~6 s after the build finishes (so the preview is on screen), or when the user ends the share
       const unsub = useBuild.subscribe((b, prev) => {
@@ -375,7 +375,7 @@ function AppInner() {
     const blob = await rec.stop()
     const cfg = useArena.getState().config
     const ext = rec.mime.includes('mp4') ? 'mp4' : 'webm'
-    downloadBlob(blob, `agent-arena-${slug(cfg?.title || cfg?.topic || id)}-${o.layout === 'vertical' ? '9x16' : '16x9'}.${ext}`)
+    downloadBlob(blob, `tablyteam-${slug(cfg?.title || cfg?.topic || id)}-${o.layout === 'vertical' ? '9x16' : '16x9'}.${ext}`)
     setSfx(prev.sound)
     useArena.getState().set({ recording: false, layout: prev.layout, recMode: prev.recMode, speed: prev.speed })
   }

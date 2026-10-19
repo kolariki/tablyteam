@@ -5,7 +5,7 @@
 
 The CLI works in a real folder on this machine (data/builds/<user>/<build>/): it writes files, can run
 commands, and keeps its own conversation (`--continue`) so change requests and resumes keep context.
-Agent Arena watches the folder and streams the agent's messages/tools into the builder UI.
+Tably Team watches the folder and streams the agent's messages/tools into the builder UI.
 
 Nothing here talks to claude.ai or chatgpt.com directly: only the vendors' CLIs, with their own login.
 """

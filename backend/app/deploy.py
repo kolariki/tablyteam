@@ -287,7 +287,7 @@ async def deploy(target: str, user_id: str, build_id: str, name: str, cwd: Path,
         return {"ok": False, "url": None, "error": f"{t['label']} CLI no está instalado"}
     token = get_key(user_id, target)
     env = {**os.environ, "CI": "1", "NO_COLOR": "1"}
-    slug = re.sub(r"[^a-z0-9-]+", "-", name.lower()).strip("-")[:48] or "agent-arena-app"
+    slug = re.sub(r"[^a-z0-9-]+", "-", name.lower()).strip("-")[:48] or "tablyteam-app"
     (cwd / ".env").write_text(render_env(values, {}))  # local file for the build step; platforms get vars explicitly below
     await _call(log, f"▶ deploy a {t['label']} · proyecto «{slug}» · {len(values)} variables")
     if target == "vercel":

@@ -93,7 +93,7 @@ export default function Builder({ onBack }: { onBack: () => void }) {
       const blob = await rec.current.stop()
       rec.current = null
       useBuild.getState().set({ recording: false })
-      downloadBlob(blob, `agent-arena-construccion-${b.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'proyecto'}.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`)
+      downloadBlob(blob, `tablyteam-construccion-${b.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'proyecto'}.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`)
       return
     }
     try {

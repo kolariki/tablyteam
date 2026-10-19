@@ -48,7 +48,7 @@ TARGETS: dict[str, dict[str, str]] = {
 }
 
 BRIEF_SYSTEM = """Sos un arquitecto de software y product manager senior. Recibís la transcripción de un debate entre agentes de IA
-con roles de equipo (AGENT ARENA) y tenés que convertirlo en una ESPECIFICACIÓN DE CONSTRUCCIÓN COMPLETA: el documento que otro
+con roles de equipo (TABLY TEAM) y tenés que convertirlo en una ESPECIFICACIÓN DE CONSTRUCCIÓN COMPLETA: el documento que otro
 modelo de IA va a usar para construir el producto de punta a punta, sin volver a preguntar.
 
 Reglas:
@@ -277,14 +277,14 @@ async def stream_brief(user: User, session_id: str, req: BriefRequest) -> AsyncI
     system = BRIEF_SYSTEM.format(language=cfg.get("language", "español"), howto=TARGETS[req.target]["howto"])
     user_msg = f"DEBATE A CONVERTIR EN BRIEF:\n\n{transcript}"
     header = (
-        f"<!-- Agent Arena · brief de construcción · sesión {session_id} · escrito por {req.model} · "
+        f"<!-- Tably Team · brief de construcción · sesión {session_id} · escrito por {req.model} · "
         f"para {TARGETS[req.target]['label']} · {time.strftime('%Y-%m-%d %H:%M')} -->\n\n"
     )
     yield header
     parts: list[str] = []
     result = CallResult()
     mock = MockContext("Arquitecto", [("x", "x")], cfg["topic"], script=_mock_brief(data, req.target))
-    with obs.session_trace(session_id, user.email, f"brief · {cfg.get('title') or cfg['topic']}"[:200], ["agent-arena", "brief", req.target], {"target": req.target}, {"session": session_id}):
+    with obs.session_trace(session_id, user.email, f"brief · {cfg.get('title') or cfg['topic']}"[:200], ["tablyteam", "brief", req.target], {"target": req.target}, {"session": session_id}):
         with obs.observation(as_type="generation", name=f"brief · {req.model}", model=req.model, input=[{"role": "system", "content": system}, {"role": "user", "content": user_msg}]) as gen:
             async for kind, delta in stream(req.provider, req.model, system, user_msg, temperature=0.4, max_tokens=16000, result=result, mock=mock, cred=cred):
                 if kind == "text":

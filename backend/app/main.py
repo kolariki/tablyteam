@@ -56,7 +56,7 @@ from .providers import PROVIDERS, Cred, available_models, list_models
 from .schemas import SessionConfig
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-app = FastAPI(title="Agent Arena", version="1.0.0", docs_url="/api/docs", redoc_url=None, openapi_url="/api/openapi.json")
+app = FastAPI(title="Tably Team", version="1.0.0", docs_url="/api/docs", redoc_url=None, openapi_url="/api/openapi.json")
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 
 MAX_CONCURRENT_JOBS = int(env("ARENA_MAX_JOBS_PER_USER", "3"))

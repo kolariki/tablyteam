@@ -144,7 +144,7 @@ export default function BriefExport({ onClose, onBuild, onOpenBuild }: { onClose
   const steps = [T('Leyendo la transcripción', 'Reading the transcript'), T('Rescatando las decisiones del equipo', 'Recovering the team decisions'), T('Resolviendo desacuerdos', 'Resolving disagreements'), T('Escribiendo la especificación', 'Writing the specification')]
   const stepIdx = Math.min(steps.length - 1, Math.floor(elapsed / 6))
   const prompt = useMemo(() => extractPrompt(text), [text])
-  const base = `agent-arena-${slug(config?.title || config?.topic || sessionId)}`
+  const base = `tablyteam-${slug(config?.title || config?.topic || sessionId)}`
 
   const generate = async (regenerate: boolean) => {
     setError(null)

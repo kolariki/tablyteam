@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
+import { gsap } from '../lib/anim'
 
 /**
  * The team at work, as a blurred looping scene behind the landing and the login: six roles (one colour each) around
@@ -27,10 +28,22 @@ export default function TeamBackdrop({ blur = 7, opacity = 0.5, className = '', 
   }), [])
   // the word goes around the table, then crosses to whoever is relevant: a loop of handoffs
   const passes = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 0], [1, 4], [2, 5], [0, 3]]
+  // the scene leans gently with the pointer and breathes on its own, so the blur never feels like a static image
+  const svgRef = useRef<SVGSVGElement>(null)
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const toX = gsap.quickTo(el, 'x', { duration: 1.4, ease: 'power3.out' })
+    const toY = gsap.quickTo(el, 'y', { duration: 1.4, ease: 'power3.out' })
+    const onMove = (e: MouseEvent) => { toX((e.clientX / window.innerWidth - 0.5) * -28); toY((e.clientY / window.innerHeight - 0.5) * -18) }
+    window.addEventListener('mousemove', onMove)
+    const breathe = gsap.to(el, { scale: 1.04, duration: 9, yoyo: true, repeat: -1, ease: 'sine.inOut', transformOrigin: '50% 50%' })
+    return () => { window.removeEventListener('mousemove', onMove); breathe.kill() }
+  }, [])
   const files = ['package.json', 'app/page.tsx', 'lib/weather.ts', 'components/Umbrella.tsx', 'styles/tokens.css', 'tests/forecast.test.ts']
   return (
     <div className={`pointer-events-none ${fixed ? 'fixed' : 'absolute'} inset-0 overflow-hidden ${className}`} aria-hidden style={{ filter: `blur(${blur}px)`, opacity }}>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid slice" className="h-full w-full">
         <defs>
           <radialGradient id="tb-glow" cx="0.5" cy="0.5" r="0.5">
             <stop offset="0" stopColor="#2F6B5D" stopOpacity="0.25" />

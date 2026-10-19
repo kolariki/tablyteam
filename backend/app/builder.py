@@ -129,7 +129,7 @@ def research_context(md: str) -> str:
     return f"\n\n===== {RESEARCH_PATH} (benchmark de apps de referencia: emulá los patrones marcados, evitá los señalados) =====\n{md[:12000]}\n" if md else ""
 
 
-REVIEW_SYSTEM = """Sos {name}, {role_label} del equipo que diseñó este producto en AGENT ARENA. Personalidad: {persona}
+REVIEW_SYSTEM = """Sos {name}, {role_label} del equipo que diseñó este producto en TABLY TEAM. Personalidad: {persona}
 Tu responsabilidad en el equipo: {mandate}.
 {craft}
 
@@ -489,7 +489,7 @@ class Build:
             else:
                 pending_user = f"(Estado actual del proyecto: {len(self.files)} archivos ya escritos:\n{files})\n\nPedido del usuario: {resume_with}\nAplicá los cambios entregando los archivos completos afectados."
         try:
-            with obs.session_trace(self.req.session_id, self.user.email, f"build · {self.title}"[:200], ["agent-arena", "build", self.req.provider], {"model": self.req.model}, {"session": self.req.session_id}):
+            with obs.session_trace(self.req.session_id, self.user.email, f"build · {self.title}"[:200], ["tablyteam", "build", self.req.provider], {"model": self.req.model}, {"session": self.req.session_id}):
                 while self.turns < MAX_TURNS and not self._stop.is_set():
                     self.turns += 1
                     text = await self._turn(system, pending_user)
@@ -823,7 +823,7 @@ class Build:
             self._activity("plan", "Armando el brief de referentes", RESEARCH_PATH)
             synth = await self._ask(rsch.SYNTH_SYSTEM, f"NUESTRO BRIEF:\n{self.brief[:8000]}\n\nNOTAS DE BENCHMARK:\n\n" + "\n\n---\n\n".join(notes), provider, model, cred, max_tokens=3500,
                                     mock_text="# Referentes\n| app | mejor | falta |\n|---|---|---|\n| Open-Meteo | API clara | UI |\n# Patrones a emular\n- Buscador arriba\n# Patrones a evitar\n- Densidad\n# Flujo recomendado\n1. Buscar ciudad 2. Ver pronóstico\n# Copy y tono\nDirecto.\n# Checklist\n1. Carga < 2 s")
-            md = f"<!-- Benchmark generado por Agent Arena el {rsch.stamp()}. Observación de productos públicos; nada copiado. -->\n\n{synth.strip()}\n\n---\n\n# Notas por referente\n\n" + "\n\n".join(notes) + "\n"
+            md = f"<!-- Benchmark generado por Tably Team el {rsch.stamp()}. Observación de productos públicos; nada copiado. -->\n\n{synth.strip()}\n\n---\n\n# Notas por referente\n\n" + "\n\n".join(notes) + "\n"
             self._write(RESEARCH_PATH, md)
             self.research_md = md
             if self.workdir:
@@ -1335,7 +1335,7 @@ def _mock_build_script(turn: int, title: str, brief: str) -> str:
 <file path="README.md">
 # {title}
 
-Proyecto generado por Agent Arena (modo simulado).
+Proyecto generado por Tably Team (modo simulado).
 
 ## Setup
 ```bash

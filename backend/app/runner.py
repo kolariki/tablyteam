@@ -1,5 +1,5 @@
 """
-Run the built product locally, from inside Agent Arena.
+Run the built product locally, from inside Tably Team.
 
 detect(root)  → the runnable services in the project (Next/Vite/Node, FastAPI/Flask/Django, docker compose)
 start(...)    → installs what's missing, launches the dev server on a free port, streams logs, waits until it answers

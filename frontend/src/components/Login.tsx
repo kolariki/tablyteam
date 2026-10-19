@@ -5,6 +5,7 @@ import { api, auth, type User } from '../lib/api'
 import TeamBackdrop from './TeamBackdrop'
 import { useT } from '../lib/i18n'
 import LogoMarquee from './LogoMarquee'
+import { MadeWith } from './Landing'
 import ProviderLogo from './ProviderLogo'
 
 export default function Login({ onAuthed, onBack, initialMode = 'login' }: { onAuthed: (u: User) => void; onBack: () => void; initialMode?: 'login' | 'register' }) {
@@ -108,7 +109,7 @@ export default function Login({ onAuthed, onBack, initialMode = 'login' }: { onA
           <button onClick={onBack} className="mb-6 text-sm text-ink-3 hover:text-ink">{T('← Volver a la presentación', '← Back to the intro')}</button>
           <div className="text-xs uppercase tracking-[0.5em] text-accent">{T('tu equipo que diseña y construye', 'your team that designs and builds')}</div>
           <h1 className="mt-2 text-6xl md:text-7xl tracking-tight">
-            Agent <em className="text-accent">Arena</em>
+            Tably <em className="text-accent">Team</em>
           </h1>
           <p className="mt-4 text-ink-2 text-lg leading-relaxed max-w-md">
             {T('Escribí tu idea, elegí qué IA ocupa cada rol y el equipo la debate, la diseña, la construye y la revisa. Vos aprobás cada paso.', 'Write your idea, choose which AI takes each role, and the team debates it, designs it, builds it and reviews it. You approve every step.')}
@@ -182,6 +183,7 @@ export default function Login({ onAuthed, onBack, initialMode = 'login' }: { onA
       </motion.div>
       </div>
       <LogoMarquee />
+      <MadeWith />
     </div>
   )
 }

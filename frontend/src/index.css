@@ -91,3 +91,7 @@ input[type="color"] { border: 1px solid var(--color-line); padding: 2px; }
 .md.md-compact p, .md.md-compact ul, .md.md-compact ol { margin: .3rem 0; }
 .md.md-compact > :first-child { margin-top: 0; } .md.md-compact > :last-child { margin-bottom: 0; }
 .md.md-compact code { font-size: .92em; }
+
+/* hero title: SplitText characters animate in 3D from below (see lib/anim.ts) */
+[data-hero-title] { perspective: 700px; }
+.hero-char { display: inline-block; transform-style: preserve-3d; will-change: transform, opacity; }

@@ -19,7 +19,7 @@ def configured() -> bool:
 
 
 def sender() -> str:
-    return env("MAIL_FROM", "") or env("SMTP_FROM", "") or "Agent Arena <onboarding@resend.dev>"
+    return env("MAIL_FROM", "") or env("SMTP_FROM", "") or "Tably Team <onboarding@resend.dev>"
 
 
 def send(to: str, subject: str, text: str, html: str | None = None) -> bool:
@@ -58,13 +58,13 @@ def send(to: str, subject: str, text: str, html: str | None = None) -> bool:
 
 
 def verification_email(name: str, code: str) -> tuple[str, str, str]:
-    subject = f"{code} es tu código de Agent Arena"
-    text = f"Hola {name},\n\nTu código para verificar el email es: {code}\n\nVence en 15 minutos. Si no creaste una cuenta en Agent Arena, ignorá este mensaje."
+    subject = f"{code} es tu código de Tably Team"
+    text = f"Hola {name},\n\nTu código para verificar el email es: {code}\n\nVence en 15 minutos. Si no creaste una cuenta en Tably Team, ignorá este mensaje."
     html = f"""<div style="font-family:Instrument Sans,system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#1E2622">
-  <div style="font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:#2F6B5D">Agent Arena</div>
+  <div style="font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:#2F6B5D">Tably Team</div>
   <h1 style="font-family:Newsreader,Georgia,serif;font-weight:500;font-size:28px;margin:12px 0 4px">Verificá tu email</h1>
   <p style="color:#46514B;font-size:15px">Hola {name}, este es tu código. Vence en 15 minutos.</p>
   <div style="font-family:JetBrains Mono,ui-monospace,monospace;font-size:36px;letter-spacing:.35em;font-weight:700;background:#E2EDE8;color:#1D4A40;border-radius:14px;padding:18px 0;text-align:center;margin:20px 0">{code}</div>
-  <p style="color:#717C76;font-size:12.5px">Si no creaste una cuenta en Agent Arena, ignorá este mensaje.</p>
+  <p style="color:#717C76;font-size:12.5px">Si no creaste una cuenta en Tably Team, ignorá este mensaje.</p>
 </div>"""
     return subject, text, html

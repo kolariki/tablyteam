@@ -18,7 +18,7 @@ export default function TopBar({ onNew, onRerun }: { onNew: () => void; onRerun?
     <div className="flex items-center gap-3 px-4 h-14 border-b border-line bg-surface backdrop-blur shrink-0">
       <div className="flex items-center gap-2">
         <img src="/icon.svg" alt="" aria-hidden className="h-7 w-7 rounded-lg shadow-sm" draggable={false} />
-        <span className={`serif text-lg ${compact ? 'hidden' : ''}`}>Agent <em className="text-accent">Arena</em></span>
+        <span className={`serif text-lg ${compact ? 'hidden' : ''}`}>Tably <em className="text-accent">Team</em></span>
       </div>
       <div className="flex items-center gap-2 ml-2">
         {s.recording ? null : s.status === 'paused' ? (
@@ -79,7 +79,7 @@ function ExportMenu({ btn }: { btn: string }) {
   const transcript = async () => {
     setOpen(false)
     const md = await api.transcript(sessionId!)
-    downloadBlob(new Blob([md], { type: 'text/markdown' }), `agent-arena-${slug(config?.title || config?.topic || sessionId!)}-transcripcion.md`)
+    downloadBlob(new Blob([md], { type: 'text/markdown' }), `tablyteam-${slug(config?.title || config?.topic || sessionId!)}-transcripcion.md`)
   }
   const item = 'w-full flex items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-surface-2'
   return (

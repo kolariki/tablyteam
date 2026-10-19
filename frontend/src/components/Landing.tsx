@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, ChevronLeft, ChevronRight, Play } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { heroIntro, sceneIn, scrollReveal, useGSAP } from '../lib/anim'
 import { useT } from '../lib/i18n'
 import LogoMarquee from './LogoMarquee'
 import TeamBackdrop from './TeamBackdrop'
@@ -85,8 +86,14 @@ const ease = (x: number) => Math.min(1, Math.max(0, x))
 
 export default function Landing({ onLogin, onSignup }: { onLogin: () => void; onSignup: () => void }) {
   const T = useT()
+  const page = useRef<HTMLDivElement>(null)
+  useGSAP(() => {
+    if (!page.current) return
+    heroIntro(page.current)
+    scrollReveal(page.current)
+  }, { scope: page })
   return (
-    <div className="relative h-full overflow-y-auto overflow-x-hidden scroll-thin arena-bg">
+    <div ref={page} className="relative h-full overflow-y-auto overflow-x-hidden scroll-thin arena-bg">
       {/* the team building, blurred, behind everything */}
       <TeamBackdrop fixed blur={8} opacity={0.45} />
       {/* everything else sits above the backdrop (positioned, so the fixed scene never paints over cards or buttons) */}
@@ -94,7 +101,7 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
       {/* header */}
       <header className="sticky top-0 z-20 flex items-center gap-3 px-6 h-14 border-b border-line bg-paper/80 backdrop-blur">
         <img src="/icon.svg" alt="" aria-hidden className="h-7 w-7 rounded-lg shadow-sm" draggable={false} />
-        <span className="serif text-lg">Agent <em className="text-accent">Arena</em></span>
+        <span className="serif text-lg">Tably <em className="text-accent">Team</em></span>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={onLogin} className="rounded-lg px-3 py-1.5 text-sm text-ink-2 hover:text-ink">{T('Iniciar sesión', 'Sign in')}</button>
           <button onClick={onSignup} className="rounded-lg bg-accent text-white px-3.5 py-1.5 text-sm font-medium hover:brightness-110">{T('Crear cuenta', 'Create account')}</button>
@@ -103,35 +110,35 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
 
       {/* hero */}
       <section className="max-w-6xl mx-auto px-6 pt-16 pb-10 grid lg:grid-cols-[1fr_1.15fr] gap-12 items-center">
-        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="text-xs uppercase tracking-[0.5em] text-accent">{T('tu equipo que diseña y construye', 'your team that designs and builds')}</div>
-          <h1 className="mt-3 text-6xl md:text-7xl leading-[0.95] tracking-tight">
+        <div>
+          <div data-hero-kicker className="text-xs uppercase tracking-[0.5em] text-accent">{T('tu equipo que diseña y construye', 'your team that designs and builds')}</div>
+          <h1 data-hero-title className="mt-3 text-6xl md:text-7xl leading-[0.95] tracking-tight opacity-0">
             {T('Escribí tu idea.', 'Write your idea.')} <em className="text-accent">{T('El equipo', 'The team')}</em> {T('la construye.', 'builds it.')}
           </h1>
-          <p className="mt-5 text-lg text-ink-2 leading-relaxed max-w-lg">
+          <p data-hero-copy className="mt-5 text-lg text-ink-2 leading-relaxed max-w-lg">
             {T('Describís la app que querés y elegís qué IA ocupa cada rol: CEO, CTO, ingeniería, producto, diseño y QA. El equipo debate tu idea, estudia apps de referencia, diseña las pantallas, escribe el código y lo revisa antes de entregarte un producto listo para correr. Vos aprobás cada paso.', 'Describe the app you want and choose which AI takes each role: CEO, CTO, engineering, product, design and QA. The team debates your idea, studies reference apps, designs the screens, writes the code and reviews it before handing you a product ready to run. You approve every step.')}
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <button onClick={onSignup} className="flex items-center gap-2 rounded-2xl bg-accent text-white px-6 py-3.5 font-semibold text-lg hover:brightness-110 transition">
+            <button data-hero-cta onClick={onSignup} className="flex items-center gap-2 rounded-2xl bg-accent text-white px-6 py-3.5 font-semibold text-lg hover:brightness-110 transition">
               {T('Empezar gratis', 'Start for free')} <ArrowRight size={18} />
             </button>
-            <a href="#demo" className="flex items-center gap-2 rounded-2xl border border-line bg-surface px-6 py-3.5 font-medium text-lg text-ink-2 hover:text-ink transition">
+            <a data-hero-cta href="#demo" className="flex items-center gap-2 rounded-2xl border border-line bg-surface px-6 py-3.5 font-medium text-lg text-ink-2 hover:text-ink transition">
               <Play size={16} /> {T('Ver cómo funciona', 'See how it works')}
             </a>
           </div>
           <div className="mt-8 flex items-center gap-2">
-            {['anthropic', 'openai', 'deepseek', 'gemini', 'kimi', 'xai', 'mistral'].map((id, i) => (
-              <motion.span key={id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + i * 0.06 }} className="w-10 h-10 rounded-full bg-surface border border-line flex items-center justify-center">
+            {['anthropic', 'openai', 'deepseek', 'gemini', 'kimi', 'xai', 'mistral'].map((id) => (
+              <span data-hero-logo key={id} className="w-10 h-10 rounded-full bg-surface border border-line flex items-center justify-center">
                 <ProviderLogo provider={id} size={22} />
-              </motion.span>
+              </span>
             ))}
-            <span className="ml-1 text-sm text-ink-3">+ Groq, OpenRouter, Ollama</span>
+            <span data-hero-logo className="ml-1 text-sm text-ink-3">+ Groq, OpenRouter, Ollama</span>
           </div>
-        </motion.div>
+        </div>
 
-        <motion.div id="demo" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.15 }}>
+        <div id="demo" data-hero-demo>
           <DemoBlock />
-        </motion.div>
+        </div>
       </section>
 
       {/* features */}
@@ -141,7 +148,7 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
           { title: T('Diseñan y construyen', 'They design and build'), text: T('El equipo estudia apps de referencia, el diseñador entrega sistema, pantallas y mockup, y recién cuando lo aprobás el constructor escribe el código con Claude Code o Codex, al nivel de un producto profesional.', 'The team studies reference apps, the designer delivers system, screens and mockup, and only once you approve it does the builder write the code with Claude Code or Codex, at the level of a professional product.') },
           { title: T('Vos decidís, ellos iteran', 'You decide, they iterate'), text: T('Pedís cambios en el diseño o en el código, el consejo revisa cada versión antes de producción y vuelve a debatir si hace falta. Todo con costo, tokens y confianza por agente, y tus API keys cifradas y solo tuyas.', 'You ask for changes in the design or the code, the council reviews every version before production and debates again if needed. All with cost, tokens and confidence per agent, and your API keys encrypted and yours alone.') },
         ].map((f) => (
-          <div key={f.title} className="panel rounded-2xl p-6">
+          <div key={f.title} data-scroll-reveal className="panel rounded-2xl p-6">
             <h3 className="text-2xl">{f.title}</h3>
             <p className="mt-2 text-[14.5px] text-ink-2 leading-relaxed">{f.text}</p>
           </div>
@@ -150,7 +157,18 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
 
       <LogoMarquee />
       </div>
+      <MadeWith />
     </div>
+  )
+}
+
+/** The "made with" seal: the TT mark and the name, bottom-right, linking to the site. */
+export function MadeWith() {
+  return (
+    <a href="https://tablyteam.com" target="_blank" rel="noreferrer" className="fixed bottom-4 right-4 z-30 flex items-center gap-2 rounded-full border border-line bg-surface/90 py-1.5 pl-1.5 pr-3.5 text-[12px] text-ink-2 shadow-md backdrop-blur transition hover:border-accent hover:text-ink">
+      <img src="/icon.svg" alt="" aria-hidden className="h-5 w-5 rounded-md" draggable={false} />
+      <span>Made with <b className="font-semibold text-ink">Tably Team</b></span>
+    </a>
   )
 }
 
@@ -164,12 +182,20 @@ function DemoBlock() {
 function Demo({ clock }: { clock: ReturnType<typeof useClock> }) {
   const T = useT()
   const s = SCENES[clock.scene]
+  const stage = useRef<HTMLDivElement>(null)
+  // every scene change: the new scene's pieces cascade in and its SVG lines draw themselves (after framer's slide)
+  useGSAP(() => {
+    const el = stage.current
+    if (!el) return
+    const t = setTimeout(() => sceneIn(el), 60)
+    return () => clearTimeout(t)
+  }, { dependencies: [clock.key], scope: stage })
   const btn = 'flex h-7 w-7 items-center justify-center rounded-full border border-line bg-surface text-ink-2 transition hover:border-accent hover:text-accent'
   return (
     <div className="panel overflow-hidden rounded-3xl shadow-xl">
       <div className="flex items-center gap-2 px-4 h-10 border-b border-line bg-surface-2">
         <span className="w-2.5 h-2.5 rounded-full bg-[#E6A19A]" /><span className="w-2.5 h-2.5 rounded-full bg-[#E9C97A]" /><span className="w-2.5 h-2.5 rounded-full bg-[#9FCDA8]" />
-        <span className="ml-3 text-[11px] font-mono text-ink-3">agent-arena · {T('app del clima', 'weather app')}</span>
+        <span className="ml-3 text-[11px] font-mono text-ink-3">tablyteam · {T('app del clima', 'weather app')}</span>
         <span className="ml-auto flex items-center gap-1.5 text-[11px] font-bold text-danger"><span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse" /> {T('EN VIVO', 'LIVE')}</span>
       </div>
       {/* what is happening on screen, with ‹ › to go back or skip ahead */}
@@ -194,7 +220,7 @@ function Demo({ clock }: { clock: ReturnType<typeof useClock> }) {
         </div>
         <button type="button" onClick={() => clock.jump(clock.scene + 1)} className={btn} aria-label={T('Paso siguiente', 'Next step')}><ChevronRight size={15} /></button>
       </div>
-      <div className="relative h-[400px] bg-surface">
+      <div ref={stage} className="relative h-[400px] bg-surface">
         <AnimatePresence mode="wait">
           {clock.key === 'idea' && <SceneIdea key="idea" t={clock.local} />}
           {clock.key === 'prompt' && <ScenePrompt key="prompt" t={clock.local} />}
@@ -225,12 +251,12 @@ function Cursor({ x, y, click }: { x: number; y: number; click?: boolean }) {
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return <div className="text-[11px] uppercase tracking-widest text-ink-3">{children}</div>
+  return <div data-r className="text-[11px] uppercase tracking-widest text-ink-3">{children}</div>
 }
 
 function Check({ on, children }: { on: boolean; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2 text-[13px]">
+    <div data-r className="flex items-center gap-2 text-[13px]">
       <span className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] transition-colors ${on ? 'border-accent bg-accent text-white' : 'border-line bg-surface'}`}>{on ? '✓' : ''}</span>
       <span>{children}</span>
     </div>
@@ -248,12 +274,12 @@ function SceneIdea({ t: raw }: { t: number }) {
   return (
     <motion.div {...sceneProps}>
       <Label>{T('Nombre de la app', 'App name')}</Label>
-      <div className="mt-1.5 rounded-xl border border-line bg-surface px-3 py-2 text-[14px]">{t > 200 ? T('Paraguas', 'Umbrella') : ''}</div>
+      <div data-r className="mt-1.5 rounded-xl border border-line bg-surface px-3 py-2 text-[14px]">{t > 200 ? T('Paraguas', 'Umbrella') : ''}</div>
       <div className="mt-4"><Label>{T('Qué querés construir', 'What you want to build')}</Label></div>
-      <div className="mt-1.5 min-h-[88px] rounded-xl border border-accent bg-surface px-4 py-3 text-[15px] leading-snug">
+      <div data-r className="mt-1.5 min-h-[88px] rounded-xl border border-accent bg-surface px-4 py-3 text-[15px] leading-snug">
         {idea.slice(0, typed)}{t > 400 && typed < idea.length && <span className="caret" />}
       </div>
-      <div className="mt-4 flex items-center gap-2 text-[12.5px] text-ink-3">
+      <div data-r className="mt-4 flex items-center gap-2 text-[12.5px] text-ink-3">
         <span>{T('Adjuntá lo que ayude:', 'Attach what helps:')}</span>
         {[T('documentos', 'documents'), T('carpeta', 'folder'), T('proyecto local', 'local project')].map((c, i) => (
           <span key={c} className={`rounded-lg border px-2.5 py-1 transition-colors ${i === 0 && attach ? 'border-accent bg-accent-soft text-accent' : 'border-line bg-surface-2'}`}>{c}</span>
@@ -279,7 +305,7 @@ function ScenePrompt({ t: raw }: { t: number }) {
   const lines = BRIEF_LINES.filter((_, i) => t > 4700 + i * 380)
   return (
     <motion.div {...sceneProps}>
-      <div className="flex items-center gap-3">
+      <div data-r className="flex items-center gap-3">
         <motion.div animate={{ scale: pressed ? 0.95 : 1 }} className="flex items-center gap-2 rounded-xl px-4 py-2 text-[13.5px] font-semibold text-white shadow-md" style={{ background: '#C0603F' }}>
           <ProviderLogo provider="anthropic" size={16} /> {T('Generar prompt engineering a mi texto', 'Prompt-engineer my text')}
         </motion.div>
@@ -325,7 +351,7 @@ function SceneTeam({ t: raw }: { t: number }) {
         {TEAM.map((m) => {
           const picked = on.includes(m)
           return (
-            <motion.div key={m.id} animate={{ scale: picked ? [1, 1.05, 1] : 1 }} className={`rounded-xl border px-3 py-2.5 transition-colors ${picked ? 'bg-surface' : 'border-line bg-surface-2/50'}`} style={{ borderColor: picked ? m.color : undefined }}>
+            <motion.div data-r key={m.id} animate={{ scale: picked ? [1, 1.05, 1] : 1 }} className={`rounded-xl border px-3 py-2.5 transition-colors ${picked ? 'bg-surface' : 'border-line bg-surface-2/50'}`} style={{ borderColor: picked ? m.color : undefined }}>
               <div className="flex items-center gap-2">
                 <ProviderLogo provider={m.provider} size={20} />
                 <span className="text-[13.5px] font-semibold" style={{ color: picked ? m.color : undefined }}>{T(m.name, m.name_en)}</span>
@@ -356,7 +382,7 @@ function SceneRefs({ t: raw }: { t: number }) {
   return (
     <motion.div {...sceneProps}>
       <Label>{T('Apps de referencia', 'Reference apps')}</Label>
-      <div className="mt-1.5 flex min-h-[44px] flex-wrap items-center gap-1.5 rounded-xl border border-accent bg-surface px-3 py-2">
+      <div data-r className="mt-1.5 flex min-h-[44px] flex-wrap items-center gap-1.5 rounded-xl border border-accent bg-surface px-3 py-2">
         {chips.map((c) => <motion.span key={c} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="rounded-full bg-accent-soft px-2.5 py-0.5 text-[12.5px] text-accent">{c} ×</motion.span>)}
         {chips.length < REFS.length && <span className="text-[13px] text-ink-4">{t > 300 ? <span className="caret" /> : T('ej. apple.com/weather, windy.com', 'e.g. apple.com/weather, windy.com')}</span>}
       </div>
@@ -415,7 +441,7 @@ function SceneArena({ t }: { t: number }) {
           <div className="serif text-[14px] leading-snug mt-1 text-ink-2">{T('Paraguas · app del clima', 'Umbrella · weather app')}</div>
         </div>
         <svg className="absolute inset-0 w-full h-full pointer-events-none">
-          {ARENA.map((a, i) => ARENA.slice(i + 1).map((b) => <line key={a.id + b.id} x1={P[a.id].x} y1={P[a.id].y} x2={P[b.id].x} y2={P[b.id].y} stroke="#1E2622" strokeOpacity="0.07" strokeDasharray="2 6" />))}
+          {ARENA.map((a, i) => ARENA.slice(i + 1).map((b) => <line data-draw key={a.id + b.id} x1={P[a.id].x} y1={P[a.id].y} x2={P[b.id].x} y2={P[b.id].y} stroke="#1E2622" strokeOpacity="0.12" />))}
           {TURNS.slice(0, idx).map((h) => (
             <line key={h.from + h.to} x1={P[h.from].x} y1={P[h.from].y} x2={P[h.to].x} y2={P[h.to].y} stroke={MEMBER[h.from].color} strokeOpacity="0.4" strokeWidth="2" />
           ))}
@@ -435,7 +461,7 @@ function SceneArena({ t }: { t: number }) {
           const on = m.id === turn.from && !handing
           const target = m.id === turn.to && handing
           return (
-            <div key={m.id} className="absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
+            <div data-r key={m.id} className="absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
               <motion.div
                 animate={{ scale: on ? 1.1 : target ? 1.04 : 1, boxShadow: on ? `0 0 0 7px ${m.color}22, 0 12px 28px -12px ${m.color}99` : '0 1px 2px rgba(30,38,34,.06)' }}
                 className="w-[72px] h-[72px] rounded-full bg-surface flex flex-col items-center justify-center"
@@ -496,7 +522,7 @@ function SceneBuild({ t }: { t: number }) {
               const isDone = i < done
               const isActive = i === active && !finished
               return (
-                <li key={s.key} className={`flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5 transition-colors ${isActive ? 'border-accent bg-accent-soft' : isDone ? 'border-line bg-surface' : 'border-dashed border-line bg-surface-2/50'}`}>
+                <li data-r key={s.key} className={`flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5 transition-colors ${isActive ? 'border-accent bg-accent-soft' : isDone ? 'border-line bg-surface' : 'border-dashed border-line bg-surface-2/50'}`}>
                   <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${isDone ? 'bg-accent text-white' : isActive ? 'bg-surface text-accent ring-2 ring-accent' : 'bg-surface-2 text-ink-3'}`}>{isDone ? '✓' : i + 1}</span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 text-[12.5px] font-semibold leading-tight">
@@ -513,7 +539,7 @@ function SceneBuild({ t }: { t: number }) {
           </ol>
         </div>
         <div className="relative flex items-center justify-center">
-          <motion.div animate={{ opacity: appOn ? 1 : 0.25, scale: appOn ? 1 : 0.96, filter: appOn ? 'blur(0px)' : 'blur(2px)' }} className="w-[190px] overflow-hidden rounded-[26px] border-[6px] border-ink/85 bg-[#EAF3FB] shadow-xl">
+          <motion.div data-r animate={{ opacity: appOn ? 1 : 0.25, scale: appOn ? 1 : 0.96, filter: appOn ? 'blur(0px)' : 'blur(2px)' }} className="w-[190px] overflow-hidden rounded-[26px] border-[6px] border-ink/85 bg-[#EAF3FB] shadow-xl">
             <div className="px-4 pt-4 text-[10px] text-ink-3">{T('Buenos Aires · hoy', 'Buenos Aires · today')}</div>
             <div className="px-4 font-mono text-[40px] font-bold leading-none text-ink">17°</div>
             <div className="mx-3 mt-2 rounded-xl bg-[#2F6B5D] px-3 py-2 text-[12px] font-semibold text-white">☔ {T('Llevá paraguas', 'Take an umbrella')} <span className="font-normal opacity-80">· 70 % 15–18 h</span></div>
@@ -592,7 +618,7 @@ function SceneAudit({ t }: { t: number }) {
           </div>
         </div>
         <div className="flex flex-col items-center justify-center">
-          <div className="relative h-[150px] w-[150px]">
+          <div data-r className="relative h-[150px] w-[150px]">
             <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
               <circle cx="60" cy="60" r="50" fill="none" stroke="#E6EAE7" strokeWidth="12" />
               <motion.circle cx="60" cy="60" r="50" fill="none" stroke="#9C7622" strokeWidth="12" strokeLinecap="round" strokeDasharray={2 * Math.PI * 50} initial={{ strokeDashoffset: 2 * Math.PI * 50 }} animate={{ strokeDashoffset: 2 * Math.PI * 50 * (1 - readiness / 100) }} transition={{ duration: 1.2, ease: 'easeOut' }} />
