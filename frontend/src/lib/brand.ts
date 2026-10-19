@@ -1,0 +1,85 @@
+export const GLYPH: Record<string, string> = {
+  anthropic: '✳',
+  openai: '◎',
+  deepseek: '🐋',
+  gemini: '✦',
+  xai: '𝕏',
+  groq: '⚡',
+  kimi: '☾',
+  mistral: '▲',
+  openrouter: '⇄',
+  ollama: '🦙',
+  mock: '◌',
+}
+
+/** Sober categorical palette (validated: light surface, CVD-safe with name labels) for agents that share a provider (e.g. all on "mock"). */
+export const PALETTE = ['#C0603F', '#17896A', '#3D5CC4', '#AD7D1A', '#9A57B8', '#6E8226', '#1689A8', '#C24B6E']
+
+export const BRAND_COLOR: Record<string, string> = {
+  anthropic: '#C0603F',
+  openai: '#17896A',
+  deepseek: '#3D5CC4',
+  gemini: '#9A57B8',
+  xai: '#4B5157',
+  groq: '#C24B6E',
+  kimi: '#1F3A68',
+  mistral: '#AD7D1A',
+  openrouter: '#1689A8',
+  ollama: '#6E8226',
+  mock: '#8A9299',
+  'claude-code': '#C0603F',
+  codex: '#17896A',
+}
+
+/** `label`/`desc` are Spanish; `label_en`/`desc_en` the English. Resolve with `pick(MODE_INFO[m], 'label')` from lib/i18n. */
+export const MODE_INFO = {
+  handoff: {
+    label: 'Handoff libre',
+    label_en: 'Free handoff',
+    desc: 'Cada agente decide a quién pasarle la palabra (o terminar). Se ve quién llama a quién y por qué.',
+    desc_en: 'Each agent decides who speaks next (or ends). You see who calls whom and why.',
+  },
+  debate: {
+    label: 'Debate',
+    label_en: 'Debate',
+    desc: 'Turnos fijos en ronda. Los agentes igual eligen a quién querrían llamar: se muestra como “deseo” vs. realidad.',
+    desc_en: 'Fixed turns in rounds. Agents still pick whom they would call: shown as “wish” vs. reality.',
+  },
+  roundtable: {
+    label: 'Mesa redonda',
+    label_en: 'Round table',
+    desc: 'Ronda ordenada para construir una solución en conjunto.',
+    desc_en: 'An ordered round to build a solution together.',
+  },
+  audit: {
+    label: 'Auditoría',
+    label_en: 'Audit',
+    desc: 'El equipo evalúa un proyecto existente.',
+    desc_en: 'The team evaluates an existing project.',
+  },
+  review: {
+    label: 'Consejo de revisión',
+    label_en: 'Review council',
+    desc: 'El equipo revisa el producto construido antes de salir a producción.',
+    desc_en: 'The team reviews the built product before it ships to production.',
+  },
+} as const
+
+
+/** Per-company card look: a soft brand-tinted surface + border, so a role card reads as "the Anthropic one" at a glance. */
+export const BRAND_THEME: Record<string, { tint: string; bg: string; border: string; accent: string; ink: string }> = {
+  anthropic: { tint: '#F2E4D6', bg: 'linear-gradient(135deg, #F8F2EA 0%, #F1E4D6 100%)', border: '#E6CDB8', accent: '#C0603F', ink: '#3B2A22' },
+  openai: { tint: '#E7ECEA', bg: 'linear-gradient(135deg, #F6F7F7 0%, #E9ECEB 100%)', border: '#D3D9D6', accent: '#0F0F0F', ink: '#1B1F1E' },
+  deepseek: { tint: '#DFE8FF', bg: 'linear-gradient(135deg, #EEF3FF 0%, #E1E9FF 100%)', border: '#C9D6FA', accent: '#4D6BFE', ink: '#1E2A5A' },
+  gemini: { tint: '#E9E6FB', bg: 'linear-gradient(135deg, #EDF2FF 0%, #F4EDFF 60%, #FDEFF4 100%)', border: '#D6D4F5', accent: '#5B7BFF', ink: '#2A2E5A' },
+  xai: { tint: '#E3E3E3', bg: 'linear-gradient(135deg, #F3F3F3 0%, #E6E6E6 100%)', border: '#CFCFCF', accent: '#111111', ink: '#161616' },
+  groq: { tint: '#FFE1D6', bg: 'linear-gradient(135deg, #FFF2EC 0%, #FFE4DA 100%)', border: '#F6C9B8', accent: '#F55036', ink: '#4A221A' },
+  kimi: { tint: '#DEE4F2', bg: 'linear-gradient(135deg, #EEF1F8 0%, #E2E7F3 100%)', border: '#C8D1E6', accent: '#1D2B53', ink: '#1D2B53' },
+  mistral: { tint: '#FFE6C2', bg: 'linear-gradient(135deg, #FFF5E6 0%, #FFE8C7 100%)', border: '#F3D59F', accent: '#FF7000', ink: '#4A2E0A' },
+  openrouter: { tint: '#E5E0FA', bg: 'linear-gradient(135deg, #F1EEFF 0%, #E7E3FB 100%)', border: '#D2CBF3', accent: '#6467F2', ink: '#2B2A5A' },
+  ollama: { tint: '#EAEAEA', bg: 'linear-gradient(135deg, #FAFAFA 0%, #ECECEC 100%)', border: '#D6D6D6', accent: '#222222', ink: '#1A1A1A' },
+  mock: { tint: '#E9EDEB', bg: 'linear-gradient(135deg, #F6F7F6 0%, #ECEFED 100%)', border: '#DCE2DE', accent: '#8A9299', ink: '#3A4440' },
+  'claude-code': { tint: '#F2E4D6', bg: 'linear-gradient(135deg, #F8F2EA 0%, #F1E4D6 100%)', border: '#E6CDB8', accent: '#C0603F', ink: '#3B2A22' },
+  codex: { tint: '#E7ECEA', bg: 'linear-gradient(135deg, #F6F7F7 0%, #E9ECEB 100%)', border: '#D3D9D6', accent: '#0F0F0F', ink: '#1B1F1E' },
+}
+export const brandTheme = (provider?: string | null) => BRAND_THEME[provider ?? ''] ?? BRAND_THEME.mock

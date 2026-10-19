@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Agent Arena · app icon. A pine-green squircle; inside, the arena ring with the agents (one per company colour)
+       sitting on it, the handoff arrow crossing the stage, and the spark of the verdict at the centre. Reads at 16 px
+       (ring + dots + spark) and at 1024 px (soft light, depth on the ring). -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3A7D6D"/>
+      <stop offset="0.55" stop-color="#2F6B5D"/>
+      <stop offset="1" stop-color="#1D4A40"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.42" r="0.6">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#DCEBE4" stop-opacity="0.85"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+    <filter id="dot" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#0B2A23" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- squircle -->
+  <path d="M256 12C60 12 12 60 12 256s48 244 244 244 244-48 244-244S452 12 256 12z" fill="url(#bg)"/>
+  <path d="M256 12C60 12 12 60 12 256s48 244 244 244 244-48 244-244S452 12 256 12z" fill="url(#glow)"/>
+  <!-- inner rim light -->
+  <path d="M256 30C76 30 30 76 30 256s46 226 226 226 226-46 226-226S436 30 256 30z" fill="none" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="2"/>
+
+  <!-- the arena: a tilted ring (stage seen from above) with its shadow -->
+  <ellipse cx="256" cy="282" rx="150" ry="62" fill="#0B2A23" fill-opacity="0.35" filter="url(#soft)"/>
+  <ellipse cx="256" cy="268" rx="150" ry="62" fill="none" stroke="url(#ring)" stroke-width="14" stroke-linecap="round"/>
+  <ellipse cx="256" cy="268" rx="150" ry="62" fill="none" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="2"/>
+
+  <!-- handoff: the word passing across the stage, from the orange agent to the blue one -->
+  <path d="M138 226 C 200 150, 312 150, 366 210" fill="none" stroke="#F2C9A0" stroke-width="12" stroke-linecap="round" stroke-dasharray="2 22"/>
+  <path d="M378 224 l-34 -2 l20 -28 z" fill="#F2C9A0"/>
+
+  <!-- the agents on the ring: one colour per company, like the arena -->
+  <g filter="url(#dot)">
+    <circle cx="118" cy="240" r="32" fill="#E07A5F"/>
+    <circle cx="256" cy="334" r="32" fill="#F2CC6A"/>
+    <circle cx="394" cy="240" r="32" fill="#7FB3E0"/>
+  </g>
+  <!-- highlights -->
+  <circle cx="108" cy="229" r="9" fill="#FFFFFF" fill-opacity="0.45"/>
+  <circle cx="246" cy="323" r="9" fill="#FFFFFF" fill-opacity="0.45"/>
+  <circle cx="384" cy="229" r="9" fill="#FFFFFF" fill-opacity="0.45"/>
+
+  <!-- the spark: the verdict, at the centre of the stage -->
+  <g transform="translate(256 196)">
+    <path d="M0 -58 C 6 -22, 22 -6, 58 0 C 22 6, 6 22, 0 58 C -6 22, -22 6, -58 0 C -22 -6, -6 -22, 0 -58 z" fill="#FFFFFF"/>
+    <path d="M0 -58 C 6 -22, 22 -6, 58 0 C 22 6, 6 22, 0 58 C -6 22, -22 6, -58 0 C -22 -6, -6 -22, 0 -58 z" fill="#FFF6D6" fill-opacity="0.9" transform="scale(0.62)"/>
+  </g>
+</svg>

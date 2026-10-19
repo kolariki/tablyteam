@@ -1,0 +1,19 @@
+# App: backend (FastAPI) + frontend (nginx). Langfuse va aparte: docker-compose.langfuse.yml
+services:
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      # dentro de docker, Langfuse local se alcanza por el host
+      LANGFUSE_BASE_URL: ${LANGFUSE_DOCKER_URL:-http://host.docker.internal:3000}
+    volumes:
+      - ./backend/data:/data
+    ports:
+      - "8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  frontend:
+    build: ./frontend
+    depends_on: [backend]
+    ports:
+      - "8080:80"

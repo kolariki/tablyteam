@@ -1,0 +1,319 @@
+"""Session exports.
+
+- transcript_markdown(): the debate as a readable Markdown file (no LLM).
+- stream_brief(): an LLM turns the debate into a build brief + a ready-to-paste prompt for the agent
+  that will build it (Claude Code, Cursor, a chat app…). Streamed, cached next to the session file.
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import re
+import time
+from pathlib import Path
+from typing import AsyncIterator, Literal
+
+from pydantic import BaseModel
+
+from . import observability as obs
+from .auth import User, user_dir
+from .pricing import cost_usd
+from . import keystore
+from .providers import PROVIDERS, CallResult, MockContext, stream
+from .roles import role_of
+
+Target = Literal["claude-code", "cursor", "chat", "generic"]
+
+TARGETS: dict[str, dict[str, str]] = {
+    "claude-code": {
+        "label": "Claude Code",
+        "howto": "El prompt final es para Claude Code (agente en terminal). Debe pedirle: guardar este documento como BRIEF.md en la raíz, "
+        "crear un CLAUDE.md con convenciones y comandos del proyecto, armar el plan con su lista de tareas, implementar etapa por etapa "
+        "verificando cada una (tests, correr la app), y frenar a preguntar sólo ante decisiones que el brief deja abiertas.",
+    },
+    "cursor": {
+        "label": "Cursor",
+        "howto": "El prompt final es para el agente de Cursor. Debe pedirle: guardar el documento como BRIEF.md, crear .cursor/rules/proyecto.mdc "
+        "con las convenciones clave, y avanzar etapa por etapa con commits pequeños.",
+    },
+    "chat": {
+        "label": "ChatGPT / Claude.ai",
+        "howto": "El prompt final es para pegar en una app de chat (ChatGPT, Claude.ai, Gemini). Debe pedir que primero devuelva la estructura "
+        "de carpetas y el plan, y luego el código archivo por archivo, empezando por la etapa 1.",
+    },
+    "generic": {
+        "label": "Cualquier agente",
+        "howto": "El prompt final debe ser agnóstico de herramienta: un agente de código cualquiera debe poder seguirlo.",
+    },
+}
+
+BRIEF_SYSTEM = """Sos un arquitecto de software y product manager senior. Recibís la transcripción de un debate entre agentes de IA
+con roles de equipo (AGENT ARENA) y tenés que convertirlo en una ESPECIFICACIÓN DE CONSTRUCCIÓN COMPLETA: el documento que otro
+modelo de IA va a usar para construir el producto de punta a punta, sin volver a preguntar.
+
+Reglas:
+- Basate en lo que se debatió y, sobre todo, en la RONDA DE CIERRE (decisiones finales de cada rol). Citá quién decidió qué
+  (nombre, rol, turno) y resolvé los desacuerdos con una recomendación concreta y su porqué.
+- Lo que el equipo no cerró, decidilo vos con criterio y marcálo **(supuesto)**. Nunca dejes un hueco: el constructor no puede preguntar.
+- Si el tema no es un producto de software, proponé el entregable construible más útil que materialice la conclusión y especificálo igual.
+- Sé exhaustivo y específico: nombres exactos de paquetes y versiones, comandos reales, tablas con columnas y tipos, endpoints con
+  request/response, pantallas con sus estados, variables de entorno con nombre exacto. Preferí tablas, listas y bloques de código.
+- Idioma: {language}. Extensión esperada: larga (2.500-5.000 palabras). No resumas.
+- {howto}
+
+Formato EXACTO (Markdown, con estos encabezados):
+# <Nombre del producto>
+> <qué es, para quién y qué problema resuelve, en 2 líneas>
+
+## 1. Resumen ejecutivo y métrica de éxito
+## 2. Decisiones del equipo
+(tabla: Decisión | Quién (rol) | Turno | Por qué · incluí las de la ronda de cierre)
+## 3. Desacuerdos y resolución
+## 4. Alcance del MVP
+(lista "Incluye" / lista "Fuera de alcance" / supuestos)
+## 5. Usuarios e historias de usuario
+(checklist "- [ ] US-NN · como … quiero … para …" con criterios de aceptación verificables)
+## 6. Stack y servicios externos
+(tabla: Componente | Tecnología/servicio | Versión | Por qué)
+### 6.1 Cuentas y API keys necesarias
+(tabla: Servicio | Para qué | Dónde se obtiene (URL) | Variable de entorno | Plan/costo estimado · si no hace falta ninguna, decilo)
+### 6.2 Variables de entorno
+(bloque ```env``` con TODAS las variables, valores de ejemplo y comentario)
+## 7. Arquitectura
+(diagrama ```mermaid```, módulos y responsabilidades, flujo de datos principal)
+## 8. Modelo de datos
+(bloque ```sql``` con DDL completo: tablas, tipos, claves, índices, constraints; más reglas de negocio sobre los datos)
+## 9. Contratos: API / acciones
+(tabla o lista por endpoint/acción: método, ruta, auth, request, response, errores)
+## 10. Pantallas y flujos de UI
+(por pantalla: propósito, elementos, estados vacío/carga/error/éxito, navegación; accesibilidad)
+## 11. Estructura del proyecto
+(bloque con el árbol de carpetas y archivos principales)
+## 12. Setup del entorno
+(comandos exactos en bloques ```bash``` para crear el proyecto, instalar dependencias, configurar servicios y correrlo local)
+## 13. Plan de construcción por etapas
+(Etapa N — objetivo · tickets "T-NN: …" con criterio de terminado · entregable verificable al final de cada etapa)
+## 14. Estrategia de pruebas y criterios de aceptación
+(qué se testea en cada nivel, casos críticos, comandos para correrlos, gate de release)
+## 15. Deploy y operación
+(entornos, CI/CD, hosting, dominios, observabilidad, backups, costos mensuales estimados)
+## 16. Riesgos, seguridad y preguntas abiertas
+## 17. Prompt para el agente constructor
+(un único bloque ```text``` autocontenido, listo para copiar y pegar: referencia este documento, indica por dónde empezar,
+qué verificar al final de cada etapa, cuándo frenar a preguntar y qué NO hacer)"""
+
+
+class BriefRequest(BaseModel):
+    provider: str
+    model: str
+    target: Target = "claude-code"
+    include_transcript: bool = True
+    regenerate: bool = False
+
+
+def session_path(user: User, session_id: str) -> Path:
+    folder = user_dir(user.id)
+    path = folder / f"{session_id}.json"
+    if path.resolve().parent != folder.resolve():
+        raise FileNotFoundError(session_id)
+    return path
+
+
+def _digest(data: dict) -> dict:
+    """Rebuild turns / votes / verdict from the event log."""
+    ev = data["events"]
+    turns = [e for e in ev if e["type"] == "turn.completed"]
+    votes = [e for e in ev if e["type"] == "vote"]
+    verdict = next((e for e in reversed(ev) if e["type"] == "verdict"), None)
+    expl = next((e for e in reversed(ev) if e["type"] == "verdict.explained"), None)
+    done = next((e for e in reversed(ev) if e["type"] == "session.completed"), None)
+    return {"turns": turns, "votes": votes, "verdict": verdict, "explanation": expl, "stats": (done or {}).get("stats")}
+
+
+def transcript_markdown(data: dict) -> str:
+    cfg = data["config"]
+    agents = {a["id"]: a for a in cfg["agents"]}
+    d = _digest(data)
+    name = lambda i: agents.get(i or "", {}).get("name", i or "—")  # noqa: E731
+    stance = {"agree": "🤝 de acuerdo", "disagree": "⚔️ en desacuerdo", "propose": "💡 propone", "neutral": "😐 neutral"}
+    started = data["events"][0]["ts"] if data["events"] else time.time()
+    out = [
+        f"# {cfg.get('title') or cfg['topic']}",
+        "",
+        f"> Sesión `{data['id']}` · {time.strftime('%Y-%m-%d %H:%M', time.localtime(started))} · modo **{cfg['mode']}** · {len(d['turns'])} turnos",
+        "",
+        "## Tema",
+        "",
+        cfg["topic"],
+        "",
+        "## Participantes",
+        "",
+        "| Agente | Rol | Proveedor | Modelo | Personalidad |",
+        "|---|---|---|---|---|",
+        *[f"| {a['name']} | {(role_of(a.get('role')) or {}).get('label', '—')} | {a.get('wanted_provider') or a['provider']} | `{a['model']}` | {a.get('persona', '').replace('|', '/')} |" for a in cfg["agents"]],
+        "",
+        "## Debate",
+        "",
+    ]
+    closing = [t for t in d["turns"] if t.get("phase") == "closing"]
+    for t in d["turns"]:
+        if t.get("phase") == "closing":
+            continue
+        resp = f" — responde a {name(t['responding_to'])}" if t.get("responding_to") else ""
+        conf = f" · confianza {t['confidence']}%" if t.get("confidence") is not None else ""
+        out += [f"### Turno {t['turn']} · {name(t['agent_id'])}{resp}", "", f"*{stance.get(t['stance'], t['stance'])}{conf}*", ""]
+        if t.get("thinking"):
+            out += [f"> 💭 {t['thinking']}", ""]
+        out += [t["message"], ""]
+        if t.get("next"):
+            out += [f"→ le pasa la palabra a **{name(t['next']) if t['next'] != 'end' else 'FIN'}**: _{t.get('reason', '')}_", ""]
+    if closing:
+        out += ["## Ronda de cierre: decisiones finales por rol", ""]
+        for t in closing:
+            a = agents.get(t["agent_id"], {})
+            r = role_of(a.get("role"))
+            out += [f"### {a.get('name', t['agent_id'])}" + (f" · {r['label']}" if r and r["label"].lower() != a.get("name", "").lower() else ""), ""]
+            if t.get("thinking"):
+                out += [f"> {t['thinking']}", ""]
+            out += [t["message"], ""]
+    if d["verdict"]:
+        v = d["verdict"]
+        out += ["## Veredicto", "", f"**Ganador: {name(v['winner'])}**" + (" (desempate por confianza)" if v.get("tie") else ""), ""]
+        out += ["| Agente | Votos |", "|---|---|", *[f"| {name(k)} | {n} |" for k, n in sorted(v["tally"].items(), key=lambda x: -x[1])], ""]
+        for vo in d["votes"]:
+            out.append(f"- {name(vo['voter'])} votó a **{name(vo.get('target'))}**: _{vo.get('reason', '')}_")
+        out.append("")
+        if e := d["explanation"]:
+            out += [f"### Por qué ganó: {e.get('headline', '')}", "", e.get("why", ""), "", f"**Momento clave:** {e.get('key_moment', '')}", "", f"**Al resto le faltó:** {e.get('others', '')}", ""]
+    if s := d["stats"]:
+        out += ["## Métricas", "", "| Agente | Turnos | Tokens salida | Latencia prom. | Costo |", "|---|---|---|---|---|"]
+        for k, a in s.get("agents", {}).items():
+            out.append(f"| {name(k)} | {a['turns']} | {a['output_tokens']} | {round((a.get('avg_latency_ms') or 0) / 1000, 1)} s | ${a['cost_usd']} |")
+        out += ["", f"Total: {s.get('total_tokens')} tokens · ${s.get('total_cost_usd')} · desacuerdo {round(100 * (s.get('disagreement_rate') or 0))}%", ""]
+    return "\n".join(out)
+
+
+def _mock_brief(data: dict, target: str) -> str:
+    cfg = data["config"]
+    agents = {a["id"]: a["name"] for a in cfg["agents"]}
+    d = _digest(data)
+    props = [t for t in d["turns"] if t["stance"] == "propose"] or d["turns"][:3]
+    dis = [t for t in d["turns"] if t["stance"] == "disagree"]
+    title = cfg.get("title") or cfg["topic"][:60]
+    rows = "\n".join(f"| {t['message'][:90].replace('|', '/')}… | {agents.get(t['agent_id'])} | {t['turn']} | {t.get('reason', '')[:60]} |" for t in props[:5])
+    disl = "\n".join(f"- **{agents.get(t['agent_id'])}** (turno {t['turn']}) objetó: {t['message'][:120]}… → **Recomendación (supuesto):** priorizar la opción más barata de validar." for t in dis[:3]) or "- No hubo desacuerdos fuertes."
+    return f"""# {title}
+> Brief generado en modo simulado (sin API) a partir del debate. Con un modelo real este documento es mucho más específico.
+
+## 1. Objetivo y métrica de éxito
+Materializar la conclusión del debate sobre: {cfg['topic']}
+Métrica **(supuesto)**: un prototipo usable por 5 personas en 2 semanas.
+
+## 2. Decisiones del debate
+| Decisión | Propuesta por | Turno | Por qué |
+|---|---|---|---|
+{rows}
+
+## 3. Desacuerdos y resolución recomendada
+{disl}
+
+## 4. Alcance del MVP
+**Incluye:** flujo principal, persistencia simple, una pantalla de resultados.
+**Fuera de alcance:** pagos, multi-idioma, app móvil.
+
+## 5. Requisitos funcionales
+- [ ] Flujo principal de punta a punta
+- [ ] Guardar y listar resultados
+- [ ] Exportar resultados
+
+## 6. Arquitectura y stack
+```mermaid
+flowchart LR
+  UI[Frontend React] --> API[API FastAPI]
+  API --> DB[(SQLite)]
+```
+
+## 7. Plan de implementación por etapas
+**Etapa 1:** esqueleto del proyecto y modelo de datos → la app arranca y persiste.
+**Etapa 2:** flujo principal → se puede completar de punta a punta.
+**Etapa 3:** pulido, exportación y tests → criterios de aceptación en verde.
+
+## 8. Criterios de aceptación
+- El flujo principal funciona sin errores en un entorno limpio.
+- Hay tests para la lógica central.
+
+## 9. Riesgos y preguntas abiertas
+- El debate no fijó presupuesto ni usuarios objetivo concretos.
+
+## 6.1 Cuentas y API keys necesarias
+| Servicio | Para qué | Dónde | Variable | Costo |
+|---|---|---|---|---|
+| (ninguno en modo simulado) | | | | |
+
+## 17. Prompt para el agente constructor
+```text
+Leé BRIEF.md (este documento). Es la especificación de un proyecto surgido de un debate entre agentes de IA.
+{TARGETS[target]['howto']}
+Empezá por la Etapa 1 y mostrame el plan antes de escribir código.
+```"""
+
+
+async def stream_brief(user: User, session_id: str, req: BriefRequest) -> AsyncIterator[str]:
+    path = session_path(user, session_id)
+    cache = path.with_suffix(f".brief.{req.target}.md")
+    data = json.loads(path.read_text())
+    transcript = transcript_markdown(data)
+    appendix = f"\n\n---\n\n<details>\n<summary>Anexo: transcripción completa del debate</summary>\n\n{transcript}\n\n</details>\n" if req.include_transcript else ""
+
+    if cache.exists() and not req.regenerate:
+        body = cache.read_text()
+        yield body + appendix
+        return
+
+    cred = keystore.creds(user.id).get(req.provider)
+    if req.provider not in PROVIDERS or not cred or cred.source == "none":
+        raise ValueError(f"Proveedor sin configurar: {req.provider}")
+    cfg = data["config"]
+    system = BRIEF_SYSTEM.format(language=cfg.get("language", "español"), howto=TARGETS[req.target]["howto"])
+    user_msg = f"DEBATE A CONVERTIR EN BRIEF:\n\n{transcript}"
+    header = (
+        f"<!-- Agent Arena · brief de construcción · sesión {session_id} · escrito por {req.model} · "
+        f"para {TARGETS[req.target]['label']} · {time.strftime('%Y-%m-%d %H:%M')} -->\n\n"
+    )
+    yield header
+    parts: list[str] = []
+    result = CallResult()
+    mock = MockContext("Arquitecto", [("x", "x")], cfg["topic"], script=_mock_brief(data, req.target))
+    with obs.session_trace(session_id, user.email, f"brief · {cfg.get('title') or cfg['topic']}"[:200], ["agent-arena", "brief", req.target], {"target": req.target}, {"session": session_id}):
+        with obs.observation(as_type="generation", name=f"brief · {req.model}", model=req.model, input=[{"role": "system", "content": system}, {"role": "user", "content": user_msg}]) as gen:
+            async for kind, delta in stream(req.provider, req.model, system, user_msg, temperature=0.4, max_tokens=16000, result=result, mock=mock, cred=cred):
+                if kind == "text":
+                    parts.append(delta)
+                    yield delta
+            obs.safe_update(gen, output="".join(parts), usage_details={"input": result.input_tokens, "output": result.output_tokens}, cost_details={"total": cost_usd(req.model, result.input_tokens, result.output_tokens)})
+        # a brief has 17 numbered sections; if the model stopped early (max_tokens, hiccup), ask it to continue where it left off
+        for _ in range(3):
+            text_so_far = "".join(parts)
+            sections = len(re.findall(r"^## \d+\.", text_so_far, re.M))
+            if not (result.truncated or sections < 12) or mock.script:
+                break
+            tail = text_so_far[-1500:]
+            cont = CallResult()
+            more: list[str] = []
+            with obs.observation(as_type="generation", name=f"brief · continuación · {req.model}", model=req.model, input=[{"role": "user", "content": "continuar"}]) as gen2:
+                async for kind, delta in stream(req.provider, req.model, system,
+                                                f"{user_msg}\n\n---\nYa escribiste este brief hasta acá (termina en):\n…{tail}\n\nCONTINUÁ EXACTAMENTE desde ese punto, sin repetir nada ni volver a empezar, hasta completar las 17 secciones.",
+                                                temperature=0.4, max_tokens=16000, result=cont, mock=mock, cred=cred):
+                    if kind == "text":
+                        more.append(delta)
+                        yield delta
+                obs.safe_update(gen2, output="".join(more), usage_details={"input": cont.input_tokens, "output": cont.output_tokens})
+            if not "".join(more).strip():
+                break
+            parts.append("\n" + "".join(more))
+            result.truncated = cont.truncated
+    await asyncio.to_thread(obs.flush)
+    body = header + "".join(parts).strip()
+    if len(re.findall(r"^## \d+\.", body, re.M)) >= 12 or mock.script:
+        cache.write_text(body)  # incomplete briefs are shown but not cached: "regenerar" starts clean
+    yield appendix

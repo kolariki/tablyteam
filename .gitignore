@@ -1,0 +1,18 @@
+.env
+node_modules/
+dist/
+.venv/
+__pycache__/
+backend/data/sessions/*.json
+.DS_Store
+backend/data/.secret
+backend/data/arena.db
+backend/data/builds/
+
+# local data: user accounts, sessions, builds, the downloaded skills catalog, generated scenes, encryption secret
+backend/data/
+*.log
+.env.*
+!.env.example
+frontend/.env*
+.claude/launch.json

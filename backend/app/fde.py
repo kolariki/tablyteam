@@ -1,0 +1,168 @@
+"""
+"Pedir un developer": a Forward Deployed Engineer closes the last mile of a product built here — production deploy,
+real integrations (payments, email, auth, an external data source), a human pre-launch review, extra hours.
+
+Fixed-price packages with a closed scope. The request is created from the project's real state, so the engineer
+receives a ticket with everything (brief summary, version and readiness, the council's open blockers, the services
+still missing, stack, where the code is) instead of "hi, it doesn't work".
+Payment / scheduling links are optional: set FDE_CHECKOUT_URL_<PACKAGE_ID_UPPER> (Stripe Payment Link) and
+FDE_BOOKING_URL (Cal.com) in .env; without them the request stays "new" and you follow up by email.
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+import time
+import uuid
+
+from .auth import _db
+
+with _db() as _c:
+    _c.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS fde_requests (
+            id TEXT PRIMARY KEY, user_id TEXT NOT NULL, session_id TEXT NOT NULL, build_id TEXT NOT NULL,
+            package TEXT NOT NULL, status TEXT NOT NULL, notes TEXT NOT NULL DEFAULT '', contact TEXT NOT NULL DEFAULT '',
+            ticket TEXT NOT NULL, created REAL NOT NULL, updated REAL NOT NULL);
+        CREATE INDEX IF NOT EXISTS fde_user ON fde_requests (user_id, created);
+        """
+    )
+
+PACKAGES: list[dict] = [
+    {
+        "id": "launch", "name": "Puesta en producción", "price_usd": 199, "eta": "48 h hábiles", "badge": "más pedido",
+        "tagline": "De «funciona en mi máquina» a una URL real, con todo configurado.",
+        "includes": ["Dominio y HTTPS", "Deploy en Vercel / Railway (o tu nube)", "Variables y secretos por entorno", "Base de datos gestionada + migraciones", "CI con tests en cada push", "Monitoreo y alertas básicas", "Acta de entrega con accesos y cómo operar"],
+        "excludes": ["Cambios de funcionalidad", "Integraciones nuevas (ver «Integración»)"],
+        "needs": ["Invitación como colaborador a tu cuenta de Vercel/Railway y GitHub", "Dominio (si ya lo tenés)"],
+    },
+    {
+        "id": "integration", "name": "Integración de un servicio", "price_usd": 149, "eta": "24–48 h hábiles", "badge": None,
+        "tagline": "Pagos, email, login social, una API externa real (datos, mapas, SMS…), analítica.",
+        "includes": ["Cuenta y keys configuradas (modo test y producción)", "Código de integración revisado y probado", "Webhooks / reintentos / errores manejados", "Documentación corta de cómo cambiarlo"],
+        "excludes": ["Más de un servicio por paquete", "Contratos o costos del proveedor"],
+        "needs": ["Acceso al servicio (Stripe, Resend, Google Cloud…) por invitación"],
+    },
+    {
+        "id": "review", "name": "Revisión humana pre-lanzamiento", "price_usd": 99, "eta": "24 h hábiles", "badge": None,
+        "tagline": "Un ingeniero senior repasa lo que marcó el consejo: seguridad, costos, lo que se rompe primero.",
+        "includes": ["Lectura del código y de los bloqueantes del consejo", "Llamada de 45 min", "Informe con prioridades y estimaciones", "Checklist de salida firmado"],
+        "excludes": ["Implementar los cambios (se cotizan aparte o con «Horas»)"],
+        "needs": ["Nada: trabaja sobre el proyecto tal como está en la plataforma"],
+    },
+    {
+        "id": "hours", "name": "Horas de developer", "price_usd": 75, "eta": "a coordinar", "badge": "por hora",
+        "tagline": "Para lo que no entra en un paquete: migraciones de datos, features puntuales, soporte de lanzamiento.",
+        "includes": ["Mínimo 4 h", "Reporte por hora con lo hecho", "Trabajo sobre el repo del proyecto, versionado"],
+        "excludes": [],
+        "needs": ["Alcance acordado por escrito antes de empezar"],
+    },
+]
+
+STATUSES = ["new", "paid", "scheduled", "in_progress", "delivered", "closed", "cancelled"]
+
+
+def package(pid: str) -> dict | None:
+    return next((p for p in PACKAGES if p["id"] == pid), None)
+
+
+def links(pid: str) -> dict:
+    return {"checkout_url": os.environ.get(f"FDE_CHECKOUT_URL_{pid.upper()}") or None, "booking_url": os.environ.get("FDE_BOOKING_URL") or None}
+
+
+# ------------------------------------------------------------------ ticket
+
+def _brief_summary(brief: str) -> str:
+    m = re.search(r"^##\s*1\.[^\n]*\n(.*?)(?=^##\s*2\.|\Z)", brief or "", re.S | re.M)
+    txt = (m.group(1) if m else (brief or "")).strip()
+    return re.sub(r"\n{3,}", "\n\n", txt)[:1500]
+
+
+def build_ticket(b, services: dict, stack: list[dict], pkg: dict, notes: str, contact: str) -> dict:
+    """Everything the engineer needs, from the project's real state."""
+    v = b.versions[-1] if b.versions else None
+    blockers = []
+    if v and v.get("council_session"):
+        pending = [r for r in (v.get("resolved") or []) if r.get("status") != "done"]
+        blockers += [{"severity": "bloqueante", "text": f"{r['text']} (pedido {r['id']}: {r['status']})", "role": ""} for r in pending]
+    for rv in reversed(b.reviews[-1:]):
+        for c in rv.get("changes") or []:
+            if c.get("severity") == "bloqueante":
+                blockers.append(c)
+    missing = [x for x in (services.get("missing") or [])]
+    groups = services.get("groups") or []
+    return {
+        "project": {"title": b.title, "session_id": b.req.session_id, "build_id": b.id, "files": len(b.files), "workdir": str(b.workdir) if b.workdir else None,
+                    "version": v["tag"] if v else None, "commit": v.get("commit") if v else None, "readiness": v.get("readiness") if v else None, "status": b.status},
+        "brief_summary": _brief_summary(b.brief),
+        "stack": [{"id": s["id"], "label": s["label"], "run": s["run"]} for s in stack],
+        "blockers": blockers[:20],
+        "services": [{"service": g["service"], "purpose": g.get("purpose", ""), "vars": [x["var"] for x in g.get("vars", [])], "configured": all(x.get("configured") for x in g.get("vars", []))} for g in groups],
+        "missing_vars": missing,
+        "deploys": [{"target": d.get("target"), "ok": d.get("ok"), "url": d.get("url")} for d in (b.deploys or [])[-3:]],
+        "app_run": {"status": b.app_run.status, "url": b.app_run.url} if getattr(b, "app_run", None) else None,
+        "package": {"id": pkg["id"], "name": pkg["name"], "price_usd": pkg["price_usd"], "eta": pkg["eta"]},
+        "notes": notes, "contact": contact,
+    }
+
+
+def ticket_markdown(t: dict) -> str:
+    p = t["project"]
+    lines = [f"# Pedido FDE · {t['package']['name']} (USD {t['package']['price_usd']}, {t['package']['eta']})", "",
+             f"**Proyecto:** {p['title']}  ", f"**Versión:** {p.get('version') or '—'} ({p.get('commit') or 'sin commit'}) · listo para prod: {str(p.get('readiness')) + '%' if p.get('readiness') is not None else 'sin revisar'}  ",
+             f"**Archivos:** {p['files']} · estado: {p['status']}  ", f"**Código:** build `{p['build_id']}` de la sesión `{p['session_id']}`" + (f" · carpeta `{p['workdir']}`" if p.get("workdir") else ""), "",
+             "## Lo que pide el cliente", t.get("notes") or "(sin detalle)", "", f"**Contacto:** {t.get('contact') or '—'}", "",
+             "## Resumen del brief", t.get("brief_summary") or "—", ""]
+    if t.get("stack"):
+        lines += ["## Stack detectado"] + [f"- {s['label']} → `{s['run']}`" for s in t["stack"]] + [""]
+    if t.get("blockers"):
+        lines += ["## Bloqueantes abiertos (consejo de revisión)"] + [f"- [{c.get('severity', 'bloqueante')}] {c['text']}" + (f" · {c['role']}" if c.get("role") else "") for c in t["blockers"]] + [""]
+    if t.get("services"):
+        lines += ["## Servicios externos"] + [f"- {'✅' if s['configured'] else '⬜'} {s['service']}" + (f" — {s['purpose']}" if s.get("purpose") else "") + f" ({', '.join(s['vars'])})" for s in t["services"]] + [""]
+    if t.get("missing_vars"):
+        lines += [f"**Variables sin cargar:** {', '.join(t['missing_vars'])}", ""]
+    if t.get("deploys"):
+        lines += ["## Deploys previos"] + [f"- {d['target']}: {'ok' if d['ok'] else 'falló'}" + (f" → {d['url']}" if d.get("url") else "") for d in t["deploys"]] + [""]
+    return "\n".join(lines)
+
+
+# ------------------------------------------------------------------ storage
+
+def _row(r) -> dict:
+    d = dict(r)
+    d["ticket"] = json.loads(d["ticket"])
+    return d
+
+
+def create_request(user_id: str, session_id: str, build_id: str, pkg: dict, ticket: dict, notes: str, contact: str) -> dict:
+    rid = "fde-" + uuid.uuid4().hex[:8]
+    now = time.time()
+    with _db() as c:
+        c.execute("INSERT INTO fde_requests (id, user_id, session_id, build_id, package, status, notes, contact, ticket, created, updated) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                  (rid, user_id, session_id, build_id, pkg["id"], "new", notes[:4000], contact[:300], json.dumps(ticket, ensure_ascii=False), now, now))
+    return get_request(user_id, rid)  # type: ignore[return-value]
+
+
+def list_requests(user_id: str, session_id: str | None = None) -> list[dict]:
+    with _db() as c:
+        if session_id:
+            rows = c.execute("SELECT * FROM fde_requests WHERE user_id=? AND session_id=? ORDER BY created DESC", (user_id, session_id))
+        else:
+            rows = c.execute("SELECT * FROM fde_requests WHERE user_id=? ORDER BY created DESC", (user_id,))
+        return [_row(r) for r in rows]
+
+
+def get_request(user_id: str, rid: str) -> dict | None:
+    with _db() as c:
+        r = c.execute("SELECT * FROM fde_requests WHERE user_id=? AND id=?", (user_id, rid)).fetchone()
+    return _row(r) if r else None
+
+
+def update_request(user_id: str, rid: str, status: str | None = None, notes: str | None = None) -> dict | None:
+    with _db() as c:
+        if status and status in STATUSES:
+            c.execute("UPDATE fde_requests SET status=?, updated=? WHERE user_id=? AND id=?", (status, time.time(), user_id, rid))
+        if notes is not None:
+            c.execute("UPDATE fde_requests SET notes=?, updated=? WHERE user_id=? AND id=?", (notes[:4000], time.time(), user_id, rid))
+    return get_request(user_id, rid)
