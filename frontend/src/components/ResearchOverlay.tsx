@@ -14,10 +14,31 @@ const RING = ['anthropic', 'openai', 'deepseek', 'gemini', 'xai', 'groq', 'kimi'
  * elsewhere would race the job) and shows what is happening: each reference visited, captured and analysed, the live
  * activity feed, the elapsed time. It leaves by itself when the council opens.
  */
-export default function ResearchOverlay() {
+export default function ResearchOverlay({ demo = false, onClose }: { demo?: boolean; onClose?: () => void } = {}) {
   const T = useT()
   const b = useBuild()
   const r = b.researching
+  // demo mode (#demo=research): a scripted run so the screen can be seen without a real benchmark; loops every ~24 s
+  useEffect(() => {
+    if (!demo) return
+    const refs = ['windy.com', 'accuweather.com', 'apple.com/weather']
+    const steps: { at: number; apply: () => void }[] = [
+      { at: 0, apply: () => useBuild.getState().set({ researching: { refs, started: Date.now(), visited: [], finished: false }, activity: [{ kind: 'search', label: 'Buscando referentes', path: '', ts: Date.now() }] }) },
+      { at: 2500, apply: () => useBuild.getState().set({ activity: [...useBuild.getState().activity, { kind: 'search', label: 'Entrando a windy.com', path: 'https://windy.com', ts: Date.now() }] }) },
+      { at: 5500, apply: () => useBuild.getState().set({ activity: [...useBuild.getState().activity, { kind: 'read', label: 'Analizando Windy', path: 'https://windy.com', ts: Date.now() }] }) },
+      { at: 8000, apply: () => { const st = useBuild.getState(); st.set({ researching: st.researching && { ...st.researching, visited: [{ name: 'windy.com', url: 'https://windy.com', ok: true }] }, activity: [...st.activity, { kind: 'search', label: 'Entrando a accuweather.com', path: 'https://accuweather.com', ts: Date.now() }] }) } },
+      { at: 11500, apply: () => { const st = useBuild.getState(); st.set({ researching: st.researching && { ...st.researching, visited: [...st.researching.visited, { name: 'accuweather.com', url: 'https://accuweather.com', ok: false }] }, activity: [...st.activity, { kind: 'search', label: 'Entrando a apple.com/weather', path: 'https://apple.com/weather', ts: Date.now() }] }) } },
+      { at: 14500, apply: () => { const st = useBuild.getState(); st.set({ activity: [...st.activity, { kind: 'read', label: 'Analizando Apple Weather', path: 'https://apple.com/weather', ts: Date.now() }] }) } },
+      { at: 17500, apply: () => { const st = useBuild.getState(); st.set({ researching: st.researching && { ...st.researching, visited: [...st.researching.visited, { name: 'apple.com/weather', url: 'https://apple.com/weather', ok: true }, { name: 'Yr.no', url: 'https://yr.no', ok: true }] }, activity: [...st.activity, { kind: 'plan', label: 'Armando el brief de referentes', path: 'research/REFERENCES.md', ts: Date.now() }] }) } },
+      { at: 21000, apply: () => { const st = useBuild.getState(); st.set({ researching: st.researching && { ...st.researching, finished: true } }) } },
+    ]
+    let timers: number[] = []
+    const run = () => { timers = steps.map((x) => window.setTimeout(x.apply, x.at)); timers.push(window.setTimeout(run, 24500)) }
+    run()
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose?.() }
+    window.addEventListener('keydown', onKey)
+    return () => { timers.forEach(clearTimeout); window.removeEventListener('keydown', onKey); useBuild.getState().set({ researching: null, activity: [] }) }
+  }, [demo]) // eslint-disable-line react-hooks/exhaustive-deps
   const [now, setNow] = useState(Date.now())
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000)
@@ -57,6 +78,7 @@ export default function ResearchOverlay() {
 
   return createPortal(
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.4 } }} className="fixed inset-0 z-[160] flex items-center justify-center bg-paper arena-bg p-6">
+      {demo && <button onClick={onClose} className="absolute right-5 top-5 flex h-9 items-center gap-2 rounded-full border border-line bg-surface px-3.5 text-sm text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent">{T('Demo · cerrar (Esc)', 'Demo · close (Esc)')}</button>}
       <div className="grid w-full max-w-4xl items-center gap-10 md:grid-cols-[auto_1fr]">
         {/* the orbit */}
         <div className="relative mx-auto" style={{ width: R * 2 + 56, height: R * 2 + 56 }}>

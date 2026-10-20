@@ -17,6 +17,7 @@ import TopBar from './components/TopBar'
 import { PauseModal, TeamModal } from './components/TeamModal'
 import Verdict from './components/Verdict'
 import VideoExport, { type VideoOptions } from './components/VideoExport'
+import ResearchOverlay from './components/ResearchOverlay'
 import { api, auth, connect, connectBuild, replay } from './lib/api'
 import { tr, useT } from './lib/i18n'
 import { downloadBlob, requestTabStream, slug, startRecording } from './lib/recorder'
@@ -434,6 +435,15 @@ function AppInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
 
+  // #demo=research: the research screen with a scripted run, to look at the UI without launching a real benchmark
+  const [demo, setDemo] = useState<string | null>(() => location.hash.match(/^#demo=(\w+)$/)?.[1] ?? null)
+  useEffect(() => {
+    const onHash = () => setDemo(location.hash.match(/^#demo=(\w+)$/)?.[1] ?? null)
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
+  const demoLayer = demo === 'research' ? <ResearchOverlay demo onClose={() => { history.replaceState(null, '', location.pathname); setDemo(null) }} /> : null
+
   const banner = <OfflineBanner />
   if (!authChecked) return <div className="h-full arena-bg">{banner}</div>
   if (!user) {
@@ -450,7 +460,7 @@ function AppInner() {
   }
   if (view === 'audit') return <>{banner}<AuditSetup onBack={() => useArena.getState().set({ view: 'setup' })} onStart={startAudit} /></>
   if (view === 'settings') return <>{banner}<Settings onBack={() => useArena.getState().set({ view: 'setup' })} /></>
-  if (view === 'setup') return <>{banner}<Setup key={user.id} user={user} onLogout={logout} onSettings={() => useArena.getState().set({ view: 'settings' })} onAudit={() => useArena.getState().set({ view: 'audit' })} onStart={start} onReplay={startReplay} onOpen={(id) => openSaved(id).catch((e) => toast.error(tr('No se pudo abrir', 'Could not open'), (e as Error).message))} /></>
+  if (view === 'setup') return <>{banner}{demoLayer}<Setup key={user.id} user={user} onLogout={logout} onSettings={() => useArena.getState().set({ view: 'settings' })} onAudit={() => useArena.getState().set({ view: 'audit' })} onStart={start} onReplay={startReplay} onOpen={(id) => openSaved(id).catch((e) => toast.error(tr('No se pudo abrir', 'Could not open'), (e as Error).message))} /></>
 
   const exporter = (
     <>
