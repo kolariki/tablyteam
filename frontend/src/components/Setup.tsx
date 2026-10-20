@@ -295,13 +295,9 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
             </div>
           </div>
         </div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="text-xs uppercase tracking-[0.5em] text-accent">{T('tu equipo que diseña y construye', 'your team that designs and builds')}</div>
-          <h1 className="mt-2 text-5xl md:text-7xl font-normal tracking-tight">
-            Tably <em className="text-accent">Team</em>
-          </h1>
-          <p className="mt-3 text-ink-3 max-w-2xl">{T('Escribí tu idea y armá el equipo: un rol por IA, con su prompt y sus skills. Debaten, estudian apps de referencia, diseñan las pantallas, escriben el código y lo revisan antes de entregarte la app lista para correr.', 'Write your idea and build the team: one role per AI, with its prompt and skills. They debate, study reference apps, design the screens, write the code and review it before handing you the app ready to run.')}</p>
-          <div className="mt-4 flex flex-wrap gap-2 text-[11px]">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-8">
+          {/* no hero on the home: the brand is in the header, the companies' row is the first thing */}
+          <div className="flex flex-wrap gap-2 text-[11px]">
             {providers.map((p) => (
               <ProviderChip key={p.id} provider={p} active={connecting === p.id} onSettings={onSettings} onOpen={() => setConnecting(p.id)} />
             ))}

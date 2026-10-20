@@ -10,12 +10,13 @@ let lang: Lang = (() => {
   try {
     const v = localStorage.getItem(KEY)
     if (v === 'en' || v === 'es') return v
-    return navigator.language?.toLowerCase().startsWith('en') ? 'en' : 'es'
+    return 'es'  // Spanish unless the person picked English in the header (never inferred from the browser)
   } catch {
     return 'es'
   }
 })()
 const subs = new Set<() => void>()
+try { document.documentElement.lang = lang } catch { /* ssr */ }
 
 export function getLang(): Lang {
   return lang
