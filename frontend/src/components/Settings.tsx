@@ -66,7 +66,30 @@ export default function Settings({ onBack }: { onBack: () => void }) {
           ))}
         </div>
         <DeploySettings />
+        <LangfuseSettings />
       </div>
+    </div>
+  )
+}
+
+/** Tracing: whether every model call lands in Langfuse, and where. Configured in the backend .env (LANGFUSE_*). */
+function LangfuseSettings() {
+  const T = useT()
+  const [h, setH] = useState<{ langfuse: boolean; langfuse_host: string | null } | null>(null)
+  useEffect(() => { api.health().then(setH).catch(() => setH({ langfuse: false, langfuse_host: null })) }, [])
+  return (
+    <div className="mt-8">
+      <h2 className="text-2xl">{T('Trazas · Langfuse', 'Tracing · Langfuse')}</h2>
+      <p className="mt-1 text-[13px] text-ink-2">{T('Cada llamada a un modelo (debates, briefs, construcciones, revisiones) queda registrada con latencia, tokens y costo.', 'Every model call (debates, briefs, builds, reviews) is recorded with latency, tokens and cost.')}</p>
+      <div className="panel mt-3 flex items-center gap-4 rounded-2xl p-5">
+        <span className={`flex h-10 w-10 items-center justify-center rounded-full text-[18px] ${h?.langfuse ? 'bg-ok/15 text-ok' : 'bg-surface-2 text-ink-3'}`}>📈</span>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold">{h === null ? '…' : h.langfuse ? T('Conectado', 'Connected') : T('Desactivado', 'Off')}</div>
+          <div className="truncate font-mono text-[12px] text-ink-3">{h?.langfuse_host || T('sin servidor configurado', 'no server configured')}</div>
+        </div>
+        {h?.langfuse && h.langfuse_host && <a href={h.langfuse_host} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm hover:bg-surface-2"><ExternalLink size={14} /> {T('Abrir', 'Open')}</a>}
+      </div>
+      <p className="mt-2 text-[12px] text-ink-4">{T('Se configura en el .env del backend con LANGFUSE_HOST, LANGFUSE_PUBLIC_KEY y LANGFUSE_SECRET_KEY; también podés levantarlo local con docker-compose.langfuse.yml.', 'Configured in the backend .env with LANGFUSE_HOST, LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY; you can also run it locally with docker-compose.langfuse.yml.')}</p>
     </div>
   )
 }

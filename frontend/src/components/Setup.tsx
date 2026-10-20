@@ -62,7 +62,6 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   const [providers, setProviders] = useState<Provider[]>([])
   const [roles, setRoles] = useState<{ groups: string[]; groups_en?: string[]; roles: Role[] }>({ groups: [], roles: [] })
   const [presets, setPresets] = useState<Preset[]>([])
-  const [health, setHealth] = useState<{ langfuse: boolean; langfuse_host: string | null } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [launching, setLaunching] = useState(false) // intro animation (button → arena)
@@ -91,7 +90,6 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
       if (p[0]) applyPreset(p[0])
     }).catch(() => {})
     api.roles().then(setRoles).catch(() => {})
-    api.health().then(setHealth).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -300,11 +298,6 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
             {providers.map((p) => (
               <ProviderChip key={p.id} provider={p} active={connecting === p.id} onSettings={onSettings} onOpen={() => setConnecting(p.id)} />
             ))}
-            {health && (
-              <span className={`rounded-full border px-2.5 py-1 font-mono ${health.langfuse ? 'border-ok/40 text-ok' : 'border-line text-ink-4'}`}>
-                📈 Langfuse {health.langfuse ? '✓' : T('· desactivado', '· off')}
-              </span>
-            )}
           </div>
           {/* the chip being connected travels down here, alone and centred, so the others keep their place */}
           <AnimatePresence>
