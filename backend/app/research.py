@@ -155,8 +155,14 @@ def capture(url: str) -> Capture:
         cap.error = "No se encontró Chrome/Chromium para sacar capturas (instalá Google Chrome o definí ARENA_CHROME)."
         return cap
     with tempfile.TemporaryDirectory(prefix="arena-ref-") as tmp:
-        base = [chrome, "--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars", "--no-first-run", "--disable-extensions",
-                f"--user-data-dir={tmp}/profile", "--virtual-time-budget=6000", "--timeout=20000", "--lang=es"]
+        # software WebGL (SwiftShader) instead of --disable-gpu: map/canvas apps such as Windy refuse to render without
+        # WebGL and show an error banner, which is all the vision model would see. A real desktop UA and no automation
+        # flag keep bot walls quieter; a longer virtual-time budget lets heavy front-ends finish their first paint.
+        base = [chrome, "--headless=new", "--no-sandbox", "--hide-scrollbars", "--no-first-run", "--disable-extensions",
+                "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--enable-webgl",
+                "--disable-blink-features=AutomationControlled",
+                "--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+                f"--user-data-dir={tmp}/profile", "--virtual-time-budget=15000", "--timeout=30000", "--lang=es"]
         d = Path(tmp) / "desktop.png"
         m = Path(tmp) / "mobile.png"
         code, _ = _run(base + ["--window-size=1440,1100", f"--screenshot={d}", url], SHOT_TIMEOUT)

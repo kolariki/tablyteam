@@ -286,7 +286,7 @@ class Build:
             "activity": self.activity[-60:], "todos": self.todos,
             "app_run": self.app_run.state() if self.app_run else None,
             "design_review": self.status == "design_review", "design_rounds": self.design_rounds,
-            "research": self.research_refs, "fees": self.fees, "fees_usd": round(sum(float(f.get("usd") or 0) for f in self.fees), 2), "fees_due_usd": round(sum(float(f.get("usd") or 0) for f in self.fees if not f.get("paid")), 2),
+            "research": self.research_refs, "references": self.req.references, "deep_analysis": self.req.deep_analysis, "fees": self.fees, "fees_usd": round(sum(float(f.get("usd") or 0) for f in self.fees), 2), "fees_due_usd": round(sum(float(f.get("usd") or 0) for f in self.fees if not f.get("paid")), 2),
             "council_sessions": self.council_sessions, "council": self.req.council,
             "versions": self.versions, "version": len(self.versions), "pending_council": self.pending_council(),
             "mode": self.mode, "audit_report": self.audit_report, "deploys": self.deploys,
@@ -573,7 +573,9 @@ class Build:
                       f"(y los archivos incompletos), regenerá `{PREVIEW_PATH}` si cambió algo visible, y resumí qué hiciste y cómo correrlo.")
         else:
             prompt = (f"Pedido de cambios sobre el proyecto de este directorio (ver BRIEF.md):\n{resume_with}\n\nAplicá TODOS los cambios con archivos completos, "
-                      f"actualizá README/NOTES si corresponde, regenerá `{PREVIEW_PATH}` para reflejarlos, y resumí qué cambió y cómo verificarlo.")
+                      f"actualizá README/NOTES si corresponde, regenerá `{PREVIEW_PATH}` para reflejarlos, y resumí qué cambió y cómo verificarlo."
+                      + (f"\n\nREFERENTES: leé {RESEARCH_PATH} (benchmark de apps de referencia que eligió el usuario) y llevá las pantallas y flujos tocados al nivel de esos productos: emulá los patrones marcados, evitá los señalados." if (self.workdir / RESEARCH_PATH).exists() else "")
+                      + (REA_PROMPT if self.req.deep_analysis else ""))
         self.turns += 1
         self.emit("turn.started", turn=self.turns, phase="build")
         buf: list[str] = []
@@ -782,7 +784,9 @@ class Build:
             url = rsch.normalize_reference(r)
             refs.append({"name": r.strip()[:60], "url": url, "why": ""} if url else {"name": r.strip()[:60], "url": None, "why": ""})
         named_only = [r["name"] for r in refs if not r["url"]]
-        refs = [r for r in refs if r["url"]]
+        done_urls = {(r.get("url") or "").rstrip("/").lower() for r in self.research_refs if r.get("ok")}
+        refs = [r for r in refs if r["url"] and r["url"].rstrip("/").lower() not in done_urls]  # already benchmarked: keep its notes
+        shot_base = len(self.research_refs)
         if not refs or named_only:
             # the user's list is respected as is: the team only proposes references when nothing was given, and
             # otherwise just resolves the public URL of apps the user typed by name
@@ -815,7 +819,7 @@ class Build:
                 break
             self._activity("search", f"Entrando a {ref['name'] or ref['url']}", ref["url"])
             cap = await rsch.capture_async(ref["url"])
-            shots = rsch.save_shots(self.workdir, i, cap)
+            shots = rsch.save_shots(self.workdir, shot_base + i, cap)
             entry = {"name": ref["name"], "url": ref["url"], "why": ref.get("why", ""), "ok": cap.ok, "error": cap.error, "shots": shots, "title": cap.title}
             self.research_refs.append(entry)
             self.emit("research.reference", **entry)
@@ -1065,6 +1069,10 @@ class Build:
             prior = "\n\nÍTEMS PEDIDOS EN LA RONDA ANTERIOR (verificá si el constructor los resolvió):\n" + "\n".join(f"- [{r['id']}] [{r.get('severity', 'mejora')}] {r['text'][:220]}" for r in prior_requests)
         prio = (self.council_priorities or "").strip()[:2000]
         self.council_priorities = ""
+        if self.req.references and self.research_md:
+            prior += ("\n\nREFERENTES ELEGIDOS POR EL USUARIO: " + ", ".join(self.req.references[:8]) + f". Sus notas están en {RESEARCH_PATH} (arriba). "
+                      "Cada rol compara el proyecto contra esos referentes desde su área (Diseño y Product: layout, jerarquía, interacciones, estados; Head of Eng y CTO: arquitectura y datos) "
+                      "y pide como cambios CONCRETOS, con pantalla y archivo, lo que haya que emular para estar a ese nivel. No basta con decir que está bien: la vara son los referentes.")
         if prio:
             prior += f"\n\nPRIORIDADES DEL USUARIO PARA ESTA RONDA (tratarlas primero):\n{prio}"
         cfg = SessionConfig(
@@ -1090,6 +1098,8 @@ class Build:
         text = "CAMBIOS PEDIDOS POR EL CONSEJO DE REVISIÓN (ronda {r}):\n".format(r=len(self.council_sessions)) + "\n".join(
             f"- [{c.get('severity', 'mejora')}]{(' [' + c['role'] + ']') if c.get('role') else ''} {c['text']}" for c in changes if c.get("text"))
         text += "\n\nAplicá TODOS los cambios con archivos completos (respetando el estilo y la estructura existentes), primero los bloqueantes, actualizá README/NOTES si corresponde y, al terminar, emití <done>."
+        if self.req.references and self.research_md:
+            text += f"\n\nREFERENTES del usuario: {', '.join(self.req.references[:8])} (notas en {RESEARCH_PATH}). Los cambios de UI y flujo tienen que dejar el producto al nivel de esos referentes."
         self.status = "running"
         self._stop = asyncio.Event()
         self.chat.append({"role": "user", "text": text, "ts": time.time()})
@@ -1330,6 +1340,8 @@ def rehydrate(user: User, session_id: str, build_id: str, cred: Cred, team: list
     b.council_sessions = d.get("council_sessions", [])
     b.versions = d.get("versions", [])
     b.req.council = bool(d.get("council", True))
+    b.req.references = [r for r in (d.get("references") or []) if isinstance(r, str)]
+    b.req.deep_analysis = bool(d.get("deep_analysis", False))
     b.stages = d.get("stages", [])
     b.chat = d.get("chat", [])
     b.events = d.get("events", [])
