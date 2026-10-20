@@ -113,6 +113,8 @@ export const api = {
   renameSession: (id: string, title: string) => j(authed(`/api/sessions/${id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title }) })),
   engines: () => j<EngineStatus[]>(authed('/api/engines')),
   buildDesignApprove: (id: string, session_id?: string | null) => j<{ ok: boolean }>(post(`/api/builds/${id}/design/approve`, { session_id })),
+  designSummary: (sessionId: string, id: string, lang: string, refresh = false) => j<{ text: string | null; reason?: string; model?: string; ts?: number }>(authed(`/api/sessions/${sessionId}/builds/${id}/design/summary?lang=${lang}${refresh ? '&refresh=true' : ''}`)),
+  designRequest: (id: string, text: string, session_id?: string | null) => j<{ ok: boolean; mode: 'redo' | 'queued' | 'resumed' }>(post(`/api/builds/${id}/design/request`, { text, session_id })),
   buildDesignRedo: (id: string, feedback: string, session_id?: string | null) => j<{ ok: boolean }>(post(`/api/builds/${id}/design/redo`, { feedback, session_id })),
   startBuild: (session_id: string, provider: string, model: string, target: string, review_rounds = 0, priorities = '', design = true, opts: { research?: boolean; references?: string[]; deep_analysis?: boolean } = {}) =>
     j<{ id: string }>(post('/api/builds', { session_id, provider, model, target, review_rounds, priorities, design, research: opts.research ?? false, references: opts.references ?? [], deep_analysis: opts.deep_analysis ?? false })),

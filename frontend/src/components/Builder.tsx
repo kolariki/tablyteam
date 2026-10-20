@@ -19,6 +19,7 @@ import CouncilLaunch from './CouncilLaunch'
 import FdeModal from './FdeModal'
 import { useArena } from '../store'
 import CodeEditor from './CodeEditor'
+import DesignPanel from './DesignPanel'
 import { useEditorTheme } from '../lib/editorThemes'
 
 /** Header buttons share the home page's language: pills that lift on hover. */
@@ -30,7 +31,7 @@ type BuildState = ReturnType<typeof useBuild.getState>
 /** The panes the rail can open, in order, with when each one is still empty. */
 const PANES: { id: BuildState['pane']; icon: typeof FileCode2; es: string; en: string; off: (b: BuildState) => boolean }[] = [
   { id: 'code', icon: FileCode2, es: 'Código', en: 'Code', off: () => false },
-  { id: 'design', icon: Palette, es: 'Diseño', en: 'Design', off: (b) => !b.designHtml },
+  { id: 'design', icon: Palette, es: 'Diseño', en: 'Design', off: () => false },
   { id: 'preview', icon: Eye, es: 'Vista previa', en: 'Preview', off: (b) => !b.previewHtml },
   { id: 'app', icon: MonitorPlay, es: 'App real', en: 'Real app', off: (b) => Object.keys(b.files).length === 0 },
   { id: 'versions', icon: GitBranch, es: 'Versiones', en: 'Versions', off: (b) => b.versions.length === 0 },
@@ -426,7 +427,7 @@ export default function Builder({ onBack }: { onBack: () => void }) {
                 ) : b.pane === 'versions' ? (
                   <span className="ml-auto text-[11px] text-ink-3">{T('qué cambió en cada iteración y qué tan lista está', 'what changed in each iteration and how ready it is')}</span>
                 ) : b.pane === 'design' ? (
-                  <span className="ml-auto text-[11px] text-ink-3">design/mockup.html · {T('lo que la UI debe reproducir', 'what the UI must reproduce')}</span>
+                  <span className="ml-auto text-[11px] text-ink-3">{T('qué tiene el diseño y pedidos al diseñador', 'what the design has and requests to the designer')}</span>
                 ) : b.pane === 'report' ? (
                   <div className="ml-auto flex items-center gap-1">
                     <button onClick={() => b.auditReport && downloadBlob(new Blob([b.auditReport], { type: 'text/markdown' }), `informe-auditoria-${b.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.md`)} className={PBTN}><Download size={12} /> {T('descargar .md', 'download .md')}</button>
@@ -441,13 +442,8 @@ export default function Builder({ onBack }: { onBack: () => void }) {
               </div>
               <AnimatePresence mode="wait" initial={false}>
                 <motion.div key={b.pane} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -6 }} transition={{ duration: 0.18, ease: 'easeOut' }} className="flex min-h-0 flex-1 flex-col">
-          {b.pane === 'design' && b.designHtml ? (
-                <div className="flex-1 min-h-0 p-3">
-                  <div className="h-full rounded-xl border border-line bg-surface overflow-hidden shadow-sm">
-                    <div className="flex items-center gap-1.5 px-3 h-7 border-b border-line bg-surface-2/70"><span className="w-2 h-2 rounded-full bg-[#E6A19A]" /><span className="w-2 h-2 rounded-full bg-[#E9C97A]" /><span className="w-2 h-2 rounded-full bg-[#9FCDA8]" /><span className="ml-2 text-[10px] font-mono text-ink-3">design/mockup.html · {T('maqueta hi-fi del Product Designer', 'hi-fi mockup by the Product Designer')}</span><button onClick={() => useBuild.getState().set({ selected: 'design/DESIGN.md', pane: 'code' })} className="ml-auto text-[11px] text-accent hover:underline">{T('ver DESIGN.md', 'view DESIGN.md')}</button></div>
-                    <iframe title={T('Diseño', 'Design')} sandbox="allow-scripts allow-forms allow-modals allow-popups" srcDoc={b.designHtml} className="w-full h-[calc(100%-28px)] bg-white" />
-                  </div>
-                </div>
+          {b.pane === 'design' ? (
+                <DesignPanel />
               ) : b.pane === 'versions' ? (
                 <VersionsPanel />
               ) : b.pane === 'app' ? (

@@ -22,6 +22,8 @@ import asyncio
 from pathlib import Path
 import copy
 import json
+import time
+import hashlib
 import logging
 import re
 
@@ -43,6 +45,7 @@ from .local_engine import ENGINES, engine_status, is_engine, snapshot_dir
 from . import deploy as deploymod
 from . import service_guide
 from . import billing
+from . import providers
 from . import runner as runmod
 from . import skills as skillmod
 from . import skills_catalog as catalog
@@ -1278,6 +1281,74 @@ async def build_design_redo(build_id: str, body: dict, user: User = CurrentUser)
         raise HTTPException(400, "Contá qué cambiar del diseño")
     b.redo_design(fb)
     return {"ok": True}
+
+
+DESIGN_SUMMARY_SYSTEM = {
+    "es": "Sos un/a Product Designer que le explica el diseño de una app a alguien sin formación técnica. Escribí en español rioplatense, claro y concreto, en Markdown corto: un párrafo de 2-3 líneas con la idea general (estilo, sensación, a qué se parece), y después secciones breves con viñetas: **Colores** (cuáles y para qué), **Tipografía**, **Pantallas** (qué hay en cada una y qué puede hacer la persona), **Componentes** (botones, tarjetas, listas… cómo se ven), **Detalles** (animaciones, estados vacíos, errores, modo oscuro, accesibilidad). Sin jerga: nada de tokens, px, hex, nombres de clases ni archivos. Máximo 300 palabras.",
+    "en": "You are a Product Designer explaining an app's design to someone non-technical. Write clear, concrete, short Markdown: a 2-3 line paragraph with the overall idea (style, feel, what it resembles), then brief bulleted sections: **Colors** (which and what for), **Typography**, **Screens** (what is on each and what the person can do), **Components** (buttons, cards, lists… how they look), **Details** (animations, empty states, errors, dark mode, accessibility). No jargon: no tokens, px, hex, class or file names. 300 words max.",
+}
+
+
+@app.get("/api/sessions/{session_id}/builds/{build_id}/design/summary")
+async def build_design_summary(session_id: str, build_id: str, lang: str = "es", refresh: bool = False, user: User = CurrentUser):
+    """What the current design is, in plain language, written by a model from design/DESIGN.md + the mockup.
+    Cached next to the build and keyed by the design's content, so it is rewritten only when the design changes."""
+    b = _build_any(user, session_id, build_id)
+    md = b.files.get("design/DESIGN.md") or ""
+    html = b.files.get(buildermod.DESIGN_MOCKUP) or b.design_html or ""
+    if not md and not html:
+        return {"text": None, "reason": "no_design"}
+    key = hashlib.sha1((md + html[:20000] + lang).encode()).hexdigest()[:16]
+    cache = auth.user_dir(user.id) / f"{session_id}.build.{build_id}.design-summary.json"
+    try:
+        d = json.loads(cache.read_text())
+        if not refresh and d.get("key") == key:
+            return d
+    except Exception:  # noqa: BLE001
+        pass
+    who = scene_gen._pick_model(user, {"agents": []})
+    if not who:
+        return {"text": None, "reason": "no_key"}
+    provider, model, cred = who
+    text_html = re.sub(r"<script.*?</script>|<style.*?</style>", " ", html, flags=re.S | re.I)
+    text_html = re.sub(r"<[^>]+>", " ", text_html)
+    text_html = " ".join(text_html.split())[:3000]
+    prompt = f"PROYECTO: {b.title}\n\nDESIGN.md (lo que escribió el diseñador):\n{md[:9000]}\n\nTEXTO VISIBLE DE LA MAQUETA:\n{text_html}"
+    result = providers.CallResult()
+    buf: list[str] = []
+    async for kind, delta in providers.stream(provider, model, DESIGN_SUMMARY_SYSTEM["en" if lang == "en" else "es"], prompt, temperature=0.3, max_tokens=1200, result=result, cred=cred):
+        if kind == "text":
+            buf.append(delta)
+    out = {"key": key, "text": "".join(buf).strip(), "model": f"{providers.PROVIDERS[provider].label} · {model}", "lang": lang, "ts": time.time()}
+    try:
+        cache.write_text(json.dumps(out, ensure_ascii=False))
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+@app.post("/api/builds/{build_id}/design/request")
+async def build_design_request(build_id: str, body: dict, user: User = CurrentUser):
+    """A specific design change, in the user's words, at any moment: during the design gate it is another designer
+    round; while building it goes to the builder's inbox; on a finished build it resumes the build with the change."""
+    b = _build(user, build_id, body.get("session_id"))
+    text = (body.get("text") or "").strip()[:4000]
+    if not text:
+        raise HTTPException(400, "Contá qué cambiar del diseño")
+    if b.status == "design_review":
+        b.redo_design(text)
+        return {"ok": True, "mode": "redo"}
+    ask = (
+        "CAMBIO DE DISEÑO pedido por el usuario (prioridad): " + text
+        + "\n\nActuá como Product Designer + frontend: actualizá design/mockup.html y design/DESIGN.md para reflejar el cambio y aplicalo en la UI real, "
+        "archivo por archivo, sin romper funcionalidad ni tests. Mantené coherencia con el resto del sistema visual. Al terminar, en <say>, resumí en lenguaje simple qué cambió visualmente."
+    )
+    if b.status == "running":
+        b.say(ask)
+        return {"ok": True, "mode": "queued"}
+    b.chat.append({"role": "user", "text": f"🎨 {text}", "ts": time.time()})
+    b.resume(ask)
+    return {"ok": True, "mode": "resumed"}
 
 
 @app.post("/api/builds/{build_id}/stop")
