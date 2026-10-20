@@ -95,3 +95,4 @@ input[type="color"] { border: 1px solid var(--color-line); padding: 2px; }
 /* hero title: SplitText characters animate in 3D from below (see lib/anim.ts) */
 [data-hero-title] { perspective: 700px; }
 .hero-char { display: inline-block; transform-style: preserve-3d; will-change: transform, opacity; }
+[data-hero-demo] { will-change: transform, opacity; backface-visibility: hidden; }

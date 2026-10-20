@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, ChevronLeft, ChevronRight, Play } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { heroIntro, sceneIn, scrollReveal, useGSAP } from '../lib/anim'
+import { countTo, gsap, heroIntro, sceneIn, scrollReveal, useGSAP } from '../lib/anim'
 import { useT } from '../lib/i18n'
 import LogoMarquee from './LogoMarquee'
 import TeamBackdrop from './TeamBackdrop'
@@ -113,7 +113,7 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
         <div>
           <div data-hero-kicker className="text-xs uppercase tracking-[0.5em] text-accent">{T('tu equipo que diseña y construye', 'your team that designs and builds')}</div>
           <h1 data-hero-title className="mt-3 text-6xl md:text-7xl leading-[0.95] tracking-tight opacity-0">
-            {T('Escribí tu idea.', 'Write your idea.')} <em className="text-accent">{T('El equipo', 'The team')}</em> {T('la construye.', 'builds it.')}
+            {T('Escribí tu idea.', 'Write your idea.')} <em className="text-accent">Tably</em> {T('la construye.', 'builds it.')}
           </h1>
           <p data-hero-copy className="mt-5 text-lg text-ink-2 leading-relaxed max-w-lg">
             {T('Describís la app que querés y elegís qué IA ocupa cada rol: CEO, CTO, ingeniería, producto, diseño y QA. El equipo debate tu idea, estudia apps de referencia, diseña las pantallas, escribe el código y lo revisa antes de entregarte un producto listo para correr. Vos aprobás cada paso.', 'Describe the app you want and choose which AI takes each role: CEO, CTO, engineering, product, design and QA. The team debates your idea, studies reference apps, designs the screens, writes the code and reviews it before handing you a product ready to run. You approve every step.')}
@@ -256,8 +256,8 @@ function Label({ children }: { children: React.ReactNode }) {
 
 function Check({ on, children }: { on: boolean; children: React.ReactNode }) {
   return (
-    <div data-r className="flex items-center gap-2 text-[13px]">
-      <span className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] transition-colors ${on ? 'border-accent bg-accent text-white' : 'border-line bg-surface'}`}>{on ? '✓' : ''}</span>
+    <div data-r className="flex items-center gap-2.5 text-[13px]">
+      <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-[1.5px] text-[12px] font-bold transition-all ${on ? 'border-accent bg-accent text-white shadow-[0_0_0_4px_rgba(47,107,93,.15)]' : 'border-line bg-surface'}`}>{on ? '✓' : ''}</span>
       <span>{children}</span>
     </div>
   )
@@ -268,25 +268,61 @@ function SceneIdea({ t: raw }: { t: number }) {
   const t = raw * 0.78
   const T = useT()
   const idea = T(IDEA, IDEA_EN)
-  const typed = Math.floor(ease((t - 400) / 3000) * idea.length)
-  const attach = t > 3900
-  const clickAttach = t > 3600 && t < 3900
+  const typed = Math.floor(ease((t - 300) / 2300) * idea.length)
+  const clickDocs = t > 2700 && t < 2950
+  const picker = t > 2950 && t < 4650
+  const fileChosen = t > 3700
+  const clickFile = t > 3550 && t < 3750
+  const clickOpen = t > 4400 && t < 4650
+  const attach = t > 4650
+  const files = [['brief-clima.pdf', '14 págs · 1,2 MB'], ['logo-paraguas.png', '512×512'], ['notas-entrevistas.md', '6 KB'], ['competencia.xlsx', '3 hojas']]
+  const cursor = t < 2500 ? { x: 330, y: 150 } : t < 2950 ? { x: 150, y: 262 } : t < 3750 ? { x: 250, y: 150 } : t < 4650 ? { x: 470, y: 300 } : { x: 420, y: 262 }
   return (
     <motion.div {...sceneProps}>
       <Label>{T('Nombre de la app', 'App name')}</Label>
       <div data-r className="mt-1.5 rounded-xl border border-line bg-surface px-3 py-2 text-[14px]">{t > 200 ? T('Paraguas', 'Umbrella') : ''}</div>
       <div className="mt-4"><Label>{T('Qué querés construir', 'What you want to build')}</Label></div>
       <div data-r className="mt-1.5 min-h-[88px] rounded-xl border border-accent bg-surface px-4 py-3 text-[15px] leading-snug">
-        {idea.slice(0, typed)}{t > 400 && typed < idea.length && <span className="caret" />}
+        {idea.slice(0, typed)}{t > 300 && typed < idea.length && <span className="caret" />}
       </div>
       <div data-r className="mt-4 flex items-center gap-2 text-[12.5px] text-ink-3">
         <span>{T('Adjuntá lo que ayude:', 'Attach what helps:')}</span>
         {[T('documentos', 'documents'), T('carpeta', 'folder'), T('proyecto local', 'local project')].map((c, i) => (
-          <span key={c} className={`rounded-lg border px-2.5 py-1 transition-colors ${i === 0 && attach ? 'border-accent bg-accent-soft text-accent' : 'border-line bg-surface-2'}`}>{c}</span>
+          <motion.span key={c} animate={{ scale: i === 0 && clickDocs ? 0.94 : 1 }} className={`rounded-lg border px-2.5 py-1 transition-colors ${i === 0 && (picker || attach) ? 'border-accent bg-accent-soft text-accent' : 'border-line bg-surface-2'}`}>{c}</motion.span>
         ))}
-        <AnimatePresence>{attach && <motion.span initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} className="rounded-lg bg-accent-soft px-2.5 py-1 text-accent">📎 brief-clima.pdf ✓</motion.span>}</AnimatePresence>
+        <AnimatePresence>{attach && <motion.span initial={{ opacity: 0, scale: 0.8, x: -8 }} animate={{ opacity: 1, scale: 1, x: 0 }} className="rounded-lg bg-accent-soft px-2.5 py-1 text-accent">📎 brief-clima.pdf ✓</motion.span>}</AnimatePresence>
       </div>
-      <Cursor x={t < 3400 ? 330 : 150} y={t < 3400 ? 140 : 262} click={clickAttach} />
+      {/* the file picker, like the system dialog */}
+      <AnimatePresence>
+        {picker && (
+          <motion.div key="picker" initial={{ opacity: 0, scale: 0.94, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 8, transition: { duration: 0.18 } }} transition={{ type: 'spring', stiffness: 260, damping: 24 }} className="absolute left-1/2 top-1/2 z-10 w-[440px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_30px_80px_-20px_rgba(30,38,34,.45)]">
+            <div className="flex items-center gap-2 border-b border-line bg-surface-2/70 px-3 py-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#E6A19A]" /><span className="h-2.5 w-2.5 rounded-full bg-[#E9C97A]" /><span className="h-2.5 w-2.5 rounded-full bg-[#9FCDA8]" />
+              <span className="ml-2 text-[12px] font-semibold text-ink-2">{T('Elegí los documentos', 'Choose the documents')}</span>
+              <span className="ml-auto rounded-md border border-line bg-surface px-2 py-0.5 text-[10.5px] text-ink-3">📁 {T('Documentos', 'Documents')}</span>
+            </div>
+            <div className="grid grid-cols-[120px_1fr]">
+              <div className="border-r border-line bg-surface-2/40 p-2 text-[11.5px] text-ink-2">
+                {[T('Recientes', 'Recent'), T('Escritorio', 'Desktop'), T('Documentos', 'Documents'), T('Descargas', 'Downloads')].map((f, i) => <div key={f} className={`rounded-md px-2 py-1 ${i === 2 ? 'bg-accent-soft font-medium text-accent' : ''}`}>{f}</div>)}
+              </div>
+              <div className="p-2">
+                {files.map(([name, meta], i) => (
+                  <div key={name} className={`flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[12.5px] transition-colors ${i === 0 && fileChosen ? 'bg-accent text-white' : 'text-ink'}`}>
+                    <span className="text-[15px]">{name.endsWith('.pdf') ? '📄' : name.endsWith('.png') ? '🖼️' : name.endsWith('.md') ? '📝' : '📊'}</span>
+                    <span className="flex-1 truncate font-medium">{name}</span>
+                    <span className={`text-[10.5px] ${i === 0 && fileChosen ? 'text-white/80' : 'text-ink-3'}`}>{meta}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-line px-3 py-2">
+              <span className="rounded-lg border border-line px-3 py-1 text-[12px] text-ink-2">{T('Cancelar', 'Cancel')}</span>
+              <motion.span animate={{ scale: clickOpen ? 0.94 : 1 }} className={`rounded-lg px-3 py-1 text-[12px] font-semibold text-white ${fileChosen ? 'bg-accent' : 'bg-ink-4'}`}>{T('Abrir', 'Open')}</motion.span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <Cursor x={cursor.x} y={cursor.y} click={clickDocs || clickFile || clickOpen} />
     </motion.div>
   )
 }
@@ -388,7 +424,7 @@ function SceneRefs({ t: raw }: { t: number }) {
       </div>
       <div className="mt-4 space-y-2.5">
         <Check on={research}>{T('Investigar apps de referencia', 'Research reference apps')} <span className="text-ink-3">{T('(el equipo entra, saca capturas y anota qué emular y qué evitar)', '(the team visits them, takes screenshots and notes what to emulate and avoid)')}</span></Check>
-        <Check on={deep}>{T('Análisis profundo e ingeniería inversa', 'Deep analysis and reverse engineering')} <span className="rounded-full border border-gold/50 bg-gold/10 px-2 py-[1px] text-[10.5px] font-semibold text-gold">{T('pago por uso', 'pay per use')} · USD 9,00</span></Check>
+        <Check on={deep}>{T('Análisis profundo e ingeniería inversa', 'Deep analysis and reverse engineering')} <span className="rounded-full border border-gold/50 bg-gold/10 px-2 py-[1px] text-[10.5px] font-semibold text-gold">{T('pago por uso', 'pay per use')}</span></Check>
         <Check on={t > 1000}>{T('Diseño UX/UI primero', 'UX/UI design first')} <span className="text-ink-3">{T('(aprobás el mockup antes de que exista código)', '(you approve the mockup before any code exists)')}</span></Check>
       </div>
       <AnimatePresence>
@@ -419,6 +455,12 @@ const pos = (i: number) => ({ x: CX + Math.cos(-Math.PI / 2 + (i * Math.PI) / 2)
 const BUBBLE = (i: number, p: { x: number; y: number }) =>
   [{ left: p.x + 46, top: p.y - 26 }, { left: p.x - 210, top: p.y + 44 }, { left: p.x - 46 - 210, top: p.y - 44 }, { left: p.x - 30, top: p.y + 44 }][i]
 
+const curveBetween = (a: { x: number; y: number }, b: { x: number; y: number }, bend = 0.18) => {
+  const mx = (a.x + b.x) / 2 - (b.y - a.y) * bend
+  const my = (a.y + b.y) / 2 + (b.x - a.x) * bend
+  return `M${a.x},${a.y} Q${mx},${my} ${b.x},${b.y}`
+}
+
 function SceneArena({ t }: { t: number }) {
   const T = useT()
   const idx = Math.min(TURNS.length - 1, Math.floor(t / 2600))
@@ -432,6 +474,20 @@ function SceneArena({ t }: { t: number }) {
   const to = P[turn.to]
   const mf = MEMBER[turn.from]
   const mt = MEMBER[turn.to]
+  const svg = useRef<SVGSVGElement>(null)
+  // the live handoff: the path draws itself and three glowing particles ride it, GSAP MotionPath
+  useGSAP(() => {
+    const root = svg.current
+    if (!root || !handing) return
+    const path = root.querySelector<SVGPathElement>('[data-live-path]')
+    const dots = root.querySelectorAll('[data-particle]')
+    if (!path) return
+    const tl = gsap.timeline()
+    tl.fromTo(path, { drawSVG: '0%' }, { drawSVG: '100%', duration: 0.55, ease: 'power2.out' })
+      .set(dots, { opacity: 1 })
+      .to(dots, { motionPath: { path, align: path, alignOrigin: [0.5, 0.5] }, duration: 1.0, ease: 'power1.inOut', stagger: 0.22, repeat: -1 }, 0.3)
+    return () => { tl.kill() }
+  }, { dependencies: [handing, idx], scope: svg })
   return (
     <motion.div {...sceneProps} className="absolute inset-0">
       <div className="absolute left-5 top-4 text-[11px] uppercase tracking-widest text-ink-3">{T('Turno', 'Turn')} {idx + 1} {T('· el equipo decide producto, stack y alcance', '· the team decides product, stack and scope')}</div>
@@ -440,20 +496,25 @@ function SceneArena({ t }: { t: number }) {
           <div className="text-[10px] uppercase tracking-[0.3em] text-accent">{T('proyecto', 'project')}</div>
           <div className="serif text-[14px] leading-snug mt-1 text-ink-2">{T('Paraguas · app del clima', 'Umbrella · weather app')}</div>
         </div>
-        <svg className="absolute inset-0 w-full h-full pointer-events-none">
-          {ARENA.map((a, i) => ARENA.slice(i + 1).map((b) => <line data-draw key={a.id + b.id} x1={P[a.id].x} y1={P[a.id].y} x2={P[b.id].x} y2={P[b.id].y} stroke="#1E2622" strokeOpacity="0.12" />))}
+        <svg ref={svg} className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
+          <defs>
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+            {ARENA.map((m) => (
+              <linearGradient key={m.id} id={`g-${m.id}`} x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor={m.color} stopOpacity="0.15" /><stop offset="1" stopColor={m.color} stopOpacity="0.9" /></linearGradient>
+            ))}
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor" /></marker>
+          </defs>
+          {/* the table: who can talk to whom */}
+          {ARENA.map((a, i) => ARENA.slice(i + 1).map((b) => <path data-draw key={a.id + b.id} d={curveBetween(P[a.id], P[b.id], 0.08)} fill="none" stroke="#1E2622" strokeOpacity="0.09" strokeWidth="1.5" strokeDasharray="3 7" />))}
+          {/* handoffs already made: a gradient arc in the speaker's colour, with its arrow */}
           {TURNS.slice(0, idx).map((h) => (
-            <line key={h.from + h.to} x1={P[h.from].x} y1={P[h.from].y} x2={P[h.to].x} y2={P[h.to].y} stroke={MEMBER[h.from].color} strokeOpacity="0.4" strokeWidth="2" />
+            <path key={h.from + h.to} d={curveBetween(P[h.from], P[h.to])} fill="none" stroke={`url(#g-${h.from})`} strokeWidth="3" strokeLinecap="round" markerEnd="url(#arrow)" style={{ color: MEMBER[h.from].color }} />
           ))}
           {handing && (
-            <>
-              <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke={mf.color} strokeWidth="2.5" />
-              {[0, 0.25, 0.5].map((d) => (
-                <circle key={d} r="4.5" fill={mf.color} stroke="#fff" strokeWidth="2">
-                  <animateMotion dur="0.9s" begin={`${d}s`} repeatCount="indefinite" path={`M${from.x},${from.y} L${to.x},${to.y}`} />
-                </circle>
-              ))}
-            </>
+            <g>
+              <path data-live-path d={curveBetween(from, to)} fill="none" stroke={mf.color} strokeWidth="3.5" strokeLinecap="round" markerEnd="url(#arrow)" style={{ color: mf.color }} filter="url(#glow)" />
+              {[0, 1, 2].map((k) => <circle key={k} data-particle r={k === 0 ? 6 : 4} fill={mf.color} stroke="#FFFFFF" strokeWidth="2" opacity="0" filter="url(#glow)" />)}
+            </g>
           )}
         </svg>
         {ARENA.map((m) => {
@@ -462,10 +523,13 @@ function SceneArena({ t }: { t: number }) {
           const target = m.id === turn.to && handing
           return (
             <div data-r key={m.id} className="absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
+              {/* soft halo that breathes while the role talks */}
+              <motion.div className="absolute -inset-5 rounded-full" style={{ background: `radial-gradient(circle, ${m.color}44 0%, transparent 70%)` }} animate={{ scale: on ? [1, 1.25, 1] : target ? 1.1 : 0.6, opacity: on ? 1 : target ? 0.7 : 0 }} transition={on ? { duration: 1.4, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.4 }} />
               <motion.div
-                animate={{ scale: on ? 1.1 : target ? 1.04 : 1, boxShadow: on ? `0 0 0 7px ${m.color}22, 0 12px 28px -12px ${m.color}99` : '0 1px 2px rgba(30,38,34,.06)' }}
-                className="w-[72px] h-[72px] rounded-full bg-surface flex flex-col items-center justify-center"
-                style={{ border: `${on ? 2.5 : 1.5}px solid ${on || target ? m.color : m.color + '77'}` }}
+                animate={{ scale: on ? 1.1 : target ? 1.05 : 1, y: on ? -4 : 0 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+                className="relative flex h-[76px] w-[76px] flex-col items-center justify-center rounded-full"
+                style={{ background: `radial-gradient(circle at 35% 28%, #FFFFFF 0%, ${m.color}18 80%)`, border: `${on || target ? 2.5 : 1.5}px solid ${on || target ? m.color : m.color + '88'}`, boxShadow: on ? `0 0 0 6px ${m.color}22, 0 18px 36px -14px ${m.color}AA` : '0 2px 4px rgba(30,38,34,.08), 0 12px 24px -16px rgba(30,38,34,.45)' }}
               >
                 <ProviderLogo provider={m.provider} size={22} />
                 <div className="serif text-[11.5px] leading-tight mt-0.5">{T(m.name, m.name_en)}</div>
@@ -478,10 +542,11 @@ function SceneArena({ t }: { t: number }) {
           {!handing ? (
             <motion.div
               key={`b-${idx}`}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
+              initial={{ opacity: 0, scale: 0.9, y: 6 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="absolute w-[210px] rounded-xl bg-surface px-3.5 py-2.5 text-[13px] leading-snug shadow-lg border border-line"
+              transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+              className="absolute w-[210px] rounded-xl bg-surface px-3.5 py-2.5 text-[13px] leading-snug shadow-[0_18px_40px_-16px_rgba(30,38,34,.45)] border border-line"
               style={{ borderTop: `3px solid ${mf.color}`, ...BUBBLE(ARENA.findIndex((m) => m.id === turn.from), from) }}
             >
               <div className="text-[10px] uppercase tracking-widest" style={{ color: mf.color }}>{T(mf.name, mf.name_en)} · {T(turn.stance, turn.stance_en)}</div>
@@ -577,26 +642,36 @@ function SceneAudit({ t }: { t: number }) {
   const reviewing = t > 1800
   const findings = AUDIT_FINDINGS.filter((_, i) => t > 3200 + i * 900)
   const scored = t > 8200
-  const readiness = scored ? 68 : 0
   const reviewers = TEAM.filter((m) => ['cto', 'eng', 'product', 'design', 'qa'].includes(m.id))
+  const num = useRef<HTMLSpanElement>(null)
+  const blockers = useRef<HTMLSpanElement>(null)
+  const improvements = useRef<HTMLSpanElement>(null)
+  // the readiness and the counters tick up when the report lands
+  useGSAP(() => {
+    if (!scored) return
+    if (num.current) countTo(num.current, 68, '', 1.3)
+    if (blockers.current) countTo(blockers.current, 2, '', 0.8)
+    if (improvements.current) countTo(improvements.current, 3, '', 0.9)
+  }, { dependencies: [scored] })
+  const perRole = [['qa', 55], ['eng', 60], ['design', 72], ['product', 70], ['cto', 80]] as const
   return (
     <motion.div {...sceneProps}>
       <div className="grid h-full grid-cols-[1.2fr_1fr] gap-5">
         <div className="min-w-0">
           <Label>{T('Auditar un proyecto', 'Audit a project')}</Label>
-          <motion.div animate={{ borderColor: uploaded ? '#2F6B5D' : undefined }} className={`mt-2 flex items-center gap-3 rounded-xl border px-3 py-2.5 ${uploaded ? 'bg-accent-soft/60' : 'border-dashed border-line'}`}>
+          <motion.div data-r animate={{ borderColor: uploaded ? '#2F6B5D' : undefined }} className={`mt-2 flex items-center gap-3 rounded-xl border px-3 py-2.5 ${uploaded ? 'bg-accent-soft/60' : 'border-dashed border-line'}`}>
             <span className="text-[20px]">{uploaded ? '📦' : '⬆️'}</span>
             <div className="min-w-0 text-[12.5px]">
               <div className="font-semibold">{uploaded ? 'mi-tienda.zip' : T('Arrastrá tu proyecto (zip o carpeta)', 'Drop your project (zip or folder)')}</div>
               <div className="text-ink-3">{uploaded ? `142 ${T('archivos', 'files')} · Next.js · Stripe · ${T('subido', 'uploaded')} ✓` : T('código, README, lo que tengas', 'code, README, whatever you have')}</div>
             </div>
           </motion.div>
-          <div className="mt-3 flex flex-wrap gap-1.5">
+          <div data-r className="mt-3 flex flex-wrap gap-1.5">
             {reviewers.map((m, i) => {
               const on = reviewing && t > 1800 + i * 350
               const done = findings.some((f) => f.role === m.id) || scored
               return (
-                <span key={m.id} className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11.5px] transition-colors ${on ? 'bg-surface' : 'border-line bg-surface-2/60 text-ink-3'}`} style={{ borderColor: on ? m.color : undefined }}>
+                <span key={m.id} className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11.5px] transition-colors ${on ? 'bg-surface shadow-sm' : 'border-line bg-surface-2/60 text-ink-3'}`} style={{ borderColor: on ? m.color : undefined }}>
                   <ProviderLogo provider={m.provider} size={13} /> {T(m.name, m.name_en)} {done ? <span className="text-accent">✓</span> : on ? <span className="caret" /> : null}
                 </span>
               )
@@ -607,10 +682,10 @@ function SceneAudit({ t }: { t: number }) {
               {findings.map((f) => {
                 const m = MEMBER[f.role]
                 return (
-                  <motion.div key={f.text} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="flex items-start gap-2 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px]">
-                    <span className={`mt-[2px] shrink-0 rounded px-1.5 text-[9.5px] font-bold uppercase ${f.sev === 'bloqueante' ? 'bg-danger/15 text-danger' : 'bg-gold/15 text-gold'}`}>{f.sev === 'bloqueante' ? T('bloqueante', 'blocker') : T('mejora', 'improvement')}</span>
+                  <motion.div key={f.text} initial={{ opacity: 0, x: -14, scale: 0.98 }} animate={{ opacity: 1, x: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 26 }} className="flex items-center gap-2 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] shadow-[0_6px_16px_-12px_rgba(30,38,34,.4)]">
+                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] ${f.sev === 'bloqueante' ? 'bg-danger/15 text-danger' : 'bg-gold/15 text-gold'}`}>{f.sev === 'bloqueante' ? '!' : '↑'}</span>
                     <span className="min-w-0 flex-1 truncate">{T(f.text, f.text_en)} <span className="font-mono text-[10.5px] text-ink-3">{f.where}</span></span>
-                    <span className="shrink-0 text-[10.5px] font-semibold" style={{ color: m.color }}>{T(m.name, m.name_en)}</span>
+                    <span className="flex shrink-0 items-center gap-1 text-[10.5px] font-semibold" style={{ color: m.color }}><ProviderLogo provider={m.provider} size={11} />{T(m.name, m.name_en)}</span>
                   </motion.div>
                 )
               })}
@@ -619,22 +694,34 @@ function SceneAudit({ t }: { t: number }) {
         </div>
         <div className="flex flex-col items-center justify-center">
           <div data-r className="relative h-[150px] w-[150px]">
-            <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
-              <circle cx="60" cy="60" r="50" fill="none" stroke="#E6EAE7" strokeWidth="12" />
-              <motion.circle cx="60" cy="60" r="50" fill="none" stroke="#9C7622" strokeWidth="12" strokeLinecap="round" strokeDasharray={2 * Math.PI * 50} initial={{ strokeDashoffset: 2 * Math.PI * 50 }} animate={{ strokeDashoffset: 2 * Math.PI * 50 * (1 - readiness / 100) }} transition={{ duration: 1.2, ease: 'easeOut' }} />
+            <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90 overflow-visible">
+              <defs>
+                <linearGradient id="gauge" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#F2CC6A" /><stop offset="1" stopColor="#9C7622" /></linearGradient>
+                <filter id="gauge-glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.5" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+              </defs>
+              <circle cx="60" cy="60" r="50" fill="none" stroke="#E6EAE7" strokeWidth="11" />
+              <motion.circle cx="60" cy="60" r="50" fill="none" stroke="url(#gauge)" strokeWidth="11" strokeLinecap="round" strokeDasharray={2 * Math.PI * 50} initial={{ strokeDashoffset: 2 * Math.PI * 50 }} animate={{ strokeDashoffset: 2 * Math.PI * 50 * (1 - (scored ? 68 : 0) / 100) }} transition={{ duration: 1.3, ease: [0.22, 1, 0.36, 1] }} filter="url(#gauge-glow)" />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <div className="font-mono text-[34px] font-bold leading-none text-ink">{scored ? '68' : '—'}<span className="text-[16px]">%</span></div>
+              <div className="font-mono text-[34px] font-bold leading-none text-ink"><span ref={num}>{scored ? '' : '—'}</span><span className="text-[16px]">%</span></div>
               <div className="text-[10px] uppercase tracking-widest text-ink-3">{T('listo para prod', 'production-ready')}</div>
             </div>
           </div>
           <AnimatePresence>
             {scored && (
-              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-3 w-full rounded-xl border border-line bg-surface p-3 text-[12px]">
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-3 w-full rounded-xl border border-line bg-surface p-3 text-[12px] shadow-[0_18px_40px_-20px_rgba(30,38,34,.4)]">
                 <div className="text-[10px] uppercase tracking-widest text-ink-3">{T('Informe de auditoría', 'Audit report')}</div>
-                <div className="mt-1 font-semibold">2 {T('bloqueantes', 'blockers')} · 3 {T('mejoras', 'improvements')}</div>
-                <div className="mt-0.5 text-ink-2">{T('Qué arreglar primero, por rol, con archivo y línea. Y un botón para que el equipo lo corrija.', 'What to fix first, per role, with file and line. And a button for the team to fix it.')}</div>
-                <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[12px] font-semibold text-white">▶ {T('Que el equipo lo corrija', 'Have the team fix it')}</div>
+                <div className="mt-1 flex items-center gap-3 font-semibold"><span><span ref={blockers} className="font-mono text-danger">0</span> {T('bloqueantes', 'blockers')}</span><span><span ref={improvements} className="font-mono text-gold">0</span> {T('mejoras', 'improvements')}</span></div>
+                <div className="mt-2 space-y-1">
+                  {perRole.map(([id, v], i) => (
+                    <div key={id} className="flex items-center gap-2 text-[10.5px]">
+                      <span className="w-14 truncate text-ink-3">{T(MEMBER[id].name, MEMBER[id].name_en)}</span>
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-black/5"><motion.div className="h-full rounded-full" style={{ background: MEMBER[id].color }} initial={{ width: 0 }} animate={{ width: `${v}%` }} transition={{ delay: 0.2 + i * 0.1, duration: 0.8, ease: 'easeOut' }} /></div>
+                      <span className="w-7 text-right font-mono text-ink-2">{v}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[12px] font-semibold text-white shadow-md">▶ {T('Que el equipo lo corrija', 'Have the team fix it')}</div>
               </motion.div>
             )}
           </AnimatePresence>

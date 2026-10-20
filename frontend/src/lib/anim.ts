@@ -9,10 +9,13 @@ import { useGSAP } from '@gsap/react'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { SplitText } from 'gsap/SplitText'
 import { DrawSVGPlugin } from 'gsap/DrawSVGPlugin'
+import { MotionPathPlugin } from 'gsap/MotionPathPlugin'
 
-gsap.registerPlugin(useGSAP, ScrollTrigger, SplitText, DrawSVGPlugin)
+gsap.registerPlugin(useGSAP, ScrollTrigger, SplitText, DrawSVGPlugin, MotionPathPlugin)
 
 export { gsap, useGSAP, ScrollTrigger, SplitText }
+
+const splits = new WeakMap<HTMLElement, SplitText>()
 
 export const reduced = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -23,7 +26,10 @@ export function heroIntro(root: HTMLElement) {
   const title = root.querySelector<HTMLElement>('[data-hero-title]')
   const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
   if (title) {
+    // React StrictMode mounts twice in dev: undo a previous split before splitting again, or the chars nest
+    splits.get(title)?.revert()
     const split = SplitText.create(title, { type: 'words,chars', charsClass: 'hero-char' })
+    splits.set(title, split)
     gsap.set(title, { opacity: 1 })
     tl.from(split.chars, { yPercent: 110, opacity: 0, rotateX: -40, filter: 'blur(8px)', duration: 0.9, stagger: { each: 0.018, from: 'start' } }, 0.1)
   }
@@ -31,7 +37,8 @@ export function heroIntro(root: HTMLElement) {
     .from(root.querySelectorAll('[data-hero-copy]'), { y: 18, opacity: 0, filter: 'blur(6px)', duration: 0.8 }, 0.55)
     .from(root.querySelectorAll('[data-hero-cta]'), { y: 16, opacity: 0, scale: 0.96, duration: 0.6, stagger: 0.08 }, 0.8)
     .from(root.querySelectorAll('[data-hero-logo]'), { y: 10, opacity: 0, scale: 0.6, duration: 0.5, stagger: 0.05, ease: 'back.out(2)' }, 0.95)
-    .from(root.querySelectorAll('[data-hero-demo]'), { opacity: 0, y: 40, rotateY: -14, rotateX: 6, scale: 0.94, transformPerspective: 1400, transformOrigin: '50% 50%', filter: 'blur(10px)', duration: 1.2, ease: 'power4.out' }, 0.35)
+    // the demo frame rises into place (no rotation, no blur: transform + opacity only, so it never stutters)
+    .from(root.querySelectorAll('[data-hero-demo]'), { opacity: 0, y: 36, scale: 0.97, duration: 1.0, ease: 'power3.out', force3D: true, clearProps: 'transform' }, 0.3)
   return tl
 }
 
