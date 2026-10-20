@@ -384,18 +384,20 @@ export default function Builder({ onBack }: { onBack: () => void }) {
 
         {/* the side: file tree + the open pane, sliding in and out on a spring */}
         <motion.div initial={false} animate={{ width: b.paneOpen ? paneW : 0 }} transition={{ type: 'spring', stiffness: 230, damping: 30, mass: 0.9 }} className="relative min-h-0 shrink-0 overflow-hidden">
-          <div className="absolute inset-y-0 right-0 grid min-h-0 grid-cols-[232px_1fr]" style={{ width: paneW }}>
-            {/* file tree */}
-            <div className="min-h-0 overflow-y-auto scroll-thin border-r border-line bg-surface">
-              <div className="sticky top-0 border-b border-line bg-surface px-3 py-2 text-[11px] uppercase tracking-widest text-ink-3">{T('Archivos', 'Files')}</div>
-              <div className="py-1 font-mono text-[13px]">
-                {tree.length === 0 && <div className="px-3 py-3 font-sans text-xs text-ink-4">{T('Todavía no hay archivos.', 'No files yet.')}</div>}
-                {tree.map((n) => <TreeNode key={n.path} node={n} depth={0} selected={b.selected} live={b.liveFile?.path ?? null} onSelect={(p) => useBuild.getState().set({ selected: p })} />)}
+          <div className="absolute inset-y-0 right-0 flex min-h-0" style={{ width: paneW }}>
+            {/* file tree: only next to the code, sliding in and out with the same spring */}
+            <motion.div initial={false} animate={{ width: b.pane === 'code' ? 232 : 0 }} transition={{ type: 'spring', stiffness: 230, damping: 30, mass: 0.9 }} className="min-h-0 shrink-0 overflow-hidden border-r border-line bg-surface">
+              <div className="h-full w-[232px] overflow-y-auto scroll-thin">
+                <div className="sticky top-0 border-b border-line bg-surface px-3 py-2 text-[11px] uppercase tracking-widest text-ink-3">{T('Archivos', 'Files')}</div>
+                <div className="py-1 font-mono text-[13px]">
+                  {tree.length === 0 && <div className="px-3 py-3 font-sans text-xs text-ink-4">{T('Todavía no hay archivos.', 'No files yet.')}</div>}
+                  {tree.map((n) => <TreeNode key={n.path} node={n} depth={0} selected={b.selected} live={b.liveFile?.path ?? null} onSelect={(p) => useBuild.getState().set({ selected: p })} />)}
+                </div>
               </div>
-            </div>
+            </motion.div>
 
             {/* the pane */}
-            <div className={`flex min-h-0 min-w-0 flex-col ${b.pane !== 'code' ? 'bg-paper' : 'bg-[#1E2622]'}`}>
+            <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${b.pane !== 'code' ? 'bg-paper' : 'bg-[#1E2622]'}`}>
               <div className={`flex h-10 shrink-0 items-center gap-2 overflow-x-auto whitespace-nowrap border-b px-3 text-[12px] ${b.pane !== 'code' ? 'border-line bg-surface' : 'border-white/10 text-[#B9C4BE]'}`}>
                 {(() => { const cur = PANES.find((x) => x.id === b.pane); const Icon = cur?.icon ?? FileCode2; return <span className={`flex items-center gap-1.5 font-semibold ${b.pane === 'code' ? 'text-white' : 'text-ink'}`}><Icon size={14} className={b.pane === 'code' ? 'text-[#8FD3B0]' : 'text-accent'} /> {cur ? T(cur.es, cur.en) : ''}</span> })()}
                 {b.pane === 'code' ? (
