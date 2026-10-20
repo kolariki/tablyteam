@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, CheckCircle2, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, FlaskConical, Gauge, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2 } from 'lucide-react'
 import { marked } from 'marked'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { reconnectBuild, useBuild, type Activity, type ChatItem, type Todo } from '../buildStore'
@@ -352,26 +352,37 @@ export default function Builder({ onBack }: { onBack: () => void }) {
             {b.status === 'completed' && !b.liveTurn && b.team.length > 0 && (
               <ReviewLauncher team={b.team} onStart={() => setCouncilOpen(true)} />
             )}
-            {(b.status === 'completed' || b.status === 'approved') && !b.liveTurn && (
-              <button onClick={() => useBuild.getState().set({ paneOpen: true, pane: 'deploy' })} className="w-full rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold flex items-center gap-2 hover:bg-surface-2"><KeyRound size={18} className="text-accent" /> {T('Servicios externos requeridos y deploy →', 'Required external services and deploy →')}</button>
-            )}
             {b.pendingCouncil && !b.liveTurn && (
-              <button onClick={() => useArena.getState().set({ pendingLive: b.pendingCouncil! })} className="w-full rounded-2xl border-2 border-gold bg-gold/10 px-4 py-3 text-left hover:brightness-95">
+              <button onClick={() => useArena.getState().set({ pendingLive: b.pendingCouncil! })} className="w-full rounded-2xl border-2 border-gold bg-gold/10 px-4 py-3 text-left transition hover:brightness-95">
                 <div className="flex items-center gap-2 font-semibold"><Gavel size={18} className="text-gold" /> {T('El consejo ya dio su veredicto', 'The council has given its verdict')}{b.versions.length ? ` ${T('sobre', 'on')} v${b.versions.length}` : ''}</div>
                 <div className="mt-0.5 text-[12.5px] text-ink-2">{T('Mirá la lista de cambios y decidí si construir con ellos o no →', 'Check the list of changes and decide whether to build with them or not →')}</div>
               </button>
             )}
             {(b.status === 'completed' || b.status === 'approved') && !b.liveTurn && (
-              <button onClick={() => setFdeOpen('')} className="w-full rounded-2xl border border-gold/50 bg-gold/5 px-4 py-3 text-sm font-semibold flex items-center gap-2 hover:bg-gold/10"><HardHat size={18} className="text-gold" /> {T('Pedir un developer que lo suba por vos →', 'Request a developer to ship it for you →')}</button>
-            )}
-            {(b.status === 'completed' || b.status === 'approved') && !b.liveTurn && (
-              <button onClick={() => setRunOpen(true)} className="w-full rounded-2xl border-2 border-accent bg-accent-soft px-4 py-3 text-sm font-semibold text-accent flex items-center gap-2 hover:brightness-95"><MonitorPlay size={18} /> {T('Correr la app y ver cómo queda →', 'Run the app and see how it looks →')}</button>
-            )}
-            {b.designHtml && !b.liveTurn && (
-              <button onClick={() => useBuild.getState().set({ paneOpen: true, pane: 'design' })} className="w-full rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold flex items-center gap-2 hover:bg-surface-2"><Palette size={18} className="text-accent" /> {T('Ver el diseño del Product Designer →', 'See the Product Designer\'s design →')}</button>
-            )}
-            {b.status === 'completed' && !b.liveTurn && b.previewHtml && (
-              <button onClick={() => useBuild.getState().set({ paneOpen: true, pane: 'preview' })} className="w-full rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold flex items-center gap-2 hover:bg-surface-2"><Eye size={18} className="text-accent" /> {T('Prototipo navegable (sin correr nada) →', 'Clickable prototype (without running anything) →')}</button>
+              <div>
+                <div className="mb-2 text-[10.5px] uppercase tracking-[0.3em] text-ink-3">{T('Qué hacer ahora', 'What to do now')}</div>
+                <div className="grid gap-2.5 grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
+                  {([
+                    { id: 'run', icon: MonitorPlay, title: T('Correr la app', 'Run the app'), text: T('Levantala en esta máquina y vela acá', 'Start it on this machine and see it here'), primary: true, show: true, go: () => setRunOpen(true) },
+                    { id: 'preview', icon: Eye, title: T('Prototipo navegable', 'Clickable prototype'), text: T('Sin correr nada, en un clic', 'Without running anything, one click'), primary: false, show: !!b.previewHtml, go: () => useBuild.getState().set({ paneOpen: true, pane: 'preview' }) },
+                    { id: 'design', icon: Palette, title: T('Diseño', 'Design'), text: T('Qué tiene y pedile cambios', 'What it has, ask for changes'), primary: false, show: true, go: () => useBuild.getState().set({ paneOpen: true, pane: 'design' }) },
+                    { id: 'deploy', icon: KeyRound, title: T('Servicios y deploy', 'Services & deploy'), text: T('Keys, variables y publicar', 'Keys, variables and publishing'), primary: false, show: true, go: () => useBuild.getState().set({ paneOpen: true, pane: 'deploy' }) },
+                    { id: 'fde', icon: HardHat, title: T('Pedir un developer', 'Request a developer'), text: T('Un ingeniero nuestro lo sube por vos', 'One of our engineers ships it for you'), primary: false, show: true, go: () => setFdeOpen('') },
+                  ] as const).filter((a) => a.show).map((a) => {
+                    const Icon = a.icon
+                    return (
+                      <motion.button key={a.id} type="button" whileHover={{ y: -2 }} whileTap={{ scale: 0.985 }} onClick={a.go} className={`group flex items-center gap-3 rounded-2xl border px-3.5 py-3 text-left shadow-[0_10px_24px_-16px_rgba(30,38,34,.45)] transition-colors ${a.primary ? 'border-accent bg-accent text-white' : 'border-line bg-surface hover:border-accent'}`}>
+                        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${a.primary ? 'bg-white/15 text-white' : 'bg-accent-soft text-accent'}`}><Icon size={19} /></span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[13.5px] font-semibold">{a.title}</span>
+                          <span className={`block truncate text-[11.5px] ${a.primary ? 'text-white/80' : 'text-ink-3'}`}>{a.text}</span>
+                        </span>
+                        <ArrowRight size={15} className={`shrink-0 transition group-hover:translate-x-0.5 ${a.primary ? 'text-white/80' : 'text-ink-4 group-hover:text-accent'}`} />
+                      </motion.button>
+                    )
+                  })}
+                </div>
+              </div>
             )}
             {b.status === 'design_review' && !b.liveTurn && <DesignReviewCard />}
             {b.status === 'completed' && !b.liveTurn && (
@@ -384,8 +395,21 @@ export default function Builder({ onBack }: { onBack: () => void }) {
           <div className="border-t border-line bg-surface p-3">
             {/* quick actions: the full visual-polish checklist is one click (the server expands "pulido visual" into it) */}
             {b.id && !running && (
-              <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[11.5px]">
-                <button type="button" onClick={() => send('Pulido visual')} className="flex items-center gap-1 rounded-full border border-line bg-paper px-2.5 py-1 text-ink-2 hover:border-accent/50 hover:text-accent" title={T('Pasada de diseño sobre toda la UI: tipografía real, tokens, layout, estados, responsive y accesibilidad, según design/DESIGN.md y el mockup', 'Design pass over the whole UI: real typography, tokens, layout, states, responsive and accessibility, per design/DESIGN.md and the mockup')}><Sparkles size={12} /> {T('Pulido visual', 'Visual polish')}</button>
+              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 text-[10px] uppercase tracking-[0.25em] text-ink-3">{T('Pedidos rápidos', 'Quick requests')}</span>
+                {([
+                  { icon: Sparkles, label: T('Pulido visual', 'Visual polish'), text: 'Pulido visual', tip: T('Pasada de diseño sobre toda la UI: tipografía real, tokens, layout, estados, responsive y accesibilidad, según design/DESIGN.md y el mockup.', 'Design pass over the whole UI: real typography, tokens, layout, states, responsive and accessibility, per design/DESIGN.md and the mockup.'), hot: true },
+                  { icon: ShieldCheck, label: T('Accesibilidad', 'Accessibility'), text: tr('Auditá y corregí accesibilidad en toda la UI: contraste AA, foco visible, navegación por teclado, labels y roles ARIA, textos alternativos, tamaños táctiles ≥ 44 px. Verificá con lint/tests y resumí qué cambió.', 'Audit and fix accessibility across the UI: AA contrast, visible focus, keyboard navigation, ARIA labels and roles, alt texts, touch targets ≥ 44 px. Verify with lint/tests and summarise what changed.'), tip: T('Contraste, teclado, ARIA, tamaños táctiles.', 'Contrast, keyboard, ARIA, touch sizes.'), hot: false },
+                  { icon: Gauge, label: T('Rendimiento', 'Performance'), text: tr('Optimizá el rendimiento sin cambiar funcionalidad: tamaño del bundle, carga diferida, imágenes, caché, render innecesario. Medí antes y después (Lighthouse o equivalente) y reportá los números.', 'Optimise performance without changing functionality: bundle size, lazy loading, images, caching, unnecessary renders. Measure before and after (Lighthouse or equivalent) and report the numbers.'), tip: T('Bundle, carga, caché, render.', 'Bundle, loading, cache, render.'), hot: false },
+                  { icon: FlaskConical, label: T('Más tests', 'More tests'), text: tr('Subí la cobertura de tests en los flujos críticos (happy path y errores), unitarios y e2e, sin tests frágiles. Dejá todo en verde y resumí qué quedó cubierto.', 'Raise test coverage on the critical flows (happy path and errors), unit and e2e, without flaky tests. Leave everything green and summarise what is covered.'), tip: T('Cobertura en los flujos críticos.', 'Coverage on the critical flows.'), hot: false },
+                ] as const).map((q) => {
+                  const Icon = q.icon
+                  return (
+                    <button key={q.label} type="button" onClick={() => send(q.text)} title={q.tip} className={`flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12px] font-medium shadow-sm transition hover:-translate-y-0.5 ${q.hot ? 'border-accent/40 bg-accent-soft text-accent hover:bg-accent hover:text-white' : 'border-line bg-paper text-ink-2 hover:border-accent hover:text-accent'}`}>
+                      <Icon size={13} /> {q.label}
+                    </button>
+                  )
+                })}
               </div>
             )}
             <div className="flex items-end gap-2 rounded-2xl border border-line bg-paper px-3 py-2 focus-within:border-accent">
