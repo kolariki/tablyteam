@@ -137,21 +137,12 @@ function DeploySettings() {
           const k = st[t.id as 'vercel' | 'railway']
           return (
             <div key={t.id} className="relative overflow-hidden rounded-2xl border p-5 shadow-[0_14px_30px_-18px_rgba(30,38,34,.45)] transition hover:shadow-[0_18px_40px_-18px_rgba(30,38,34,.5)]" style={{ background: brandTheme(t.id).bg, borderColor: t.installed && (t.token || t.logged_in) ? brandTheme(t.id).accent : brandTheme(t.id).border }}>
-              {t.id === 'vercel'
-                ? <img src="/logos/vercel-mark.png" alt="" aria-hidden draggable={false} className="pointer-events-none absolute -right-[12%] -bottom-[22%] w-[68%] max-w-[260px] rotate-[-8deg] select-none" style={{ opacity: 0.1 }} />
-                : <LogoWatermark provider={t.id} opacity={0.1} />}
+              <LogoWatermark provider={t.id} opacity={0.1} />
               <div className="relative">
               <div className="flex items-center gap-3">
-                {t.id === 'vercel' ? (
-                  // Vercel's mark is a wordmark: show it whole, small, in a pill instead of a round medallion
-                  <span className="flex h-12 items-center justify-center rounded-full bg-surface px-4 shadow-sm" style={{ border: `1.5px solid ${brandTheme(t.id).accent}` }}>
-                    <img src="/logos/vercel.png" alt="Vercel" draggable={false} className="h-[18px] w-auto select-none" />
-                  </span>
-                ) : (
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface shadow-sm" style={{ border: `1.5px solid ${brandTheme(t.id).accent}` }}>
-                    <ProviderLogo provider={t.id} size={26} />
-                  </span>
-                )}
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface shadow-sm" style={{ border: `1.5px solid ${brandTheme(t.id).accent}` }}>
+                  <ProviderLogo provider={t.id} size={t.id === 'vercel' ? 22 : 26} />
+                </span>
                 <div>
                   <div className="text-[15px] font-semibold">{t.label}</div>
                   <a href={t.token_help} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[12px] text-ink-3 hover:text-accent">{T('crear token', 'create token')} <ExternalLink size={11} /></a>
