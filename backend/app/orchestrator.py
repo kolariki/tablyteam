@@ -291,6 +291,9 @@ class Session:
         if sk:
             role_txt += sk
         prio = (self.config.review_of or {}).get("priorities") if review else None
+        if review and (self.config.review_of or {}).get("focus") == "design":
+            role_txt += ("ESTA RONDA ES SOLO DE DISEÑO Y EXPERIENCIA: hablás de pantallas, layout, componentes, paleta, tipografía, estados, interacciones y pulido, comparando con el plano visual de los referentes. "
+                         "No pidas ni menciones tests, CI, deploy, legales, rendimiento ni deuda técnica: están fuera de alcance en esta ronda.\n")
         if prio:
             role_txt += (f"PRIORIDADES DEL USUARIO PARA ESTA RONDA (tratalas PRIMERO, con detalle; recién después lo que vos consideres):\n{prio[:2000]}\n")
         ids = ", ".join(a.id for a in others)
@@ -675,7 +678,9 @@ class Session:
         prios = split_priorities((cfg.review_of or {}).get("priorities"))
         prio_txt = ("\n\nPRIORIDADES DEL USUARIO (decidí para cada una cumplida/parcial/pendiente; las no cumplidas van a <changes> como [bloqueante] [Usuario]):\n"
                     + "\n".join(f"- [P{i + 1}] {t}" for i, t in enumerate(prios))) if prios else ""
-        user = f"PROYECTO: {(cfg.review_of or {}).get('title') or cfg.topic}\n\nDEBATE DEL CONSEJO:\n{transcript}\n\nVEREDICTOS FINALES POR ROL:\n{verdicts}{prior_txt}{prio_txt}"
+        focus_txt = ("\n\nENFOQUE DE LA RONDA: DISEÑO. Los <changes> son únicamente de UI/UX (layout, componentes, paleta, tipografía, estados, interacciones, responsive, pulido) con pantalla y archivo. "
+                     "Descartá cualquier pedido de tests, CI, deploy, legales, rendimiento o deuda técnica aunque algún rol lo haya mencionado.") if (cfg.review_of or {}).get("focus") == "design" else ""
+        user = f"PROYECTO: {(cfg.review_of or {}).get('title') or cfg.topic}\n\nDEBATE DEL CONSEJO:\n{transcript}\n\nVEREDICTOS FINALES POR ROL:\n{verdicts}{prior_txt}{prio_txt}{focus_txt}"
         system = COUNCIL_SYSTEM.format(model=judge.model, language=cfg.language)
         self.emit("judge.started", judge_id=judge.id, model=judge.model, provider=judge.provider)
         try:

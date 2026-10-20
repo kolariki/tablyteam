@@ -1044,7 +1044,7 @@ class Build:
             self.req.deep_analysis = True
         return new
 
-    async def research_then_council(self, priorities: str | None, new_refs: list[str]) -> None:
+    async def research_then_council(self, priorities: str | None, new_refs: list[str], focus: str = "production") -> None:
         """New references before a council round: benchmark them (research/REFERENCES.md grows), then open the council."""
         before = self.status
         try:
@@ -1058,9 +1058,9 @@ class Build:
             self.live = None
             self.emit("build.status", status=self.status, build=self.snapshot())
             self._save()
-        self.start_council(priorities=priorities)
+        self.start_council(priorities=priorities, focus=focus)
 
-    def start_council(self, priorities: str | None = None) -> str | None:
+    def start_council(self, priorities: str | None = None, focus: str = "production") -> str | None:
         """Launches the pre-production review as an arena session (same UI as the debate). Returns the session id."""
         if priorities is not None:
             self.council_priorities = priorities
@@ -1078,6 +1078,12 @@ class Build:
             prior = "\n\nÍTEMS PEDIDOS EN LA RONDA ANTERIOR (verificá si el constructor los resolvió):\n" + "\n".join(f"- [{r['id']}] [{r.get('severity', 'mejora')}] {r['text'][:220]}" for r in prior_requests)
         prio = (self.council_priorities or "").strip()[:2000]
         self.council_priorities = ""
+        design_focus = focus == "design"
+        if design_focus:
+            prior += ("\n\nENFOQUE DE ESTA RONDA: DISEÑO Y EXPERIENCIA. Solo se revisa cómo se ve y cómo se siente el producto: layout, jerarquía, componentes, paleta, tipografía, "
+                      "espaciado, estados, interacciones, motion, responsive y pulido visual, comparado con el «Plano visual objetivo» de los referentes. "
+                      "FUERA DE ALCANCE (no lo pidan ni lo mencionen): tests, CI, deploy, legales, términos de uso, rendimiento medido, seguridad, deuda técnica. "
+                      "Diseño lidera; cada rol aporta desde lo suyo pero siempre sobre pantallas concretas. Pidan cambios región por región, con archivo y pantalla.")
         if self.req.references and self.research_md:
             prior += ("\n\nREFERENTES ELEGIDOS POR EL USUARIO: " + ", ".join(self.req.references[:8]) + f". Sus notas están en {RESEARCH_PATH} (arriba). "
                       "Cada rol compara el proyecto contra esos referentes desde su área (Diseño y Product: layout, jerarquía, interacciones, estados; Head of Eng y CTO: arquitectura y datos) "
@@ -1085,12 +1091,14 @@ class Build:
                       "Diseño y Product: comparen cada pantalla nuestra con el «Plano visual objetivo» de REFERENCES.md y pidan, región por región, lo que falta para que quede igual de estructurada (layout, componentes, paleta, tipografía, interacciones).")
         if prio:
             prior += f"\n\nPRIORIDADES DEL USUARIO PARA ESTA RONDA (tratarlas primero):\n{prio}"
+        ref_names = ", ".join(r.replace("https://", "").replace("http://", "").strip("/") for r in self.req.references[:3]) if self.req.references else ""
         cfg = SessionConfig(
-            topic=f"Revisión pre-producción · ronda {rnd}: ¿{self.title} está listo para salir?", title=f"Consejo · {self.title} · ronda {rnd}",
+            topic=(f"Revisión de diseño · ronda {rnd}: ¿las pantallas de {self.title} están al nivel de {ref_names or 'los referentes'}?" if design_focus else f"Revisión pre-producción · ronda {rnd}: ¿{self.title} está listo para salir?"),
+            title=f"Consejo · {self.title} · ronda {rnd}" + (" · diseño" if design_focus else ""),
             mode="review", agents=[{k: v for k, v in a.items() if k in ("id", "role", "name", "provider", "model", "persona", "wanted_provider", "skills")} for a in agents],
             max_turns=min(60, max(4, 2 * len(agents))), min_turns=min(len(agents), 4), final_vote=False, closing_round=True, pace_ms=500, max_tokens=1600,
             auto_skills=True,  # the council picks catalog skills the review needs (per role, on top of the user's)
-            judge=agents[0]["id"], context=digest + prior, review_of={"build_id": self.id, "session_id": self.req.session_id, "title": self.title, "round": rnd, "version": len(self.versions), "prior_requests": prior_requests, "priorities": prio},
+            judge=agents[0]["id"], context=digest + prior, review_of={"build_id": self.id, "session_id": self.req.session_id, "title": self.title, "round": rnd, "version": len(self.versions), "prior_requests": prior_requests, "priorities": prio, "focus": focus},
         )
         s = start_session(cfg, self.user, self.creds_all)
         self.council_sessions.append(s.id)

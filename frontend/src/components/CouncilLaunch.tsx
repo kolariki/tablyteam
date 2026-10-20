@@ -13,13 +13,17 @@ import SkillPicker from './SkillPicker'
 import { toast } from './Toast'
 
 /** Before sending the project to the council: what the user wants treated first, who sits at the table, skills per role. */
-export default function CouncilLaunch({ team, onLaunch, onClose, defaultRounds = 3, startEditing = false }: { team: TeamMember[]; onLaunch: (priorities: string, rounds: number, references: string[], deep: boolean) => Promise<void>; onClose: () => void; defaultRounds?: number; startEditing?: boolean }) {
+export default function CouncilLaunch({ team, onLaunch, onClose, defaultRounds = 3, startEditing = false }: { team: TeamMember[]; onLaunch: (priorities: string, rounds: number, references: string[], deep: boolean, focus: 'production' | 'design') => Promise<void>; onClose: () => void; defaultRounds?: number; startEditing?: boolean }) {
   const T = useT()
   const [editing, setEditing] = useState(startEditing)
   const [priorities, setPriorities] = useState('')
   const [rounds, setRounds] = useState(defaultRounds)
   const [refs, setRefs] = useState<string[]>([])
   const [deep, setDeep] = useState(false)
+  const [focus, setFocus] = useState<'production' | 'design'>('production')
+  const [focusTouched, setFocusTouched] = useState(false)
+  // references on the table: the round defaults to design (that is what references are for) unless the user chose
+  useEffect(() => { if (!focusTouched) setFocus(refs.length ? 'design' : 'production') }, [refs.length, focusTouched])
   const [busy, setBusy] = useState(false)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -29,7 +33,7 @@ export default function CouncilLaunch({ team, onLaunch, onClose, defaultRounds =
   const go = async () => {
     setBusy(true)
     try {
-      await onLaunch(priorities.trim(), rounds, refs, deep)
+      await onLaunch(priorities.trim(), rounds, refs, deep, focus)
     } finally {
       setBusy(false)
     }
@@ -50,8 +54,22 @@ export default function CouncilLaunch({ team, onLaunch, onClose, defaultRounds =
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto scroll-thin px-7 py-5">
+          {/* what kind of round */}
+          <div className={label}>{T('Enfoque de la ronda', 'Round focus')}</div>
+          <div className="mt-1.5 grid grid-cols-2 gap-2">
+            {([
+              { id: 'design', title: T('Diseño y fidelidad al referente', 'Design and fidelity to the reference'), text: T('Solo UI/UX: layout, componentes, paleta, tipografía, estados, interacciones. Nada de tests, CI ni legales.', 'UI/UX only: layout, components, palette, typography, states, interactions. No tests, CI or legal.') },
+              { id: 'production', title: T('Listo para producción', 'Ready for production'), text: T('Qué falta para salir: correctitud, tests, CI, deploy, legales, rendimiento y seguridad.', 'What is missing to ship: correctness, tests, CI, deploy, legal, performance and security.') },
+            ] as const).map((o) => (
+              <button key={o.id} type="button" onClick={() => { setFocus(o.id); setFocusTouched(true) }} className={`rounded-xl border px-3.5 py-3 text-left transition ${focus === o.id ? 'border-accent bg-accent-soft shadow-[0_0_0_3px_rgba(47,107,93,.12)]' : 'border-line bg-paper hover:border-ink-4'}`}>
+                <span className="block text-[13.5px] font-semibold">{o.title}</span>
+                <span className="mt-0.5 block text-[11.5px] leading-snug text-ink-3">{o.text}</span>
+              </button>
+            ))}
+          </div>
+
           {/* priorities */}
-          <div className={label}>{T('Prioridades (opcional)', 'Priorities (optional)')}</div>
+          <div className={`${label} mt-5`}>{T('Prioridades (opcional)', 'Priorities (optional)')}</div>
           <textarea
             autoFocus={!startEditing}
             value={priorities}

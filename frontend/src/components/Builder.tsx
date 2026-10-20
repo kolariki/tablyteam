@@ -257,10 +257,10 @@ export default function Builder({ onBack }: { onBack: () => void }) {
       {runOpen && <RunModal onClose={() => setRunOpen(false)} onDownload={downloadZip} />}
       {fdeOpen !== null && <FdeModal onClose={() => setFdeOpen(null)} prefill={fdeOpen ? `${T('Resolver los bloqueantes del consejo:', 'Resolve the council blockers:')}\n${fdeOpen}` : ''} />}
       {councilOpen && (
-        <CouncilLaunch team={b.team} startEditing={councilOpen === 'edit'} onClose={() => setCouncilOpen(false)} onLaunch={async (priorities, rounds, references, deep) => {
+        <CouncilLaunch team={b.team} startEditing={councilOpen === 'edit'} onClose={() => setCouncilOpen(false)} onLaunch={async (priorities, rounds, references, deep, focus) => {
           if (!b.id) return
           try {
-            const r = await api.buildCouncil(b.id, b.sessionId, rounds, priorities, references, deep)
+            const r = await api.buildCouncil(b.id, b.sessionId, rounds, priorities, references, deep, focus)
             if (r.session_id) useBuild.getState().set({ councilSession: r.session_id })
             else {
               // the benchmark runs in the background: open the build socket so its events (references, done, council) arrive

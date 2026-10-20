@@ -103,6 +103,15 @@ export default function DesignPanel() {
         {/* the request box */}
         <div className="shrink-0 border-t border-line bg-paper p-4">
           <div className="flex items-center gap-2 text-[13px] font-semibold"><Sparkles size={14} className="text-accent" /> {T('Pedile algo al diseñador', 'Ask the designer for something')}</div>
+          {b.files['research/REFERENCES.md'] && (
+            <button
+              disabled={sending || !b.id}
+              onClick={() => send(tr('Llevá TODAS las pantallas al nivel del «Plano visual objetivo» de research/REFERENCES.md, mirando las capturas reales de research/shots/: reproducí región por región la distribución y proporciones, los componentes y su estilo, la paleta (hex), la tipografía equivalente, el espaciado, los estados, las interacciones y el comportamiento móvil. Pulido final: nada desalineado, nada a medias. Con elementos propios, sin assets, marcas ni textos de terceros. Actualizá design/mockup.html y design/DESIGN.md para que coincidan.', 'Bring EVERY screen to the level of the «Target visual blueprint» in research/REFERENCES.md, looking at the real captures in research/shots/: reproduce region by region the layout and proportions, components and their style, palette (hex), equivalent typography, spacing, states, interactions and mobile behaviour. Final polish: nothing misaligned, nothing half done. With our own elements, no third-party assets, brands or texts. Update design/mockup.html and design/DESIGN.md to match.'))}
+              className="mb-2 flex h-9 w-full items-center justify-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40"
+            >
+              {sending ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />} {T('Llevar el diseño al nivel del referente', 'Bring the design to the reference’s level')}
+            </button>
+          )}
           <div className="mt-2 flex flex-wrap gap-1.5">
             {QUICK.map(([label, text]) => (
               <button key={label} disabled={sending} onClick={() => setAsk(text)} className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11.5px] text-ink-2 shadow-sm transition hover:bg-accent-soft hover:border-accent hover:text-accent disabled:opacity-40">{label}</button>

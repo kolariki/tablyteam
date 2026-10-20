@@ -1219,11 +1219,12 @@ async def build_council(build_id: str, body: dict, user: User = CurrentUser):
     b.review_plan = b.review_plan or {"max_rounds": min(3, max(1, int(body.get("max_rounds") or 1)))}
     refs = [r.strip() for r in body.get("references", []) if isinstance(r, str) and r.strip()] if isinstance(body.get("references"), list) else []
     b.add_references(refs, bool(body.get("deep_analysis")))
+    focus = "design" if body.get("focus") == "design" else "production"
     if refs:  # whatever the user listed this time is benchmarked first (fresh), then the council opens by itself
         b._save()
-        spawn(b.research_then_council(str(body.get("priorities") or ""), refs))
+        spawn(b.research_then_council(str(body.get("priorities") or ""), refs, focus))
         return {"ok": True, "session_id": None, "researching": len(refs)}
-    sid = b.start_council(priorities=str(body.get("priorities") or ""))
+    sid = b.start_council(priorities=str(body.get("priorities") or ""), focus=focus)
     return {"ok": True, "session_id": sid}
 
 
