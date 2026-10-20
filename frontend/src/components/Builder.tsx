@@ -177,9 +177,8 @@ export default function Builder({ onBack }: { onBack: () => void }) {
     <div className="h-full flex flex-col bg-paper">
       {/* top bar */}
       <div className="flex h-16 shrink-0 items-center gap-3 border-b border-line bg-surface/90 px-4 backdrop-blur">
-        <button onClick={onBack} className="flex shrink-0 items-center gap-2.5 rounded-lg transition hover:opacity-80" title={T('Volver al inicio', 'Back to the home')}>
-          <img src="/icon.svg" alt="" aria-hidden className="h-8 w-8 rounded-lg shadow-sm" draggable={false} />
-          <span className="serif text-[17px] leading-none">Tably <em className="text-accent">Team</em></span>
+        <button onClick={onBack} className="flex shrink-0 items-center rounded-lg transition hover:opacity-80" title={T('Tably Team · volver al inicio', 'Tably Team · back to the home')}>
+          <img src="/icon.svg" alt="Tably Team" className="h-9 w-9 rounded-xl shadow-sm" draggable={false} />
         </button>
         <button onClick={onBack} className={`${HBTN} px-3`}><ArrowLeft size={14} /> {T('Volver', 'Back')}</button>
         <span className="mx-1 h-7 w-px bg-line" />
