@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, CheckCircle2, FlaskConical, Gauge, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, FlaskConical, Gauge, ListChecks, Search, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2 } from 'lucide-react'
 import { marked } from 'marked'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { reconnectBuild, useBuild, type Activity, type ChatItem, type Todo } from '../buildStore'
@@ -448,6 +448,10 @@ export default function Builder({ onBack }: { onBack: () => void }) {
               />
               <button onClick={() => send()} disabled={!input.trim() || !b.id} className="shrink-0 rounded-xl bg-accent text-white p-2 disabled:opacity-40"><Send size={16} /></button>
             </div>
+            {/* what the agent is doing right now, under the box: last action, counters of the turn, elapsed */}
+            <AnimatePresence initial={false}>
+              {running && <LiveStatusBar key="live" />}
+            </AnimatePresence>
           </div>
         </div>
 
@@ -569,6 +573,38 @@ export default function Builder({ onBack }: { onBack: () => void }) {
         </div>
       </div>
     </div>
+  )
+}
+
+/** The live strip under the chat box: the agent's current action with its path, this turn's counters and the clock. */
+function LiveStatusBar() {
+  const T = useT()
+  const b = useBuild()
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id) }, [])
+  const acts = b.activity
+  const last = acts[acts.length - 1]
+  const counts = acts.reduce((c, a) => { c[a.kind] = (c[a.kind] ?? 0) + 1; return c }, {} as Record<string, number>)
+  const started = acts[0]?.ts ? acts[0].ts * (acts[0].ts < 1e12 ? 1000 : 1) : now
+  const el = Math.max(0, Math.round((now - started) / 1000))
+  const clock = `${String(Math.floor(el / 60)).padStart(2, '0')}:${String(el % 60).padStart(2, '0')}`
+  const ICON: Record<string, typeof Search> = { read: FileText, write: FileCode2, edit: FileCode2, search: Search, run: TerminalSquare, test: FlaskConical, install: Download, build: HardHat, git: GitBranch, plan: ListChecks, think: Eye }
+  const Icon = (last && ICON[last.kind]) || Loader2
+  const phase = b.livePhase === 'research' ? T('investigando referentes', 'researching references') : b.livePhase === 'design' ? T('diseñando', 'designing') : b.livePhase === 'preview' ? T('armando la vista previa', 'building the preview') : b.livePhase === 'report' ? T('escribiendo el informe', 'writing the report') : T('construyendo', 'building')
+  const chips: [string, number | undefined][] = [[T('leídos', 'read'), counts.read], [T('escritos', 'written'), (counts.write ?? 0) + (counts.edit ?? 0) || undefined], [T('comandos', 'commands'), counts.run], [T('tests', 'tests'), counts.test]]
+  return (
+    <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }} className="mt-2 flex items-center gap-2 overflow-hidden rounded-xl border border-accent/30 bg-accent-soft/60 px-3 py-2 text-[12px]">
+      <span className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-white"><Icon size={11} className={last ? '' : 'animate-spin'} /><span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent ring-2 ring-paper animate-pulse" /></span>
+      <span className="shrink-0 text-[10.5px] uppercase tracking-[0.2em] text-accent">{phase}{b.liveTurn ? ` · ${T('turno', 'turn')} ${b.liveTurn}` : ''}</span>
+      <span className="h-3 w-px shrink-0 bg-accent/30" />
+      <span className="min-w-0 flex-1 truncate">
+        {b.thinking && !last ? <span className="italic text-ink-2">{T('pensando…', 'thinking…')}</span> : last ? <><span className="text-ink">{last.label}</span>{last.path && <span className="ml-1.5 font-mono text-[11px] text-ink-3">{last.path}</span>}</> : <span className="text-ink-2">{T('arrancando…', 'starting…')}</span>}
+      </span>
+      <span className="hidden shrink-0 items-center gap-1.5 lg:flex">
+        {chips.filter(([, n]) => n).map(([l, n]) => <span key={l} className="rounded-full border border-line bg-surface px-2 py-0.5 text-[10.5px] text-ink-2"><b className="text-ink">{n}</b> {l}</span>)}
+      </span>
+      <span className="shrink-0 font-mono text-[11px] text-ink-3">{clock}</span>
+    </motion.div>
   )
 }
 
