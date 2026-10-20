@@ -1240,6 +1240,12 @@ async def build_council_apply(build_id: str, body: dict, user: User = CurrentUse
     rounds = int(body.get("max_rounds") or 0)
     b.review_plan = {"max_rounds": len(b.council_sessions) + rounds} if rounds > 0 else None
     b.council_priorities = str(body.get("priorities") or "")
+    refs = [r.strip() for r in body.get("references", []) if isinstance(r, str) and r.strip()] if isinstance(body.get("references"), list) else []
+    b.add_references(refs, bool(body.get("deep_analysis")))
+    if refs:  # benchmark first (the research screen shows it), then the builder applies the list against that bar
+        b._save()
+        spawn(b.research_then_apply(changes, body.get("council_session") or "", refs))
+        return {"ok": True, "researching": len(refs)}
     b.apply_council(changes, body.get("council_session") or "")
     return {"ok": True}
 

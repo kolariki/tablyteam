@@ -18,10 +18,7 @@ export default function TopBar({ onNew, onRerun }: { onNew: () => void; onRerun?
 
   return (
     <div className="flex h-16 shrink-0 items-center gap-3 border-b border-line bg-surface/90 px-4 backdrop-blur">
-      <div className="flex items-center gap-2">
-        <img src="/icon.svg" alt="" aria-hidden className="h-8 w-8 rounded-lg shadow-sm" draggable={false} />
-        <span className={`serif text-[17px] ${compact ? 'hidden' : ''}`}>Tably <em className="text-accent">Team</em></span>
-      </div>
+      <img src="/icon.svg" alt="Tably Team" title="Tably Team" className="h-9 w-9 shrink-0 rounded-xl shadow-sm" draggable={false} />
       <div className="flex items-center gap-2 ml-2">
         {s.recording ? null : s.status === 'paused' ? (
           <span className="flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/15 px-2.5 py-1 text-[11px] font-bold text-gold">
@@ -35,11 +32,18 @@ export default function TopBar({ onNew, onRerun }: { onNew: () => void; onRerun?
           <span className="flex items-center gap-1.5 rounded-full border border-ok/30 bg-ok/10 px-2.5 py-1 text-[11px] font-bold text-ok"><span className="h-2 w-2 rounded-full bg-ok shadow-[0_0_0_3px_rgba(23,137,106,.18)]" /> {s.status === 'completed' ? T('TERMINADO', 'FINISHED') : s.status.toUpperCase()}</span>
         )}
         {s.config && !s.recording && (
-          <span className="rounded-full border border-line bg-surface px-2.5 py-1 font-mono text-[11px] text-ink-2" title={T('turno actual / máximo', 'current turn / maximum')}>
+          <span className="whitespace-nowrap rounded-full border border-line bg-surface px-2.5 py-1 font-mono text-[11px] text-ink-2" title={T('turno actual / máximo', 'current turn / maximum')}>
             {s.status === 'voting' ? T('votación final', 'final vote') : s.closing && s.status === 'running' ? T('ronda de cierre', 'closing round') : `${T('turno', 'turn')} ${Math.min(s.turns.length + (s.status === 'running' ? 1 : 0), s.config.max_turns)} / ${s.config.max_turns}`}
           </span>
         )}
-        {s.config && !compact && <span className="serif hidden max-w-[40vw] truncate text-[17px] md:block">{s.config.mode === 'review' && s.config.review_of ? `${s.config.review_of.title} · ${T('consejo ronda', 'council round')} ${s.config.review_of.round} · v${s.config.review_of.version ?? ''}` : (s.config.title || s.config.topic)}</span>}
+        {s.config && !compact && (
+          <span className="hidden min-w-0 max-w-[34vw] md:block">
+            <span className="serif block truncate text-[17px] leading-tight" title={s.config.mode === 'review' && s.config.review_of ? s.config.review_of.title : (s.config.title || s.config.topic)}>{s.config.mode === 'review' && s.config.review_of ? s.config.review_of.title : (s.config.title || s.config.topic)}</span>
+            {s.config.mode === 'review' && s.config.review_of && (
+              <span className="block truncate text-[11.5px] text-ink-3">{T('Consejo · ronda', 'Council · round')} {s.config.review_of.round} · v{s.config.review_of.version ?? ''}{(s.config.review_of as { focus?: string }).focus === 'design' ? ` · ${T('diseño', 'design')}` : ''}</span>
+            )}
+          </span>
+        )}
       </div>
       <div className={`ml-auto flex min-w-0 items-center gap-2 overflow-x-auto ${s.recording ? 'invisible' : s.recMode ? 'opacity-0 hover:opacity-100 transition' : ''}`}>
         {s.source === 'replay' && (

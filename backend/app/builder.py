@@ -1132,6 +1132,21 @@ class Build:
         self._save()
         return s.id
 
+    async def research_then_apply(self, changes: list[dict], session_id: str, refs: list[str]) -> None:
+        """References added when accepting the council's list: benchmark them first, then apply the list with that bar."""
+        before = self.status
+        try:
+            self.chat.append({"role": "system", "text": f"Investigando {len(refs)} referente(s) antes de aplicar los cambios: {', '.join(refs)[:300]}", "ts": time.time()})
+            await self.research_phase(only=refs)
+        except Exception as e:  # noqa: BLE001
+            self._note(f"La investigación de referentes falló: {str(e)[:200]}")
+        finally:
+            self.status = before if before not in ("running", "reviewing") else "completed"
+            self.live = None
+            self.emit("build.status", status=self.status, build=self.snapshot())
+            self._save()
+        self.apply_council(changes, session_id)
+
     def apply_council(self, changes: list[dict], session_id: str) -> None:
         """The user accepted the council's list: the builder applies it; a new council round follows if rounds remain."""
         if self.status in ("running", "reviewing"):

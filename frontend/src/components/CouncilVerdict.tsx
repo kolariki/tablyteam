@@ -1,5 +1,7 @@
 import { motion } from 'framer-motion'
-import { Check, CheckCircle2, Hammer, HardHat, Loader2, Minus, Plus, RefreshCw, X, XCircle } from 'lucide-react'
+import { Check, CheckCircle2, ChevronDown, Hammer, HardHat, Link2, Loader2, Minus, Plus, RefreshCw, X, XCircle } from 'lucide-react'
+import ReferencesField from './ReferencesField'
+import { useBuild } from '../buildStore'
 import { useState } from 'react'
 import { api } from '../lib/api'
 import { tr, useT } from '../lib/i18n'
@@ -22,6 +24,9 @@ export default function CouncilVerdict() {
   const [priorities, setPriorities] = useState('')
   const [busy, setBusy] = useState(false)
   const [redoing, setRedoing] = useState(false)
+  const [refs, setRefs] = useState<string[]>([])
+  const [deep, setDeep] = useState(false)
+  const [refsOpen, setRefsOpen] = useState(false)
   if (!show || !config || config.mode !== 'review') return null
   const map = agentMap(config)
   const ro = config.review_of
@@ -36,7 +41,8 @@ export default function CouncilVerdict() {
     if (!ro) return
     setBusy(true)
     try {
-      await api.councilApply(ro.build_id, ro.session_id, chosen, rounds, useArena.getState().sessionId, rounds > 0 ? priorities.trim() : '')
+      const r = await api.councilApply(ro.build_id, ro.session_id, chosen, rounds, useArena.getState().sessionId, rounds > 0 ? priorities.trim() : '', refs, deep)
+      if (r.researching) useBuild.getState().set({ researching: { refs, started: Date.now(), visited: [], finished: false } })
       set({ showVerdict: false, pendingBuild: { buildId: ro.build_id, sessionId: ro.session_id } })
     } catch (e) {
       toast.error(tr('No se pudo lanzar la construcción', 'Could not start the build'), (e as Error).message)
@@ -193,6 +199,21 @@ export default function CouncilVerdict() {
                 <button onClick={() => ro && set({ showVerdict: false, pendingBuild: { buildId: ro.build_id, sessionId: ro.session_id, fde: changes.filter((c) => c.severity === 'bloqueante').map((c) => `- ${c.text}`).join('\n') } })} className={`${pill} h-11 whitespace-nowrap border-gold/40 text-gold hover:border-gold hover:bg-gold/10 hover:text-gold`} title={T('Un ingeniero nuestro resuelve esto por vos, precio fijo', 'One of our engineers solves this for you, fixed price')}><HardHat size={15} /> {T('Pedir un developer', 'Request a developer')}</button>
                 <button onClick={openBuild} className={`${pill} h-11 whitespace-nowrap`} title={T('Abrir el constructor sin aplicar cambios', 'Open the builder without applying changes')}><Hammer size={15} /> {T('Constructor sin cambios', 'Builder, no changes')}</button>
               </div>
+            </div>
+            {/* references + reverse engineering for the build that applies this list */}
+            <div className="mt-3 rounded-xl border border-line bg-surface">
+              <button type="button" onClick={() => setRefsOpen((v) => !v)} className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-[12.5px]">
+                <Link2 size={14} className="text-accent" />
+                <span className="font-semibold">{T('Referencias e ingeniería inversa para esta construcción', 'References and reverse engineering for this build')}</span>
+                <span className="text-ink-3">{refs.length ? `· ${refs.join(', ')}${deep ? ` · ${T('REA', 'REA')}` : ''}` : `· ${T('opcional', 'optional')}`}</span>
+                <ChevronDown size={14} className={`ml-auto text-ink-3 transition ${refsOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {refsOpen && (
+                <div className="border-t border-line px-3.5 pb-3.5 pt-3">
+                  <ReferencesField value={refs} onChange={setRefs} deep={deep} onDeep={setDeep} compact />
+                  <div className="mt-1.5 text-[11.5px] text-ink-3">{T('Con referencias, el equipo las investiga primero (ves la pantalla de ingeniería inversa) y después el constructor aplica la lista tomándolas como vara; con REA, como réplica.', 'With references, the team researches them first (you see the reverse-engineering screen) and then the builder applies the list with them as the bar; with REA, as a replica.')}</div>
+                </div>
+              )}
             </div>
             {chosen.length > 0 && rounds > 0 && (
               <textarea value={priorities} onChange={(e) => setPriorities(e.target.value)} rows={2} placeholder={T('Para la próxima ronda: ¿qué querés que el consejo mire primero? (opcional)', 'For the next round: what should the council look at first? (optional)')} className="mt-3 w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[12.5px] shadow-sm outline-none transition focus:border-accent" />
