@@ -15,6 +15,7 @@ interface Props {
   onSettings: () => void
   onAudit: () => void
   refreshKey?: number
+  onLoaded?: () => void  // first data in: the home can drop its loader
 }
 
 const STATUS: Record<string, { es: string; en: string; cls: string }> = {
@@ -57,7 +58,7 @@ function SceneThumb({ sessionId }: { sessionId: string }) {
   )
 }
 
-export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refreshKey }: Props) {
+export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refreshKey, onLoaded }: Props) {
   const T = useT()
   const statusLabel = (code: string) => (STATUS[code] ? T(STATUS[code].es, STATUS[code].en) : code)
   const [data, setData] = useState<DashboardData | null>(null)
@@ -68,7 +69,7 @@ export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refres
   const { confirm, dialog } = useConfirm()
 
   const load = () => {
-    api.dashboard().then(setData).catch(() => {})
+    api.dashboard().then((d) => { setData(d); onLoaded?.() }).catch(() => onLoaded?.())
   }
   useEffect(load, [refreshKey])
   useEffect(() => {

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { api, type User } from '../lib/api'
 import { fmtUsd } from '../lib/parse'
 import Dashboard from './Dashboard'
+import HomeLoader from './HomeLoader'
 import ModelSelect, { invalidateModels } from './ModelSelect'
 import ArenaIntro, { ICON_STEP, PLAY_OUT, iconExitAt, introTeam } from './ArenaIntro'
 import Intake from './Intake'
@@ -83,13 +84,19 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
     pace_ms: 700,
   })
 
+  // the loader stays until providers, experiments and projects are in (or 8 s, whichever comes first)
+  const [loaded, setLoaded] = useState({ providers: false, presets: false, dashboard: false, timeout: false })
+  const mark = (k: keyof typeof loaded) => setLoaded((l) => (l[k] ? l : { ...l, [k]: true }))
+  const booting = !loaded.timeout && !(loaded.providers && loaded.presets && loaded.dashboard)
   useEffect(() => {
-    api.providers().then(setProviders).catch((e) => setError(`${tr('No hay backend', 'No backend')}: ${e.message}`))
+    api.providers().then(setProviders).catch((e) => setError(`${tr('No hay backend', 'No backend')}: ${e.message}`)).finally(() => mark('providers'))
     api.presets().then((p) => {
       setPresets(p)
       if (p[0]) applyPreset(p[0])
-    }).catch(() => {})
+    }).catch(() => {}).finally(() => mark('presets'))
     api.roles().then(setRoles).catch(() => {})
+    const t = setTimeout(() => mark('timeout'), 8000)
+    return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -204,6 +211,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
 
   return (
     <div className="h-full overflow-y-auto scroll-thin arena-bg">
+      <AnimatePresence>{booting && <HomeLoader key="loader" />}</AnimatePresence>
       {nameDialog}
       {deleteDialog}
       {chooser && (() => {
@@ -598,7 +606,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
             })()}
         </div>
 
-        <Dashboard onOpen={onOpen} onCouncil={(id) => useArena.getState().set({ pendingLive: id })} onReplay={onReplay} onSettings={onSettings} onAudit={onAudit} />
+        <Dashboard onOpen={onOpen} onCouncil={(id) => useArena.getState().set({ pendingLive: id })} onReplay={onReplay} onSettings={onSettings} onAudit={onAudit} onLoaded={() => mark('dashboard')} />
       </div>
     </div>
   )
