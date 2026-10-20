@@ -109,6 +109,7 @@ class BriefRequest(BaseModel):
     target: Target = "claude-code"
     include_transcript: bool = True
     regenerate: bool = False
+    user_notes: str = ""  # the decisions as the user edited them in the verdict: they override the debate
 
 
 def session_path(user: User, session_id: str) -> Path:
@@ -265,6 +266,9 @@ async def stream_brief(user: User, session_id: str, req: BriefRequest) -> AsyncI
     transcript = transcript_markdown(data)
     appendix = f"\n\n---\n\n<details>\n<summary>Anexo: transcripción completa del debate</summary>\n\n{transcript}\n\n</details>\n" if req.include_transcript else ""
 
+    notes = (req.user_notes or "").strip()[:12000]
+    if notes:  # edited decisions change the brief: never serve the cached one, and regenerate from them
+        req.regenerate = True
     if cache.exists() and not req.regenerate:
         body = cache.read_text()
         yield body + appendix
@@ -276,6 +280,8 @@ async def stream_brief(user: User, session_id: str, req: BriefRequest) -> AsyncI
     cfg = data["config"]
     system = BRIEF_SYSTEM.format(language=cfg.get("language", "español"), howto=TARGETS[req.target]["howto"])
     user_msg = f"DEBATE A CONVERTIR EN BRIEF:\n\n{transcript}"
+    if notes:
+        user_msg = f"DECISIONES FINALES EDITADAS POR EL USUARIO (tienen prioridad absoluta sobre lo dicho en el debate; si contradicen algo del debate, mandan estas):\n\n{notes}\n\n" + user_msg
     header = (
         f"<!-- Tably Team · brief de construcción · sesión {session_id} · escrito por {req.model} · "
         f"para {TARGETS[req.target]['label']} · {time.strftime('%Y-%m-%d %H:%M')} -->\n\n"

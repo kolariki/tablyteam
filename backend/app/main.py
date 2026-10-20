@@ -1636,6 +1636,16 @@ def build_team_skills(build_id: str, agent_id: str, body: dict, user: User = Cur
     return {"ok": True}
 
 
+@app.put("/api/builds/{build_id}/team")
+def build_team_set(build_id: str, body: dict, user: User = CurrentUser):
+    """The council itself: which roles sit at the table and with which company/model. Used before sending to review."""
+    b = _build(user, build_id, body.get("session_id"))
+    team = body.get("team")
+    if not isinstance(team, list) or len([a for a in team if isinstance(a, dict)]) < 2:
+        raise HTTPException(400, "El consejo necesita al menos 2 roles")
+    return {"ok": True, "team": b.set_team(team)}
+
+
 # --------------------------------------------------------------------------- FDE: "pedir un developer" (fixed-price packages)
 
 @app.get("/api/fde/packages")

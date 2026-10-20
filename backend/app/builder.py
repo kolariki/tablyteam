@@ -979,6 +979,27 @@ class Build:
                 return True
         return False
 
+    def set_team(self, agents: list[dict]) -> list[dict]:
+        """Replace the council: add/remove roles, change company/model/name. Personas and skills of roles kept by id
+        survive; the next council round, review or design phase uses the new team."""
+        old = {a.get("id"): a for a in self.team}
+        out: list[dict] = []
+        for i, a in enumerate(agents[:8]):
+            if not isinstance(a, dict) or not role_of(a.get("role")):
+                continue
+            aid = str(a.get("id") or f"rol-{i + 1}")
+            prev = old.get(aid, {})
+            out.append({
+                **prev,
+                "id": aid, "name": str(a.get("name") or prev.get("name") or role_of(a.get("role"))["label"])[:60], "role": a.get("role"),
+                "provider": str(a.get("provider") or prev.get("provider") or self.req.provider), "model": str(a.get("model") or prev.get("model") or self.req.model),
+                "color": a.get("color") or prev.get("color"), "skills": a.get("skills") if isinstance(a.get("skills"), list) else prev.get("skills"),
+            })
+        self.team = out
+        self.emit("build.team", team=self.snapshot()["team"])
+        self._save()
+        return self.snapshot()["team"]
+
     # ------------------------------------------------------------- council review (live arena debate, mode "review")
     def council_agents(self) -> list[dict]:
         """Team roles that can speak via API (their own provider, or the builder's when the key is missing)."""

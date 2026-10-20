@@ -118,7 +118,7 @@ export default function ServicesDeploy({ onOpenSettings }: { onOpenSettings: () 
                   ))}
                 </div>
                 <div className="mt-3 flex items-center gap-2 border-t border-line pt-3">
-                  <button onClick={() => setGuide(g)} className="flex h-8 items-center gap-1.5 rounded-full border border-accent/40 bg-surface px-3 text-[12.5px] font-medium text-accent shadow-sm transition hover:-translate-y-0.5 hover:bg-accent/5">
+                  <button onClick={() => setGuide(g)} className="flex h-8 items-center gap-1.5 rounded-full border border-accent/40 bg-surface px-3 text-[12.5px] font-medium text-accent shadow-sm transition hover:bg-accent/5">
                     <BookOpen size={13} /> {T('Cómo conseguirlo', 'How to get it')}
                   </button>
                   {g.url && g.url.startsWith('http') && <a href={g.url} target="_blank" rel="noreferrer" className="ml-auto flex items-center gap-1 text-[12px] text-ink-3 transition hover:text-accent">{T('ir al panel', 'open the dashboard')} <ExternalLink size={11} /></a>}
@@ -129,10 +129,10 @@ export default function ServicesDeploy({ onOpenSettings }: { onOpenSettings: () 
         </div>
         {info.groups.length > 0 && (
           <div className="mt-4 flex items-center gap-2">
-            <button disabled={!dirty || saving} onClick={save} className="flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:brightness-110 disabled:opacity-40 disabled:hover:translate-y-0">
+            <button disabled={!dirty || saving} onClick={save} className="flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40">
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} {T('Guardar valores', 'Save values')}
             </button>
-            <button onClick={async () => b.sessionId && b.id && downloadBlob(new Blob([await api.envFile(b.sessionId, b.id)], { type: 'text/plain' }), '.env')} className="flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-4 text-sm shadow-sm transition hover:-translate-y-0.5 hover:border-accent hover:text-accent">
+            <button onClick={async () => b.sessionId && b.id && downloadBlob(new Blob([await api.envFile(b.sessionId, b.id)], { type: 'text/plain' }), '.env')} className="flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-4 text-sm shadow-sm transition hover:bg-accent-soft hover:border-accent hover:text-accent">
               <Download size={14} /> {T('Descargar .env', 'Download .env')}
             </button>
             {savedAt && !dirty && <span className="text-[12px] text-ok">{T('guardado', 'saved')}</span>}

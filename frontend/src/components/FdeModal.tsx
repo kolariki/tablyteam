@@ -117,8 +117,8 @@ export default function FdeModal({ onClose, prefill = '' }: { onClose: () => voi
                 <div className="flex items-center gap-2.5 text-lg font-semibold"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-ok text-white"><Check size={16} strokeWidth={3} /></span> {T('Pedido', 'Request')} {done.id} {T('recibido', 'received')} · {packages.find((p) => p.id === done.package)?.name}</div>
                 <p className="mt-2 text-[13.5px] text-ink-2">{T('Armamos el ticket con el estado real del proyecto. Te contactamos a tu email para coordinar el pago y el inicio.', 'We built the ticket with the real state of the project. We will email you to arrange payment and the start.')}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {bookingUrl && <a href={bookingUrl} target="_blank" rel="noreferrer" className="flex h-10 items-center gap-1.5 rounded-full border border-line bg-surface px-4 text-sm shadow-sm transition hover:-translate-y-0.5 hover:border-accent hover:text-accent"><Calendar size={15} /> {T('Elegir horario', 'Pick a time')}</a>}
-                  <button onClick={() => downloadTicket(done)} className="flex h-10 items-center gap-1.5 rounded-full border border-line bg-surface px-4 text-sm shadow-sm transition hover:-translate-y-0.5 hover:border-accent hover:text-accent"><Download size={15} /> {T('Ver el ticket que recibe el developer', 'See the ticket the developer receives')}</button>
+                  {bookingUrl && <a href={bookingUrl} target="_blank" rel="noreferrer" className="flex h-10 items-center gap-1.5 rounded-full border border-line bg-surface px-4 text-sm shadow-sm transition hover:bg-accent-soft hover:border-accent hover:text-accent"><Calendar size={15} /> {T('Elegir horario', 'Pick a time')}</a>}
+                  <button onClick={() => downloadTicket(done)} className="flex h-10 items-center gap-1.5 rounded-full border border-line bg-surface px-4 text-sm shadow-sm transition hover:bg-accent-soft hover:border-accent hover:text-accent"><Download size={15} /> {T('Ver el ticket que recibe el developer', 'See the ticket the developer receives')}</button>
                 </div>
               </div>
               <TicketPreview r={done} />
@@ -177,7 +177,7 @@ export default function FdeModal({ onClose, prefill = '' }: { onClose: () => voi
                         <span className="text-[12.5px] text-ink-2">{pkg.name}{pkg.id === 'hours' ? ` × ${hours} h` : ''}</span>
                         <span className="font-mono text-lg">USD {total}</span>
                       </div>
-                      <button disabled={busy || !!paying || !b.id} onClick={submit} className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-accent text-[15px] font-semibold text-white shadow-[0_12px_28px_-12px_rgba(47,107,93,.7)] transition hover:-translate-y-0.5 hover:brightness-110 disabled:opacity-40 disabled:hover:translate-y-0">
+                      <button disabled={busy || !!paying || !b.id} onClick={submit} className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-accent text-[15px] font-semibold text-white shadow-[0_12px_28px_-12px_rgba(47,107,93,.7)] transition hover:brightness-110 disabled:opacity-40">
                         {busy || paying ? <Loader2 size={17} className="animate-spin" /> : canPay ? <CreditCard size={17} /> : <HardHat size={17} />}
                         {canPay ? `${T('Pedir y pagar', 'Request and pay')} · USD ${total}` : `${T('Pedir', 'Request')} «${pkg.name}» · USD ${total}`}
                       </button>

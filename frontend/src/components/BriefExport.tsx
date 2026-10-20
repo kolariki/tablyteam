@@ -152,7 +152,7 @@ export default function BriefExport({ onClose, onBuild, onOpenBuild }: { onClose
     setText('')
     abort.current = new AbortController()
     try {
-      await api.brief(sessionId, { provider, model, target, include_transcript: includeTranscript, regenerate }, setText, abort.current.signal)
+      await api.brief(sessionId, { provider, model, target, include_transcript: includeTranscript, regenerate, user_notes: useArena.getState().decisionNotes || undefined }, setText, abort.current.signal)
     } catch (e) {
       setError((e as Error).message)
     } finally {

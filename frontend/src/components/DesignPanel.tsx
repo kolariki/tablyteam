@@ -78,7 +78,7 @@ export default function DesignPanel() {
             <div className="mt-4 rounded-2xl border border-dashed border-line bg-paper px-4 py-5 text-[13px] text-ink-2">
               <div className="flex items-center gap-2 font-semibold text-ink"><Palette size={15} className="text-accent" /> {T('Todavía no hay maqueta', 'No mockup yet')}</div>
               <p className="mt-1.5">{T('El diseñador la crea antes de escribir código cuando la construcción arranca con fase de diseño. También podés pedirla ahora:', 'The designer creates it before any code when the build starts with a design phase. You can also ask for it now:')}</p>
-              <button disabled={sending || !b.id} onClick={() => send(tr('Creá design/mockup.html (maqueta hi-fi navegable de las pantallas principales) y design/DESIGN.md (sistema visual: paleta, tipografía, componentes, estados) a partir del producto tal como está construido.', 'Create design/mockup.html (a clickable hi-fi mockup of the main screens) and design/DESIGN.md (visual system: palette, typography, components, states) from the product as built.'))} className="mt-3 flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:brightness-110 disabled:opacity-40">
+              <button disabled={sending || !b.id} onClick={() => send(tr('Creá design/mockup.html (maqueta hi-fi navegable de las pantallas principales) y design/DESIGN.md (sistema visual: paleta, tipografía, componentes, estados) a partir del producto tal como está construido.', 'Create design/mockup.html (a clickable hi-fi mockup of the main screens) and design/DESIGN.md (visual system: palette, typography, components, states) from the product as built.'))} className="mt-3 flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40">
                 {sending ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />} {T('Pedir una maqueta', 'Ask for a mockup')}
               </button>
             </div>
@@ -105,7 +105,7 @@ export default function DesignPanel() {
           <div className="flex items-center gap-2 text-[13px] font-semibold"><Sparkles size={14} className="text-accent" /> {T('Pedile algo al diseñador', 'Ask the designer for something')}</div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {QUICK.map(([label, text]) => (
-              <button key={label} disabled={sending} onClick={() => setAsk(text)} className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11.5px] text-ink-2 shadow-sm transition hover:-translate-y-0.5 hover:border-accent hover:text-accent disabled:opacity-40">{label}</button>
+              <button key={label} disabled={sending} onClick={() => setAsk(text)} className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11.5px] text-ink-2 shadow-sm transition hover:bg-accent-soft hover:border-accent hover:text-accent disabled:opacity-40">{label}</button>
             ))}
           </div>
           <div className="mt-2 flex items-end gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm focus-within:border-accent">

@@ -23,8 +23,8 @@ import DesignPanel from './DesignPanel'
 import { useEditorTheme } from '../lib/editorThemes'
 
 /** Header buttons share the home page's language: pills that lift on hover. */
-const HBTN = 'flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-sm text-ink-2 shadow-sm transition hover:-translate-y-0.5 hover:border-accent hover:text-accent disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:border-line disabled:hover:text-ink-2'
-const HBTN_PRIMARY = 'flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:brightness-110 disabled:opacity-40 disabled:hover:translate-y-0'
+const HBTN = 'flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-sm text-ink-2 shadow-sm transition hover:bg-accent-soft hover:border-accent hover:text-accent disabled:opacity-40 disabled:hover:border-line disabled:hover:text-ink-2'
+const HBTN_PRIMARY = 'flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40'
 const PBTN = 'flex items-center gap-1 rounded-md px-2 py-1 text-ink-3 transition hover:bg-surface-2 hover:text-ink disabled:opacity-40'
 
 type BuildState = ReturnType<typeof useBuild.getState>
@@ -59,7 +59,7 @@ export default function Builder({ onBack }: { onBack: () => void }) {
   const [picked, setPicked] = useState<Record<string, boolean>>({})
   const [applyRounds, setApplyRounds] = useState(2)
   const [runOpen, setRunOpen] = useState(false)
-  const [councilOpen, setCouncilOpen] = useState(false)
+  const [councilOpen, setCouncilOpen] = useState<false | 'launch' | 'edit'>(false)
   const [fdeOpen, setFdeOpen] = useState<string | null>(null)
   useEffect(() => {
     if (b.fdePrefill !== null) { setFdeOpen(b.fdePrefill); useBuild.getState().set({ fdePrefill: null }) }
@@ -226,7 +226,7 @@ export default function Builder({ onBack }: { onBack: () => void }) {
                 setPayingFees(true)
                 try { const o = await api.checkout({ kind: 'fees', build_id: b.id, session_id: b.sessionId }); window.location.href = o.url } catch (e) { toast.error(tr('No se pudo iniciar el pago', 'Could not start the payment'), (e as Error).message); setPayingFees(false) }
               }}
-              className="flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-[11px] font-bold text-gold transition hover:-translate-y-0.5 hover:bg-gold/20 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-[11px] font-bold text-gold transition hover:bg-gold/20 disabled:opacity-50"
               title={T('Cargos por uso pendientes de pago (análisis profundo). Se pagan con Stripe.', 'Unpaid per-use charges (deep analysis). Paid through Stripe.')}
             >{payingFees ? <Loader2 size={11} className="animate-spin" /> : <CreditCard size={11} />} USD {b.feesDue.toFixed(2)} {T('a pagar', 'to pay')}</button>
           )}
@@ -243,7 +243,7 @@ export default function Builder({ onBack }: { onBack: () => void }) {
       {runOpen && <RunModal onClose={() => setRunOpen(false)} onDownload={downloadZip} />}
       {fdeOpen !== null && <FdeModal onClose={() => setFdeOpen(null)} prefill={fdeOpen ? `${T('Resolver los bloqueantes del consejo:', 'Resolve the council blockers:')}\n${fdeOpen}` : ''} />}
       {councilOpen && (
-        <CouncilLaunch team={b.team} onClose={() => setCouncilOpen(false)} onLaunch={async (priorities, rounds) => {
+        <CouncilLaunch team={b.team} startEditing={councilOpen === 'edit'} onClose={() => setCouncilOpen(false)} onLaunch={async (priorities, rounds) => {
           if (!b.id) return
           try {
             const r = await api.buildCouncil(b.id, b.sessionId, rounds, priorities)
@@ -350,7 +350,7 @@ export default function Builder({ onBack }: { onBack: () => void }) {
               </div>
             )}
             {b.status === 'completed' && !b.liveTurn && b.team.length > 0 && (
-              <ReviewLauncher team={b.team} onStart={() => setCouncilOpen(true)} />
+              <ReviewLauncher team={b.team} onStart={() => setCouncilOpen('launch')} onEdit={() => setCouncilOpen('edit')} />
             )}
             {b.pendingCouncil && !b.liveTurn && (
               <button onClick={() => useArena.getState().set({ pendingLive: b.pendingCouncil! })} className="w-full rounded-2xl border-2 border-gold bg-gold/10 px-4 py-3 text-left transition hover:brightness-95">
@@ -405,7 +405,7 @@ export default function Builder({ onBack }: { onBack: () => void }) {
                 ] as const).map((q) => {
                   const Icon = q.icon
                   return (
-                    <button key={q.label} type="button" onClick={() => send(q.text)} title={q.tip} className={`flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12px] font-medium shadow-sm transition hover:-translate-y-0.5 ${q.hot ? 'border-accent/40 bg-accent-soft text-accent hover:bg-accent hover:text-white' : 'border-line bg-paper text-ink-2 hover:border-accent hover:text-accent'}`}>
+                    <button key={q.label} type="button" onClick={() => send(q.text)} title={q.tip} className={`flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12px] font-medium shadow-sm transition ${q.hot ? 'border-accent/40 bg-accent-soft text-accent hover:bg-accent hover:text-white' : 'border-line bg-paper text-ink-2 hover:border-accent hover:text-accent'}`}>
                       <Icon size={13} /> {q.label}
                     </button>
                   )

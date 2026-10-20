@@ -116,7 +116,7 @@ export default function ServiceGuide({ group, sessionId, buildId, onClose, onSav
                       <h4 className="text-lg font-semibold leading-snug">{steps[i].title}</h4>
                       <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{steps[i].detail}</p>
                       {steps[i].url && (
-                        <a href={steps[i].url!} target="_blank" rel="noreferrer" className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-full border border-accent/40 bg-surface px-4 text-sm font-medium text-accent shadow-sm transition hover:-translate-y-0.5 hover:bg-accent/5">
+                        <a href={steps[i].url!} target="_blank" rel="noreferrer" className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-full border border-accent/40 bg-surface px-4 text-sm font-medium text-accent shadow-sm transition hover:bg-accent/5">
                           <ExternalLink size={14} /> {T('Abrir la página de este paso', 'Open this step’s page')}
                         </a>
                       )}
@@ -166,10 +166,10 @@ export default function ServiceGuide({ group, sessionId, buildId, onClose, onSav
             </button>
           )}
           <div className="ml-auto flex items-center gap-2">
-            {data && i > 0 && <button onClick={() => go(i - 1)} className="flex h-10 items-center gap-1.5 rounded-full border border-line bg-surface px-4 text-sm shadow-sm transition hover:-translate-y-0.5 hover:border-accent hover:text-accent"><ArrowLeft size={15} /> {T('Anterior', 'Back')}</button>}
-            {data && !last && <button onClick={() => go(i + 1)} className="flex h-10 items-center gap-1.5 rounded-full bg-accent px-5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:brightness-110">{i === steps.length - 1 ? T('Ya lo tengo', 'I have it') : T('Siguiente', 'Next')} <ArrowRight size={15} /></button>}
+            {data && i > 0 && <button onClick={() => go(i - 1)} className="flex h-10 items-center gap-1.5 rounded-full border border-line bg-surface px-4 text-sm shadow-sm transition hover:bg-accent-soft hover:border-accent hover:text-accent"><ArrowLeft size={15} /> {T('Anterior', 'Back')}</button>}
+            {data && !last && <button onClick={() => go(i + 1)} className="flex h-10 items-center gap-1.5 rounded-full bg-accent px-5 text-sm font-semibold text-white shadow-sm transition hover:brightness-110">{i === steps.length - 1 ? T('Ya lo tengo', 'I have it') : T('Siguiente', 'Next')} <ArrowRight size={15} /></button>}
             {data && last && (
-              <button onClick={save} disabled={saving || done || !Object.values(values).some((v) => v.trim())} className={`flex h-10 items-center gap-1.5 rounded-full px-5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 disabled:opacity-40 disabled:hover:translate-y-0 ${done ? 'bg-ok' : 'bg-accent hover:brightness-110'}`}>
+              <button onClick={save} disabled={saving || done || !Object.values(values).some((v) => v.trim())} className={`flex h-10 items-center gap-1.5 rounded-full px-5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-40 ${done ? 'bg-ok' : 'bg-accent hover:brightness-110'}`}>
                 {done ? <><Check size={15} strokeWidth={3} /> {T('Guardado', 'Saved')}</> : saving ? <Loader2 size={15} className="animate-spin" /> : <><Save size={15} /> {T('Guardar', 'Save')} {filled ? `(${filled}/${group.vars.length})` : ''}</>}
               </button>
             )}

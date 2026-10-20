@@ -91,6 +91,7 @@ interface ArenaState {
   recording: boolean
   showVideoExport: boolean
   showBriefExport: boolean
+  decisionNotes: string  // the closing decisions as the user edited them in the verdict (go into the brief)
   layout: Layout
   speed: number
   showVerdict: boolean
@@ -142,6 +143,7 @@ export const useArena = create<ArenaState>((set, get) => ({
   showTeam: false,
   selectedAgent: null as string | null,
   showBriefExport: false,
+  decisionNotes: '',
   layout: 'wide',
   speed: 1,
   ...empty,

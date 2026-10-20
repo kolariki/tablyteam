@@ -94,6 +94,7 @@ export const api = {
   uploadSkill: (file: File, name = '') => { const form = new FormData(); form.append('file', file, file.name); form.append('name', name); return j<SkillSummary & { body: string; truncated: boolean; chars_total: number }>(authed('/api/skills/upload', { method: 'POST', body: form })) },
   deleteSkill: (id: string) => j(authed(`/api/skills/${id}`, { method: 'DELETE' })),
   setAgentSkills: (sessionId: string, agentId: string, skills: string[]) => j(authed(`/api/sessions/${sessionId}/agents/${agentId}/skills`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ skills }) })),
+  setTeam: (buildId: string, sessionId: string | null, team: Partial<import('../buildStore').TeamMember>[]) => j<{ ok: boolean; team: import('../buildStore').TeamMember[] }>(authed(`/api/builds/${buildId}/team`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ team, session_id: sessionId }) })),
   setTeamSkills: (buildId: string, sessionId: string | null, agentId: string, skills: string[]) => j(authed(`/api/builds/${buildId}/team/${agentId}/skills`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ skills, session_id: sessionId }) })),
   presets: () => j<Preset[]>(authed('/api/presets?fallback=true')),
   savePreset: (cfg: SessionConfig, title: string) => j<Preset>(post('/api/presets', { ...cfg, title })),
@@ -419,6 +420,7 @@ export interface BriefRequest {
   target: string
   include_transcript: boolean
   regenerate: boolean
+  user_notes?: string
 }
 
 export function connect(id: string, onEvent: (e: ArenaEvent) => void, onClose: () => void): () => void {

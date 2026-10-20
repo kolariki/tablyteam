@@ -171,7 +171,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   }
 
   const presetCard = (p: Preset) => (
-            <button key={p.id} onClick={() => (p.custom ? openChooser(p) : applyPreset(p))} className={`group relative text-left rounded-2xl border overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md ${cfg.title === p.title ? 'border-accent ring-2 ring-accent/40' : 'border-line'}`} style={{ minHeight: 150 }}>
+            <button key={p.id} onClick={() => (p.custom ? openChooser(p) : applyPreset(p))} className={`group relative text-left rounded-2xl border overflow-hidden transition hover:shadow-md ${cfg.title === p.title ? 'border-accent ring-2 ring-accent/40' : 'border-line'}`} style={{ minHeight: 150 }}>
               {/* looping animated scene as the card's "video" background (SVG with SMIL in public/scenes; drop a <id>.mp4 next to it to use a real clip) */}
               <img src={p.scene_url ?? `/scenes/${p.id}.svg`} alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover transition duration-500 group-hover:scale-[1.04]" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
               <div className="absolute inset-0 bg-gradient-to-t from-paper via-paper/80 to-transparent" />
@@ -282,10 +282,10 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
           </span>
           <div className="ml-auto flex items-center gap-2">
             <LangSwitch />
-            <button onClick={onAudit} title={T('Subí un proyecto existente y el equipo lo revisa desde cada rol', 'Upload an existing project and the team reviews it from every role')} className="flex h-10 items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-md transition hover:-translate-y-0.5 hover:brightness-110 hover:shadow-lg">
+            <button onClick={onAudit} title={T('Subí un proyecto existente y el equipo lo revisa desde cada rol', 'Upload an existing project and the team reviews it from every role')} className="flex h-10 items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-md transition hover:brightness-110 hover:shadow-lg">
               <Gavel size={16} /> {T('Auditar un proyecto', 'Audit a project')}
             </button>
-            <button onClick={onSettings} title={T('Conectá tus IAs, elegí modelos por defecto, deploy y trazas', 'Connect your AIs, pick default models, deploy and tracing')} className="flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-medium text-ink-2 shadow-sm transition hover:-translate-y-0.5 hover:border-accent hover:text-accent hover:shadow-md">
+            <button onClick={onSettings} title={T('Conectá tus IAs, elegí modelos por defecto, deploy y trazas', 'Connect your AIs, pick default models, deploy and tracing')} className="flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-medium text-ink-2 shadow-sm transition hover:bg-accent-soft hover:border-accent hover:text-accent hover:shadow-md">
               <Settings2 size={16} /> {T('Modelos y API keys', 'Models & API keys')}
             </button>
             <div className="flex h-10 items-center gap-2 rounded-full border border-line bg-surface py-1 pl-1 pr-1.5 text-sm shadow-sm">

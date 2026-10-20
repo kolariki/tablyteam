@@ -215,13 +215,13 @@ export default function AuditSetup({ onBack, onStart }: Props) {
                     setSuggesting(false)
                   }
                 }}
-                className="ml-auto flex h-8 items-center gap-1.5 rounded-full border border-accent/40 bg-surface px-3 text-xs font-medium text-accent shadow-sm transition hover:-translate-y-0.5 hover:border-accent hover:bg-accent/5 disabled:opacity-30 disabled:hover:translate-y-0"
+                className="ml-auto flex h-8 items-center gap-1.5 rounded-full border border-accent/40 bg-surface px-3 text-xs font-medium text-accent shadow-sm transition hover:border-accent hover:bg-accent/5 disabled:opacity-30"
                 title={T('Elegir del catálogo las skills que mejor encajan con el proyecto, rol por rol', 'Pick from the catalog the skills that best fit the project, role by role')}
               >{suggesting ? <Loader2 size={13} className="animate-spin" /> : <Puzzle size={13} />} {T('Sugerir skills', 'Suggest skills')}</button>
               <button
                 disabled={team.length >= 8}
                 onClick={() => setTeam((t) => [...t, { id: `rol-${t.length + 1}`, name: `Auditor ${t.length + 1}`, role: 'devils-advocate', provider: isEngine ? 'mock' : provider, model: isEngine ? 'mock-1' : model, persona: personaOf('devils-advocate'), color: PALETTE[t.length % PALETTE.length] }])}
-                className="ml-2 flex h-8 items-center gap-1.5 rounded-full border border-accent/40 bg-surface px-3 text-xs font-medium text-accent shadow-sm transition hover:-translate-y-0.5 hover:border-accent hover:bg-accent/5 disabled:opacity-30 disabled:hover:translate-y-0"
+                className="ml-2 flex h-8 items-center gap-1.5 rounded-full border border-accent/40 bg-surface px-3 text-xs font-medium text-accent shadow-sm transition hover:border-accent hover:bg-accent/5 disabled:opacity-30"
               >
                 <Plus size={14} /> {T('Agregar rol', 'Add role')}
               </button>

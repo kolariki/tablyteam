@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify'
 import { motion } from 'framer-motion'
-import { CheckCircle2, ClipboardCheck, Gavel, Loader2, XCircle } from 'lucide-react'
+import { CheckCircle2, ClipboardCheck, Gavel, Loader2, Users, XCircle } from 'lucide-react'
 import { marked } from 'marked'
 import { useState } from 'react'
 import type { ReviewResult, ReviewRound, TeamMember } from '../buildStore'
@@ -122,7 +122,7 @@ export function LiveReview({ round, team, raws, audit }: { round: number; team: 
 }
 
 /** Launch controls shown when a build is finished and a team exists. */
-export function ReviewLauncher({ team, onStart, disabled }: { team: TeamMember[]; onStart: (rounds: number) => void; disabled?: boolean }) {
+export function ReviewLauncher({ team, onStart, onEdit, disabled }: { team: TeamMember[]; onStart: (rounds: number) => void; onEdit?: () => void; disabled?: boolean }) {
   const T = useT()
   return (
     <div className="rounded-2xl border-2 border-dashed border-accent/40 p-4">
@@ -132,7 +132,12 @@ export function ReviewLauncher({ team, onStart, disabled }: { team: TeamMember[]
       </p>
       <div className="mt-3 flex items-center gap-3">
         <span className="text-[11.5px] text-ink-4">{T('Antes de empezar te pregunta qué querés que traten primero.', 'Before starting, it asks what you want them to tackle first.')}</span>
-        <button disabled={disabled} onClick={() => onStart(3)} className="ml-auto flex items-center gap-2 rounded-xl bg-accent text-white px-4 py-2 text-sm font-semibold hover:brightness-110 disabled:opacity-40">
+        {onEdit && (
+          <button disabled={disabled} onClick={onEdit} className="ml-auto flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-medium shadow-sm transition hover:bg-accent-soft hover:border-accent hover:text-accent disabled:opacity-40">
+            <Users size={15} /> {T('Modificar el consejo', 'Edit the council')}
+          </button>
+        )}
+        <button disabled={disabled} onClick={() => onStart(3)} className={`flex h-10 items-center gap-2 rounded-full bg-accent px-5 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40 ${onEdit ? '' : 'ml-auto'}`}>
           <Gavel size={15} /> {T('Enviar al consejo', 'Send to the council')}
         </button>
       </div>
