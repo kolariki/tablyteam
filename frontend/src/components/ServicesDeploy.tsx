@@ -1,9 +1,15 @@
-import { CheckCircle2, Download, ExternalLink, KeyRound, Loader2, Rocket, Save, XCircle } from 'lucide-react'
+import { AnimatePresence } from 'framer-motion'
+import { BookOpen, CheckCircle2, Download, ExternalLink, Loader2, Rocket, Save, XCircle } from 'lucide-react'
+import ServiceGuide from './ServiceGuide'
+import ProviderLogo, { logoUrl } from './ProviderLogo'
 import { useEffect, useRef, useState } from 'react'
 import { useBuild } from '../buildStore'
 import { api, type ServicesInfo } from '../lib/api'
 import { useT } from '../lib/i18n'
 import { downloadBlob } from '../lib/recorder'
+
+/** Services whose logo the app already ships (so the card can show the brand instead of an initial). */
+const PROVIDER_OF: Record<string, string> = { OpenAI: 'openai', Anthropic: 'anthropic', 'Google AI Studio': 'gemini', Vercel: 'vercel', Railway: 'railway', Langfuse: 'langfuse', Mistral: 'mistral', Groq: 'groq' }
 
 /** Right-pane tab: every external service / API key the built app needs, with values, plus one-click deploy. */
 export default function ServicesDeploy({ onOpenSettings }: { onOpenSettings: () => void }) {
@@ -15,6 +21,7 @@ export default function ServicesDeploy({ onOpenSettings }: { onOpenSettings: () 
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [target, setTarget] = useState<string>('vercel')
   const [error, setError] = useState<string | null>(null)
+  const [guide, setGuide] = useState<ServicesInfo['groups'][number] | null>(null)
   const logRef = useRef<HTMLPreElement>(null)
 
   const reload = () => {
@@ -55,71 +62,88 @@ export default function ServicesDeploy({ onOpenSettings }: { onOpenSettings: () 
     <div className="h-full overflow-y-auto scroll-thin p-5 space-y-6 bg-surface">
       {/* ---------- services */}
       <section>
-        <div className="flex items-center gap-2">
-          <KeyRound size={16} className="text-accent" />
-          <h3 className="text-xl">{T('Servicios externos requeridos', 'Required external services')}</h3>
-          <span className={`ml-auto rounded-full px-2.5 py-0.5 text-[11px] font-bold ${missing.length ? 'bg-gold/15 text-gold' : 'bg-ok/15 text-ok'}`}>
-            {missing.length ? `${T('faltan', 'missing')} ${missing.length}` : T('todo configurado', 'all configured')}
+        <div className="text-[11px] uppercase tracking-[0.3em] text-accent">{T('Servicios externos', 'External services')}</div>
+        <div className="mt-1 flex items-end gap-3">
+          <h3 className="text-2xl">{T('Lo que la app necesita para funcionar', 'What the app needs to work')}</h3>
+          <span className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${missing.length ? 'border-gold/40 bg-gold/10 text-gold' : 'border-ok/30 bg-ok/10 text-ok'}`}>
+            {missing.length ? <><span className="h-2 w-2 rounded-full bg-gold" /> {T('faltan', 'missing')} {missing.length}</> : <><span className="h-2 w-2 rounded-full bg-ok shadow-[0_0_0_3px_rgba(23,137,106,.18)]" /> {T('todo configurado', 'all configured')}</>}
           </span>
         </div>
-        <p className="mt-1 text-[12.5px] text-ink-2">
-          {T('Lo que la app necesita para funcionar, según su ', 'What the app needs to work, according to its ')}<code className="font-mono">.env.example</code>{T(' y el brief. Cargá los valores acá: se guardan cifrados, van al deploy como variables de entorno y podés bajarlos como ', ' and the brief. Enter the values here: they are stored encrypted, go to the deploy as environment variables and you can download them as ')}<code className="font-mono">.env</code>{T('. Nunca se escriben en el código.', '. They are never written into the code.')}
+        <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-ink-2">
+          {T('Cuentas, keys y URLs que el proyecto declara en su ', 'Accounts, keys and URLs the project declares in its ')}<code className="font-mono">.env.example</code>{T(' y en el brief. Cada servicio tiene una guía paso a paso para conseguirlo; lo que cargás se guarda cifrado y va al deploy como variable de entorno, nunca al código.', ' and in the brief. Each service has a step-by-step guide to get it; what you enter is stored encrypted and goes to the deploy as an environment variable, never into the code.')}
         </p>
-        {info.groups.length === 0 && <div className="mt-3 rounded-xl border border-line bg-paper px-4 py-3 text-sm text-ink-3">{T('El proyecto no declara variables de entorno: no requiere servicios externos.', 'The project declares no environment variables: it needs no external services.')}</div>}
-        <div className="mt-3 space-y-3">
-          {info.groups.map((g) => (
-            <div key={g.service} className="rounded-xl border border-line bg-paper p-3">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold">{g.service}</span>
-                {g.purpose && <span className="text-[12px] text-ink-3">· {g.purpose}</span>}
-                {g.url && (
-                  g.url.startsWith('http') ? (
-                    <a href={g.url} target="_blank" rel="noreferrer" className="ml-auto flex items-center gap-1 text-[12px] text-accent hover:underline">{T('conseguir', 'get one')} <ExternalLink size={11} /></a>
-                  ) : (
-                    <span className="ml-auto text-[12px] text-ink-3">{g.url}</span>
-                  )
-                )}
-              </div>
-              <div className="mt-2 space-y-1.5">
-                {g.vars.map((v) => (
-                  <div key={v.var} className="grid grid-cols-[minmax(160px,1fr)_1.4fr_auto] gap-2 items-center">
-                    <div className="min-w-0">
-                      <div className="font-mono text-[12px] truncate" title={v.var}>{v.var}</div>
-                      {(v.note || v.cost) && <div className="text-[11px] text-ink-3 truncate">{v.note}{v.cost ? ` · ${v.cost}` : ''}</div>}
+        {info.groups.length === 0 && <div className="mt-4 rounded-2xl border border-line bg-paper px-4 py-4 text-sm text-ink-3">{T('El proyecto no declara variables de entorno: no requiere servicios externos.', 'The project declares no environment variables: it needs no external services.')}</div>}
+        <div className="mt-4 grid gap-3 grid-cols-[repeat(auto-fill,minmax(420px,1fr))]">
+          {info.groups.map((g) => {
+            const pending = g.vars.filter((v) => v.required && !v.configured && !values[v.var]).length
+            const pid = PROVIDER_OF[g.service] ?? null
+            return (
+              <div key={g.service} className={`relative flex flex-col rounded-2xl border bg-paper p-4 shadow-[0_12px_28px_-18px_rgba(30,38,34,.45)] transition hover:shadow-[0_16px_36px_-18px_rgba(30,38,34,.5)] ${pending ? 'border-line' : 'border-ok/40'}`}>
+                <div className="flex items-start gap-3">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-[15px] font-bold text-accent shadow-sm">
+                    {pid && logoUrl(pid) ? <ProviderLogo provider={pid} size={24} /> : g.service.slice(0, 1).toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-[16px] font-semibold">{g.service}</span>
+                      <span className={`ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${pending ? 'border-gold/40 bg-gold/10 text-gold' : 'border-ok/30 bg-ok/10 text-ok'}`}>
+                        {pending ? <>{T('faltan', 'missing')} {pending}</> : <><span className="h-1.5 w-1.5 rounded-full bg-ok" /> {T('configurado', 'configured')}</>}
+                      </span>
                     </div>
-                    <input
-                      type={v.secret ? 'password' : 'text'}
-                      autoComplete="off"
-                      placeholder={v.configured ? T('•••••••• (guardada)', '•••••••• (saved)') : v.example || (v.required ? T('requerida', 'required') : T('opcional', 'optional'))}
-                      value={values[v.var] ?? ''}
-                      onChange={(e) => setValues({ ...values, [v.var]: e.target.value })}
-                      className="rounded-lg bg-surface border border-line px-2.5 py-1.5 text-[12px] font-mono outline-none focus:border-accent"
-                    />
-                    <span className="w-5 flex justify-center">{v.configured || values[v.var] ? <CheckCircle2 size={15} className="text-ok" /> : v.required ? <XCircle size={15} className="text-gold" /> : <span className="text-ink-4 text-[10px]">{T('opc.', 'opt.')}</span>}</span>
+                    {g.purpose && <div className="mt-0.5 text-[12.5px] leading-snug text-ink-2">{g.purpose}</div>}
                   </div>
-                ))}
+                </div>
+                <div className="mt-3 space-y-2">
+                  {g.vars.map((v) => (
+                    <div key={v.var} className="grid grid-cols-[minmax(150px,1fr)_1.3fr_auto] items-center gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate font-mono text-[12px] font-semibold" title={v.var}>{v.var}</div>
+                        {(v.note || v.cost) && <div className="truncate text-[11px] text-ink-3" title={v.note ?? ''}>{v.note}{v.cost ? ` · ${v.cost}` : ''}</div>}
+                      </div>
+                      <input
+                        type={v.secret ? 'password' : 'text'}
+                        autoComplete="off"
+                        placeholder={v.configured ? T('•••••••• (guardada)', '•••••••• (saved)') : v.example || (v.required ? T('requerida', 'required') : T('opcional', 'optional'))}
+                        value={values[v.var] ?? ''}
+                        onChange={(e) => setValues({ ...values, [v.var]: e.target.value })}
+                        className="rounded-lg border border-line bg-surface px-2.5 py-1.5 font-mono text-[12px] shadow-sm outline-none transition focus:border-accent"
+                      />
+                      <span className="flex w-5 justify-center">{v.configured || values[v.var] ? <CheckCircle2 size={15} className="text-ok" /> : v.required ? <XCircle size={15} className="text-gold" /> : <span className="text-[10px] text-ink-4">{T('opc.', 'opt.')}</span>}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center gap-2 border-t border-line pt-3">
+                  <button onClick={() => setGuide(g)} className="flex h-8 items-center gap-1.5 rounded-full border border-accent/40 bg-surface px-3 text-[12.5px] font-medium text-accent shadow-sm transition hover:-translate-y-0.5 hover:bg-accent/5">
+                    <BookOpen size={13} /> {T('Cómo conseguirlo', 'How to get it')}
+                  </button>
+                  {g.url && g.url.startsWith('http') && <a href={g.url} target="_blank" rel="noreferrer" className="ml-auto flex items-center gap-1 text-[12px] text-ink-3 transition hover:text-accent">{T('ir al panel', 'open the dashboard')} <ExternalLink size={11} /></a>}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
         {info.groups.length > 0 && (
-          <div className="mt-3 flex items-center gap-2">
-            <button disabled={!dirty || saving} onClick={save} className="flex items-center gap-1.5 rounded-lg bg-accent text-white px-3 py-1.5 text-sm font-medium disabled:opacity-40">
+          <div className="mt-4 flex items-center gap-2">
+            <button disabled={!dirty || saving} onClick={save} className="flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:brightness-110 disabled:opacity-40 disabled:hover:translate-y-0">
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} {T('Guardar valores', 'Save values')}
             </button>
-            <button onClick={async () => b.sessionId && b.id && downloadBlob(new Blob([await api.envFile(b.sessionId, b.id)], { type: 'text/plain' }), '.env')} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm">
+            <button onClick={async () => b.sessionId && b.id && downloadBlob(new Blob([await api.envFile(b.sessionId, b.id)], { type: 'text/plain' }), '.env')} className="flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-4 text-sm shadow-sm transition hover:-translate-y-0.5 hover:border-accent hover:text-accent">
               <Download size={14} /> {T('Descargar .env', 'Download .env')}
             </button>
             {savedAt && !dirty && <span className="text-[12px] text-ok">{T('guardado', 'saved')}</span>}
           </div>
         )}
       </section>
+      <AnimatePresence>
+        {guide && b.sessionId && b.id && <ServiceGuide key={guide.service} group={guide} sessionId={b.sessionId} buildId={b.id} onClose={() => setGuide(null)} onSaved={() => { setSavedAt(Date.now()); reload() }} />}
+      </AnimatePresence>
 
       {/* ---------- deploy */}
-      <section className="rounded-2xl border border-line bg-paper p-4">
-        <div className="flex items-center gap-2">
-          <Rocket size={16} className="text-accent" />
-          <h3 className="text-xl">{T('Deploy automático', 'Automatic deploy')}</h3>
+      <section className="rounded-2xl border border-line bg-paper p-5 shadow-[0_12px_28px_-18px_rgba(30,38,34,.45)]">
+        <div className="text-[11px] uppercase tracking-[0.3em] text-accent">{T('Publicar', 'Publish')}</div>
+        <div className="mt-1 flex items-center gap-2">
+          <Rocket size={18} className="text-accent" />
+          <h3 className="text-2xl">{T('Deploy automático', 'Automatic deploy')}</h3>
           {info.stack.length > 0 && <span className="ml-auto font-mono text-[11px] text-ink-3">{info.stack.join(' · ')}</span>}
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">

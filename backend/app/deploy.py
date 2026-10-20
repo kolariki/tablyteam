@@ -57,16 +57,35 @@ KNOWN: list[tuple[str, str, str, str]] = [  # (regex on var name, service, where
     (r"^LANGFUSE_", "Langfuse", "https://cloud.langfuse.com", "Observabilidad de LLM"),
     (r"^VERCEL_", "Vercel", "https://vercel.com/account/tokens", "Hosting"),
     (r"^RAILWAY_", "Railway", "https://railway.com/account/tokens", "Hosting"),
+    (r"^CLOUDFLARE_|^CF_", "Cloudflare", "https://dash.cloudflare.com/profile/api-tokens", "Hosting / Workers / DNS"),
+    (r"^NOMINATIM|^OPENCAGE|^GEOCOD", "Geocoding", None, "Direcciones ↔ coordenadas"),
+    (r"^OPENWEATHER|^WEATHER", "OpenWeather", "https://home.openweathermap.org/api_keys", "Datos de clima"),
     (r"^(PORT|NODE_ENV|HOST|LOG_LEVEL|TZ|VITE_PORT)$", "Configuración local", "no requiere cuenta", "Parámetros de ejecución"),
 ]
+
+_GENERIC = {"API", "APP", "BASE", "PUBLIC", "SERVER", "SERVICE", "CLIENT", "WEB", "NEXT", "VITE", "EXPO", "REACT"}
+
+
+def _service_name(var: str) -> str:
+    """CLOUDFLARE_API_TOKEN → Cloudflare; VITE_API_BASE_URL → API base; PARAGUAS_TERMS_CONFIRMED → Paraguas."""
+    raw = [p for p in re.sub(r"^(NEXT_PUBLIC_|VITE_|PUBLIC_|EXPO_PUBLIC_|REACT_APP_)", "", var).split("_") if p]
+    parts = [p for p in raw if p not in ("KEY", "SECRET", "TOKEN", "URL", "ID", "DSN", "CONFIRMED", "ENABLED")] or raw
+    # two words read as a name ("API base", "Allowed origins", "Contact email"); one would be a bare adjective
+    words = parts[:2] if len(parts) > 1 else raw[:2]
+    return " ".join(w.upper() if w == "API" else (w.title() if i == 0 else w.lower()) for i, w in enumerate(words))
+
+
+def _clean_note(note: str) -> str:
+    """Comment banners (----- Deploy -----) become plain text; runs of dashes/equals disappear."""
+    note = re.sub(r"[-=_#]{3,}", " ", note)
+    return " ".join(note.split()).strip(" ·:-")
 
 
 def classify(var: str) -> dict:
     for rx, service, url, purpose in KNOWN:
         if re.search(rx, var, re.I):
             return {"service": service, "url": url, "purpose": purpose}
-    name = re.sub(r"_(API_KEY|KEY|SECRET|TOKEN|URL|ID|DSN)$", "", var).replace("NEXT_PUBLIC_", "").replace("VITE_", "")
-    return {"service": name.replace("_", " ").title() or "Servicio", "url": None, "purpose": None}
+    return {"service": _service_name(var) or "Servicio", "url": None, "purpose": None}
 
 
 def parse_env_example(text: str) -> list[dict]:
@@ -88,7 +107,7 @@ def parse_env_example(text: str) -> list[dict]:
             val, inline = val.split("#", 1)
             val, inline = val.strip(), inline.strip()
         val = val.strip().strip("'\"")
-        out.append({"var": var, "example": val, "note": " ".join(comment + ([inline] if inline else [])).strip()})
+        out.append({"var": var, "example": val, "note": _clean_note(" ".join(comment + ([inline] if inline else [])))})
         comment = []
     return out
 

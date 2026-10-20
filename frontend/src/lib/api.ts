@@ -129,6 +129,8 @@ export const api = {
   buildApply: (id: string, session_id: string | null, requests: { role_label: string; name: string; text: string }[], max_rounds: number) =>
     j(post(`/api/builds/${id}/apply`, { session_id, requests, max_rounds })),
   services: (sessionId: string, id: string) => j<ServicesInfo>(authed(`/api/sessions/${sessionId}/builds/${id}/services`)),
+  serviceGuide: (sessionId: string, id: string, service: string, lang: string, refresh = false) =>
+    j<ServiceGuideData>(authed(`/api/sessions/${sessionId}/builds/${id}/services/guide?service=${encodeURIComponent(service)}&lang=${lang}${refresh ? '&refresh=true' : ''}`)),
   saveServices: (sessionId: string, id: string, values: Record<string, string>) =>
     j<{ ok: boolean; configured: string[] }>(authed(`/api/sessions/${sessionId}/builds/${id}/services`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ values }) })),
   envFile: async (sessionId: string, id: string) => {
@@ -227,6 +229,14 @@ export interface DeployTarget {
   good_for: string
   token_help: string
   hint: string | null
+}
+
+export interface ServiceGuideData {
+  intro: string
+  cost: string | null
+  steps: { title: string; detail: string; url: string | null }[]
+  generated: boolean
+  model?: string
 }
 
 export interface ServicesInfo {

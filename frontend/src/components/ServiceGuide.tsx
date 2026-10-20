@@ -1,0 +1,175 @@
+import { AnimatePresence, motion } from 'framer-motion'
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, ExternalLink, Loader2, RefreshCw, Save, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { api, type ServiceGuideData, type ServicesInfo } from '../lib/api'
+import { useLang, useT } from '../lib/i18n'
+
+type Group = ServicesInfo['groups'][number]
+
+/**
+ * "How do I get this?": a guided walkthrough for one external service. The steps come from a model (cached per
+ * build); the last step is always the form where the user pastes the values, so the whole journey ends here.
+ */
+export default function ServiceGuide({ group, sessionId, buildId, onClose, onSaved }: { group: Group; sessionId: string; buildId: string; onClose: () => void; onSaved: () => void }) {
+  const T = useT()
+  const lang = useLang()
+  const [data, setData] = useState<ServiceGuideData | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [i, setI] = useState(0)
+  const [dir, setDir] = useState(1)
+  const [values, setValues] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
+  const [done, setDone] = useState(false)
+
+  const load = (refresh = false) => {
+    setData(null)
+    setError(null)
+    api.serviceGuide(sessionId, buildId, group.service, lang, refresh).then(setData).catch((e) => setError((e as Error).message))
+  }
+  useEffect(() => { load() }, [group.service, lang]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const steps = data?.steps ?? []
+  const total = steps.length + 1 // + the final "paste it here"
+  const last = i === steps.length
+  const go = (n: number) => { setDir(n > i ? 1 : -1); setI(Math.max(0, Math.min(total - 1, n))) }
+  const filled = group.vars.filter((v) => (values[v.var] ?? '').trim() || v.configured).length
+
+  const save = async () => {
+    const vals = Object.fromEntries(Object.entries(values).filter(([, v]) => v.trim()))
+    if (!Object.keys(vals).length) return
+    setSaving(true)
+    setError(null)
+    try {
+      await api.saveServices(sessionId, buildId, vals)
+      setDone(true)
+      onSaved()
+      setTimeout(onClose, 900)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return createPortal(
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] flex items-center justify-center bg-ink/40 p-6 backdrop-blur-[2px]" onClick={onClose}>
+      <motion.div
+        initial={{ opacity: 0, y: 18, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 10, scale: 0.98 }}
+        transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+        onClick={(e) => e.stopPropagation()}
+        className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-[0_30px_80px_-30px_rgba(30,38,34,.55)]"
+        style={{ maxHeight: 'calc(100vh - 48px)' }}
+      >
+        {/* header */}
+        <div className="flex items-start gap-4 border-b border-line px-6 py-5">
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] uppercase tracking-[0.3em] text-accent">{T('Cómo conseguirlo', 'How to get it')}</div>
+            <h3 className="mt-1 truncate text-2xl">{group.service}</h3>
+            {data?.intro && <p className="mt-1 text-[13px] leading-snug text-ink-2">{data.intro}</p>}
+            {data?.cost && <span className="mt-2 inline-flex rounded-full border border-line bg-paper px-2.5 py-0.5 text-[11px] text-ink-2">{T('Costo', 'Cost')}: {data.cost}</span>}
+          </div>
+          <button onClick={onClose} className="rounded-full p-1.5 text-ink-3 transition hover:bg-surface-2 hover:text-ink" aria-label={T('Cerrar', 'Close')}><X size={18} strokeWidth={2.5} /></button>
+        </div>
+
+        {/* progress */}
+        {data && (
+          <div className="flex items-center gap-1.5 px-6 pt-4">
+            {Array.from({ length: total }).map((_, k) => (
+              <button key={k} onClick={() => go(k)} className="h-1.5 flex-1 overflow-hidden rounded-full bg-line" aria-label={`${T('Paso', 'Step')} ${k + 1}`}>
+                <motion.span className="block h-full bg-accent" initial={false} animate={{ scaleX: k <= i ? 1 : 0 }} style={{ transformOrigin: 'left' }} transition={{ type: 'spring', stiffness: 260, damping: 28 }} />
+              </button>
+            ))}
+            <span className="ml-2 shrink-0 font-mono text-[11px] text-ink-3">{i + 1}/{total}</span>
+          </div>
+        )}
+
+        {/* body */}
+        <div className="min-h-0 flex-1 overflow-y-auto scroll-thin px-6 py-5">
+          {!data && !error && (
+            <div className="flex items-center gap-3 rounded-2xl border border-line bg-paper px-4 py-6 text-sm text-ink-2">
+              <Loader2 size={18} className="animate-spin text-accent" /> {T('Un modelo está escribiendo la guía para este servicio…', 'A model is writing the guide for this service…')}
+            </div>
+          )}
+          {error && !data && <div className="rounded-xl border border-danger/40 bg-danger/5 px-4 py-3 text-sm text-danger">{error}</div>}
+          {data && (
+            <AnimatePresence mode="wait" initial={false} custom={dir}>
+              <motion.div key={i} custom={dir} initial={{ opacity: 0, x: 28 * dir }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -28 * dir }} transition={{ duration: 0.22, ease: 'easeOut' }}>
+                {!last ? (
+                  <div className="flex gap-4">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-[15px] font-bold text-white shadow-sm">{i + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-lg font-semibold leading-snug">{steps[i].title}</h4>
+                      <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{steps[i].detail}</p>
+                      {steps[i].url && (
+                        <a href={steps[i].url!} target="_blank" rel="noreferrer" className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-full border border-accent/40 bg-surface px-4 text-sm font-medium text-accent shadow-sm transition hover:-translate-y-0.5 hover:bg-accent/5">
+                          <ExternalLink size={14} /> {T('Abrir la página de este paso', 'Open this step’s page')}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-4">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ok text-white shadow-sm"><Check size={18} strokeWidth={3} /></span>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-lg font-semibold leading-snug">{T('Pegá acá lo que conseguiste', 'Paste here what you got')}</h4>
+                      <p className="mt-1 text-[13px] text-ink-2">{T('Se guarda cifrado y va al deploy como variable de entorno. Nunca se escribe en el código.', 'Stored encrypted and sent to the deploy as an environment variable. Never written into the code.')}</p>
+                      <div className="mt-4 space-y-3">
+                        {group.vars.map((v) => (
+                          <label key={v.var} className="block">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-[12px] font-semibold">{v.var}</span>
+                              {v.configured && <span className="inline-flex items-center gap-1 rounded-full border border-ok/30 bg-ok/10 px-2 py-0.5 text-[10.5px] font-medium text-ok"><CheckCircle2 size={11} /> {T('guardada', 'saved')}</span>}
+                              {!v.required && <span className="text-[10.5px] text-ink-4">{T('opcional', 'optional')}</span>}
+                            </div>
+                            {v.note && <div className="mt-0.5 text-[11.5px] text-ink-3">{v.note}</div>}
+                            <input
+                              type={v.secret ? 'password' : 'text'}
+                              autoComplete="off"
+                              autoFocus={v === group.vars[0]}
+                              placeholder={v.configured ? T('•••••••• (reemplazar)', '•••••••• (replace)') : v.example || (v.required ? T('requerida', 'required') : T('opcional', 'optional'))}
+                              value={values[v.var] ?? ''}
+                              onChange={(e) => setValues({ ...values, [v.var]: e.target.value })}
+                              className="mt-1.5 w-full rounded-xl border border-line bg-paper px-3 py-2.5 font-mono text-[13px] shadow-sm outline-none transition focus:border-accent"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                      {error && <div className="mt-3 text-sm text-danger">{error}</div>}
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
+          )}
+        </div>
+
+        {/* footer */}
+        <div className="flex items-center gap-2 border-t border-line bg-paper px-6 py-4">
+          {data && (
+            <button onClick={() => load(true)} className="flex items-center gap-1.5 text-[12px] text-ink-3 transition hover:text-ink" title={T('Volver a escribir la guía', 'Rewrite the guide')}>
+              <RefreshCw size={12} /> {data.generated ? data.model : T('guía genérica (sin API key para escribirla)', 'generic guide (no API key to write it)')}
+            </button>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            {data && i > 0 && <button onClick={() => go(i - 1)} className="flex h-10 items-center gap-1.5 rounded-full border border-line bg-surface px-4 text-sm shadow-sm transition hover:-translate-y-0.5 hover:border-accent hover:text-accent"><ArrowLeft size={15} /> {T('Anterior', 'Back')}</button>}
+            {data && !last && <button onClick={() => go(i + 1)} className="flex h-10 items-center gap-1.5 rounded-full bg-accent px-5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:brightness-110">{i === steps.length - 1 ? T('Ya lo tengo', 'I have it') : T('Siguiente', 'Next')} <ArrowRight size={15} /></button>}
+            {data && last && (
+              <button onClick={save} disabled={saving || done || !Object.values(values).some((v) => v.trim())} className={`flex h-10 items-center gap-1.5 rounded-full px-5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 disabled:opacity-40 disabled:hover:translate-y-0 ${done ? 'bg-ok' : 'bg-accent hover:brightness-110'}`}>
+                {done ? <><Check size={15} strokeWidth={3} /> {T('Guardado', 'Saved')}</> : saving ? <Loader2 size={15} className="animate-spin" /> : <><Save size={15} /> {T('Guardar', 'Save')} {filled ? `(${filled}/${group.vars.length})` : ''}</>}
+              </button>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>,
+    document.body,
+  )
+}

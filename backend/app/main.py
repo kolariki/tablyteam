@@ -39,6 +39,7 @@ from .auth import CurrentUser, Credentials, User
 from .builder import BUILDS, Build, BuildRequest, list_builds, load_build, rehydrate, start_build
 from .local_engine import ENGINES, engine_status, is_engine, snapshot_dir
 from . import deploy as deploymod
+from . import service_guide
 from . import runner as runmod
 from . import skills as skillmod
 from . import skills_catalog as catalog
@@ -1018,6 +1019,17 @@ def build_services(session_id: str, build_id: str, user: User = CurrentUser):
     data["deploy_targets"] = deploymod.deploy_status(user.id)
     data["deploys"] = b.deploys
     return data
+
+
+@app.get("/api/sessions/{session_id}/builds/{build_id}/services/guide")
+async def build_service_guide(session_id: str, build_id: str, service: str, lang: str = "es", refresh: bool = False, user: User = CurrentUser):
+    """How to obtain what one service needs: a model-written walkthrough (cached), or a generic one without keys."""
+    b = _build_any(user, session_id, build_id)
+    data = deploymod.services_for(b.files, b.brief, set(deploymod.load_secrets(user.id, build_id)))
+    group = next((g for g in data["groups"] if g["service"] == service), None)
+    if not group:
+        raise HTTPException(404, "service not found")
+    return await service_guide.guide(user, build_id, group, b.title, data.get("stack") or [], "en" if lang == "en" else "es", refresh=refresh)
 
 
 @app.put("/api/sessions/{session_id}/builds/{build_id}/services")
