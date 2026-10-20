@@ -13,6 +13,7 @@ import { brandTheme } from '../lib/brand'
  * so the animation is deterministic and loops cleanly.
  */
 /* ------------------------------------------------------------------ demo data: a weather app, from the idea to the built product */
+const PROVIDERS_ALL: [string, string][] = [['anthropic', 'Anthropic · Claude'], ['openai', 'OpenAI · GPT'], ['deepseek', 'DeepSeek'], ['gemini', 'Google · Gemini'], ['xai', 'xAI · Grok'], ['groq', 'Groq · Llama'], ['kimi', 'Moonshot · Kimi'], ['mistral', 'Mistral'], ['openrouter', 'OpenRouter · 300+ modelos'], ['ollama', 'Ollama · modelos locales']]
 const IDEA = 'Una app del clima para Argentina que me diga si llevo paraguas, con alertas oficiales y pronóstico por horas.'
 const IDEA_EN = 'A weather app for Argentina that tells me whether to take an umbrella, with official alerts and an hourly forecast.'
 const QUESTIONS: [string, string][] = [
@@ -122,7 +123,7 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
       <section className="relative max-w-[1400px] mx-auto px-6 pt-16 pb-10 grid lg:grid-cols-[0.75fr_1.45fr] gap-12 items-center">
         {/* the logos that fly in and fuse into "Tably" (positioned by lib/anim.ts) */}
         <div data-fuse-layer className="pointer-events-none absolute inset-0 z-20" aria-hidden>
-          {['anthropic', 'openai', 'deepseek', 'gemini', 'kimi', 'xai', 'mistral'].map((id) => (
+          {PROVIDERS_ALL.map(([id]) => (
             <span key={id} data-fuse-logo className="absolute left-0 top-0 flex h-14 w-14 items-center justify-center rounded-full border border-line bg-surface opacity-0 shadow-[0_14px_30px_-10px_rgba(30,38,34,.5)]"><ProviderLogo provider={id} size={28} /></span>
           ))}
           <span data-fuse-orb className="absolute left-0 top-0 h-20 w-20 rounded-full opacity-0" style={{ background: 'radial-gradient(circle, #FFFFFF 0%, #7FD1B9 30%, #2F6B5D 55%, rgba(47,107,93,0) 72%)', boxShadow: '0 0 80px 26px rgba(47,107,93,.45)' }} />
@@ -144,13 +145,12 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
               <Play size={16} /> {T('Ver cómo funciona', 'See how it works')}
             </a>
           </div>
-          <div className="mt-8 flex items-center gap-2">
-            {['anthropic', 'openai', 'deepseek', 'gemini', 'kimi', 'xai', 'mistral'].map((id) => (
-              <span data-hero-logo key={id} className="w-10 h-10 rounded-full bg-surface border border-line flex items-center justify-center">
+          <div className="mt-8 flex flex-wrap items-center gap-2">
+            {PROVIDERS_ALL.map(([id, label]) => (
+              <span data-hero-logo key={id} title={label} className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-surface shadow-sm transition hover:-translate-y-0.5 hover:border-accent">
                 <ProviderLogo provider={id} size={22} />
               </span>
             ))}
-            <span data-hero-logo className="ml-1 text-sm text-ink-3">+ Groq, OpenRouter, Ollama</span>
           </div>
         </div>
 
