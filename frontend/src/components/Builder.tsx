@@ -186,16 +186,19 @@ export default function Builder({ onBack }: { onBack: () => void }) {
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface shadow-sm" style={{ border: `1.5px solid ${color}` }}><ProviderLogo provider={b.provider} size={20} /></span>
         <div className="min-w-0 flex-1">
           <div className="serif truncate text-[17px] leading-tight" title={b.title}>{b.title}</div>
-          <div className="flex items-center gap-2 font-mono text-[11px] text-ink-3">
-            <span>{b.model}</span>
+          <div className="mt-0.5 flex items-center gap-2 text-[11.5px] text-ink-3">
+            <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} /> <span className="font-mono">{b.model}</span></span>
             {b.engineSession && b.workdir && (
-              <button
-                onClick={() => { navigator.clipboard?.writeText(`cd "${b.workdir}" && claude --resume ${b.engineSession}`); toast.ok(tr('Comando copiado', 'Command copied'), tr('Pegalo en tu terminal para abrir esta misma sesión en tu Claude Code.', 'Paste it in your terminal to open this same session in your Claude Code.')) }}
-                className="flex items-center gap-1 rounded-full border border-line bg-surface px-2 py-0.5 text-[10.5px] text-ink-2 shadow-sm transition hover:border-accent hover:text-accent"
-                title={`${T('Sesión de Claude Code', 'Claude Code session')} ${b.engineSession}\n${T('En tu terminal', 'In your terminal')}: cd "${b.workdir}" && claude --resume ${b.engineSession}`}
-              >
-                <TerminalSquare size={11} /> {T('abrir en mi Claude Code', 'open in my Claude Code')} <Copy size={10} />
-              </button>
+              <>
+                <span className="h-3 w-px bg-line" />
+                <button
+                  onClick={() => { navigator.clipboard?.writeText(`cd "${b.workdir}" && claude --resume ${b.engineSession}`); toast.ok(tr('Comando copiado', 'Command copied'), tr('Pegalo en tu terminal para abrir esta misma sesión en tu Claude Code.', 'Paste it in your terminal to open this same session in your Claude Code.')) }}
+                  className="flex items-center gap-1 whitespace-nowrap text-[11.5px] text-ink-3 transition hover:text-accent"
+                  title={`${T('Copia el comando para seguir esta misma sesión en tu terminal', 'Copies the command to continue this same session in your terminal')}: cd "${b.workdir}" && claude --resume ${b.engineSession}`}
+                >
+                  <TerminalSquare size={12} /> {T('Abrir en mi Claude Code', 'Open in my Claude Code')} <Copy size={10} className="opacity-60" />
+                </button>
+              </>
             )}
           </div>
         </div>
