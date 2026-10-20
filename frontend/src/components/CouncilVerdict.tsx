@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { CheckCircle2, Gavel, Hammer, Loader2, XCircle } from 'lucide-react'
+import { Check, CheckCircle2, Hammer, HardHat, Loader2, Minus, Plus, RefreshCw, X, XCircle } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '../lib/api'
 import { tr, useT } from '../lib/i18n'
@@ -62,123 +62,143 @@ export default function CouncilVerdict() {
     }
   }
 
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 z-50 bg-paper/80 backdrop-blur-sm flex items-center justify-center p-4 @container" onClick={() => set({ showVerdict: false })}>
-      <motion.div initial={{ scale: 0.92, y: 20 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 180, damping: 18 }} className="panel rounded-3xl p-5 @3xl:p-8 w-full max-w-5xl max-h-full overflow-y-auto scroll-thin" onClick={(e) => e.stopPropagation()}>
-        <div className="grid gap-6 @3xl:grid-cols-[1.2fr_1fr]">
-          {/* ---------------- verdict + changes */}
-          <div>
-            <div className="text-xs uppercase tracking-[0.4em] text-gold">{T('Veredicto del consejo', 'Council verdict')}{ro?.round ? ` · ${T('ronda', 'round')} ${ro.round}` : ''}</div>
-            <div className="mt-3 flex items-end gap-3">
-              <span className="text-5xl leading-none">{deliberating ? '⚖️' : council.approved ? '✅' : '🛠️'}</span>
-              <div>
-                <div className={`serif text-4xl @3xl:text-5xl leading-none ${deliberating ? 'text-ink-3' : council.approved ? 'text-ok' : 'text-ink'}`}>
-                  {deliberating ? T('Deliberando…', 'Deliberating…') : council.approved ? T('Listo para producción', 'Ready for production') : T('Hay que cambiar cosas', 'Things need to change')}
-                </div>
-                <div className="font-mono text-xs text-ink-3 mt-1">{ro?.title ?? config.topic}</div>
-              </div>
-            </div>
+  const pill = 'flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent disabled:opacity-40'
+  const primary = 'flex h-11 items-center gap-2 rounded-full bg-accent px-5 text-[15px] font-semibold text-white shadow-[0_12px_28px_-12px_rgba(47,107,93,.7)] transition hover:brightness-110 disabled:opacity-40'
+  const label = 'text-[10.5px] uppercase tracking-[0.25em] text-ink-3'
+  const tone = deliberating ? 'var(--color-ink-4)' : council.approved ? 'var(--color-ok)' : 'var(--color-gold)'
 
-            <div className="mt-5 rounded-2xl border border-line bg-surface-2 p-5" style={{ borderLeft: `3px solid ${council?.approved ? 'var(--color-ok)' : 'var(--color-gold)'}` }}>
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-[2px] @container" onClick={() => set({ showVerdict: false })}>
+      <motion.div initial={{ opacity: 0, y: 18, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 30 }} className="relative flex max-h-full w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-[0_30px_80px_-30px_rgba(30,38,34,.6)]" onClick={(e) => e.stopPropagation()}>
+        {/* header */}
+        <div className="flex items-start gap-4 border-b border-line px-7 py-6" style={{ background: `linear-gradient(135deg, color-mix(in srgb, ${tone} 10%, transparent) 0%, transparent 60%)` }}>
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] uppercase tracking-[0.35em] text-accent">{T('Veredicto del consejo', 'Council verdict')}{ro?.round ? ` · ${T('ronda', 'round')} ${ro.round}` : ''}</div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
+              <h3 className="serif text-[34px] leading-tight @3xl:text-[40px]" style={{ color: deliberating ? 'var(--color-ink-3)' : council.approved ? 'var(--color-ok)' : 'var(--color-ink)' }}>
+                {deliberating ? T('Deliberando…', 'Deliberating…') : council.approved ? T('Listo para producción', 'Ready for production') : T('Hay que cambiar cosas', 'Things need to change')}
+              </h3>
+              {!deliberating && (
+                <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${council.approved ? 'border-ok/30 bg-ok/10 text-ok' : 'border-gold/40 bg-gold/10 text-gold'}`}>
+                  <span className={`h-2 w-2 rounded-full ${council.approved ? 'bg-ok' : 'bg-gold'}`} /> {council.approved ? T('APROBADO', 'APPROVED') : `${changes.length} ${changes.length === 1 ? T('CAMBIO', 'CHANGE') : T('CAMBIOS', 'CHANGES')}${blocking ? ` · ${blocking} ${blocking === 1 ? T('BLOQUEANTE', 'BLOCKING') : T('BLOQUEANTES', 'BLOCKING')}` : ''}`}
+                </span>
+              )}
+            </div>
+            <div className="mt-1 truncate font-mono text-[12px] text-ink-3">{ro?.title ?? config.topic}</div>
+          </div>
+          <button onClick={() => set({ showVerdict: false })} className="rounded-full p-1.5 text-ink-3 transition hover:bg-surface-2 hover:text-ink" aria-label={T('Cerrar', 'Close')}><X size={18} strokeWidth={2.5} /></button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto scroll-thin px-7 py-6">
+          <div className="grid gap-6 @3xl:grid-cols-[1.2fr_1fr]">
+            {/* the consolidated verdict + change list */}
+            <div className="rounded-2xl border border-line bg-paper p-6 shadow-[0_12px_28px_-18px_rgba(30,38,34,.4)]" style={{ borderTop: `3px solid ${tone}` }}>
               {deliberating ? (
-                <p className="text-ink-3 italic flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> {T('El presidente del consejo consolida los veredictos de cada rol…', 'The council chair is consolidating each role’s verdict…')}</p>
+                <p className="flex items-center gap-2 text-ink-3"><Loader2 size={15} className="animate-spin text-accent" /> {T('El presidente del consejo consolida los veredictos de cada rol…', 'The council chair is consolidating each role’s verdict…')}</p>
               ) : (
                 <>
-                  {council.headline && <div className="serif text-2xl leading-tight">{council.headline}</div>}
-                  {council.why && <p className="mt-2 text-[14.5px] leading-relaxed text-ink">{council.why}</p>}
+                  {council.headline && <div className="serif text-[26px] leading-tight">{council.headline}</div>}
+                  {council.why && <p className="mt-3 text-[14.5px] leading-relaxed text-ink">{council.why}</p>}
                   {(council.priorities?.length ?? 0) > 0 && (
-                    <div className="mt-4 rounded-xl border border-accent/30 bg-accent-soft/40 px-3 py-2.5">
-                      <div className="text-[10px] uppercase tracking-widest text-accent mb-1">{T('Lo que vos pediste', 'What you asked for')}</div>
-                      <ul className="space-y-1">
+                    <div className="mt-4 rounded-xl border border-accent/30 bg-accent-soft/40 px-4 py-3">
+                      <div className={`${label} text-accent`}>{T('Lo que vos pediste', 'What you asked for')}</div>
+                      <ul className="mt-1.5 space-y-1">
                         {council.priorities!.map((p) => (
-                          <li key={p.id} className="flex items-start gap-1.5 text-[13px]">
-                            {p.status === 'done' ? <CheckCircle2 size={14} className="text-ok shrink-0 mt-0.5" /> : <XCircle size={14} className={`${p.status === 'partial' ? 'text-gold' : 'text-danger'} shrink-0 mt-0.5`} />}
+                          <li key={p.id} className="flex items-start gap-2 text-[13px]">
+                            {p.status === 'done' ? <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-ok" /> : <XCircle size={14} className={`${p.status === 'partial' ? 'text-gold' : 'text-danger'} mt-0.5 shrink-0`} />}
                             <span><span className={p.status === 'done' ? 'text-ink-3 line-through' : 'text-ink'}>{p.text}</span><span className={`ml-1.5 text-[11px] font-bold uppercase ${p.status === 'done' ? 'text-ok' : p.status === 'partial' ? 'text-gold' : 'text-danger'}`}>{p.status === 'done' ? T('cumplida', 'done') : p.status === 'partial' ? T('a medias', 'partial') : T('pendiente', 'pending')}</span>{p.note && <span className="block text-[11.5px] text-ink-3">{p.note}</span>}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
                   )}
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="text-[11px] uppercase tracking-widest text-ink-3">{T('Lo que hay que cambiar', 'What needs to change')} · {changes.length} {changes.length === 1 ? T('ítem', 'item') : T('ítems', 'items')}{blocking ? ` · ${blocking} ${blocking === 1 ? T('bloqueante', 'blocking') : T('bloqueantes', 'blocking')}` : ''}</div>
-                    {changes.length > 0 && <button onClick={() => setPicked(Object.fromEntries(changes.map((_, i) => [i, chosen.length !== changes.length])))} className="text-[11px] text-accent hover:underline">{chosen.length === changes.length ? T('desmarcar todo', 'uncheck all') : T('marcar todo', 'check all')}</button>}
+                  <div className="mt-5 flex items-center justify-between gap-3">
+                    <div className={label}>{T('Lo que hay que cambiar', 'What needs to change')} · {changes.length} {changes.length === 1 ? T('ítem', 'item') : T('ítems', 'items')}{blocking ? ` · ${blocking} ${blocking === 1 ? T('bloqueante', 'blocking') : T('bloqueantes', 'blocking')}` : ''}</div>
+                    {changes.length > 0 && <button onClick={() => setPicked(Object.fromEntries(changes.map((_, i) => [i, chosen.length !== changes.length])))} className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent">{chosen.length === changes.length ? T('desmarcar todo', 'uncheck all') : T('marcar todo', 'check all')}</button>}
                   </div>
                   {changes.length === 0 && <div className="mt-2 text-[13px] text-ink-2">{T('El consejo no pidió cambios.', 'The council asked for no changes.')}</div>}
-                  <ul className="mt-2 space-y-1.5">
-                    {changes.map((c, i) => (
-                      <li key={i}>
-                        <label className={`flex items-start gap-2 rounded-xl border px-3 py-2 text-[13px] cursor-pointer ${(picked[i] ?? true) ? 'border-line bg-paper' : 'border-dashed border-line/70 bg-transparent text-ink-3'}`}>
-                          <input type="checkbox" className="accent-accent mt-0.5" checked={picked[i] ?? true} onChange={(e) => setPicked({ ...picked, [i]: e.target.checked })} />
-                          <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase ${c.severity === 'bloqueante' ? 'bg-danger/10 text-danger' : 'bg-accent-soft text-accent'}`}>{c.severity}</span>
-                          <span className="min-w-0"><span className="text-ink">{c.text}</span>{c.role && <span className="ml-1.5 text-[11px] text-ink-3">· {c.role}</span>}</span>
-                        </label>
-                      </li>
-                    ))}
+                  <ul className="mt-2 space-y-2">
+                    {changes.map((c, i) => {
+                      const on = picked[i] ?? true
+                      return (
+                        <li key={i}>
+                          <label className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-2.5 text-[13px] transition ${on ? 'border-line bg-surface shadow-sm' : 'border-dashed border-line/70 bg-transparent text-ink-3'}`}>
+                            <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition ${on ? 'border-accent bg-accent text-white' : 'border-ink-4 bg-surface'}`}><input type="checkbox" className="sr-only" checked={on} onChange={(e) => setPicked({ ...picked, [i]: e.target.checked })} />{on && <Check size={13} strokeWidth={3} />}</span>
+                            <span className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase ${c.severity === 'bloqueante' ? 'bg-danger/10 text-danger' : 'bg-accent-soft text-accent'}`}>{c.severity}</span>
+                            <span className="min-w-0 leading-relaxed"><span className={on ? 'text-ink' : ''}>{c.text}</span>{c.role && <span className="ml-1.5 text-[11px] text-ink-3">· {c.role}</span>}</span>
+                          </label>
+                        </li>
+                      )
+                    })}
                   </ul>
-                  <div className="mt-3 flex items-center gap-3">
+                  <div className="mt-4 flex items-center gap-3 border-t border-line pt-3">
                     {council.model && <span className="font-mono text-[10.5px] text-ink-4">{T('Presidente del consejo:', 'Council chair:')} {council.model}</span>}
-                    <button disabled={redoing} onClick={redo} className={`ml-auto flex items-center gap-1 text-[11.5px] hover:underline disabled:opacity-50 ${changes.length === 0 && !council.approved ? 'text-danger font-semibold' : 'text-ink-3'}`} title={T('Vuelve a correr solo al presidente sobre el mismo debate (una llamada, barato)', 'Re-runs only the chair over the same debate (one call, cheap)')}>
-                      {redoing ? <Loader2 size={12} className="animate-spin" /> : null} {changes.length === 0 && !council.approved ? T('La lista quedó vacía aunque los roles pidieron cambios: reconsolidar →', 'The list came back empty even though the roles asked for changes: re-consolidate →') : T('reconsolidar la lista', 're-consolidate the list')}
+                    <button disabled={redoing} onClick={redo} className={`ml-auto flex h-7 items-center gap-1 rounded-full border px-2.5 text-[11px] shadow-sm transition disabled:opacity-50 ${changes.length === 0 && !council.approved ? 'border-danger/40 bg-danger/5 font-semibold text-danger' : 'border-line bg-surface text-ink-2 hover:border-accent hover:bg-accent-soft hover:text-accent'}`} title={T('Vuelve a correr solo al presidente sobre el mismo debate (una llamada, barato)', 'Re-runs only the chair over the same debate (one call, cheap)')}>
+                      {redoing ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />} {changes.length === 0 && !council.approved ? T('La lista quedó vacía: reconsolidar', 'The list came back empty: re-consolidate') : T('reconsolidar la lista', 're-consolidate the list')}
                     </button>
                   </div>
                 </>
               )}
             </div>
 
-            {!deliberating && ro && (
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                {chosen.length > 0 ? (
-                  <button disabled={busy} onClick={build} className="flex items-center gap-2 rounded-xl bg-accent text-white px-5 py-2.5 font-semibold hover:brightness-110 disabled:opacity-50">
-                    {busy ? <Loader2 size={16} className="animate-spin" /> : <Hammer size={16} />} {T('Construir con estos', 'Build with these')} {chosen.length} {chosen.length === 1 ? T('cambio', 'change') : T('cambios', 'changes')}
-                  </button>
-                ) : council.approved ? (
-                  <button onClick={openBuild} className="flex items-center gap-2 rounded-xl bg-accent text-white px-5 py-2.5 font-semibold hover:brightness-110"><CheckCircle2 size={16} /> {T('Ver el proyecto aprobado', 'View the approved project')}</button>
-                ) : (
-                  <button onClick={openBuild} className="flex items-center gap-2 rounded-xl border-2 border-accent text-accent px-5 py-2.5 font-semibold hover:bg-accent-soft"><Hammer size={16} /> {T('Volver al constructor', 'Back to the builder')}</button>
-                )}
-                {chosen.length > 0 && (
-                  <label className="flex items-center gap-1.5 text-[12px] text-ink-3">
-                    {T('después, el consejo vuelve a revisar', 'afterwards, the council reviews again')}
-                    <select value={rounds} onChange={(e) => setRounds(Number(e.target.value))} className="rounded-md border border-line bg-surface px-1.5 py-0.5 text-[12px] text-ink">
-                      <option value={0}>{T('no', 'no')}</option>
-                      {[1, 2, 3].map((n) => <option key={n} value={n}>{n} {n === 1 ? T('ronda más', 'more round') : T('rondas más', 'more rounds')}</option>)}
-                    </select>
-                  </label>
-                )}
-                <button onClick={() => ro && set({ showVerdict: false, pendingBuild: { buildId: ro.build_id, sessionId: ro.session_id, fde: changes.filter((c) => c.severity === 'bloqueante').map((c) => `- ${c.text}`).join('\n') } })} className="text-[12.5px] text-gold hover:underline" title={T('Un ingeniero nuestro resuelve esto por vos, precio fijo', 'One of our engineers solves this for you, fixed price')}>{T('¿Preferís que un developer lo resuelva? →', 'Rather have a developer handle it? →')}</button>
-                <button onClick={openBuild} className="ml-auto text-[12.5px] text-ink-3 hover:text-ink">{T('abrir el constructor sin cambios →', 'open the builder without changes →')}</button>
-                {chosen.length > 0 && rounds > 0 && (
-                  <textarea value={priorities} onChange={(e) => setPriorities(e.target.value)} rows={2} placeholder={T('Para la próxima ronda: ¿qué querés que el consejo mire primero? (opcional)', 'For the next round: what should the council look at first? (optional)')} className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-[12.5px] outline-none focus:border-accent" />
-                )}
+            {/* each role */}
+            <div>
+              <div className="rounded-2xl border border-line bg-paper p-5 shadow-[0_12px_28px_-18px_rgba(30,38,34,.4)]">
+                <div className={label}>{T('Veredicto de cada rol', 'Verdict by role')}</div>
+                <div className="mt-3 space-y-2">
+                  {closing.length === 0 && <div className="text-[12.5px] text-ink-3">{T('Todavía no hubo ronda de cierre.', 'No closing round yet.')}</div>}
+                  {closing.map((t) => {
+                    const a = map[t.agent_id]
+                    const ok = /^\s*aprueb/i.test(t.message)
+                    return (
+                      <motion.div key={t.turn} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[12.5px]" style={{ borderLeft: `3px solid ${colorOf(a)}` }}>
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface shadow-sm" style={{ border: `1.5px solid ${colorOf(a)}` }}><ProviderLogo provider={a?.wanted_provider ?? a?.provider} size={14} /></span>
+                          <span className="font-semibold" style={{ color: colorOf(a) }}>{a?.name}</span>
+                          <span className={`ml-auto inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${ok ? 'border-ok/30 bg-ok/10 text-ok' : 'border-gold/40 bg-gold/10 text-gold'}`}>{ok ? <CheckCircle2 size={11} /> : <XCircle size={11} />} {ok ? T('aprueba', 'approves') : T('pide cambios', 'requests changes')}</span>
+                        </div>
+                        <div className="mt-1.5 line-clamp-6 whitespace-pre-wrap leading-relaxed text-ink-2">{t.message.replace(/^\s*(APRUEBO|CAMBIOS)\s*/i, '')}</div>
+                      </motion.div>
+                    )
+                  })}
+                </div>
+                {judge && deliberating && <div className="mt-3 font-mono text-[10.5px] text-ink-4">{T('preside:', 'chair:')} {judge.model}</div>}
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* footer: what to do with the list */}
+        {!deliberating && ro && (
+          <div className="border-t border-line bg-paper px-7 py-4">
+            <div className="flex flex-wrap items-center gap-3">
+              {chosen.length > 0 ? (
+                <button disabled={busy} onClick={build} className={primary}>
+                  {busy ? <Loader2 size={16} className="animate-spin" /> : <Hammer size={16} />} {T('Construir con estos', 'Build with these')} {chosen.length} {chosen.length === 1 ? T('cambio', 'change') : T('cambios', 'changes')}
+                </button>
+              ) : council.approved ? (
+                <button onClick={openBuild} className={primary}><CheckCircle2 size={16} /> {T('Ver el proyecto aprobado', 'View the approved project')}</button>
+              ) : (
+                <button onClick={openBuild} className={primary}><Hammer size={16} /> {T('Volver al constructor', 'Back to the builder')}</button>
+              )}
+              {chosen.length > 0 && (
+                <div className="flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-[12px] text-ink-2 shadow-sm">
+                  <span>{T('Después, el consejo revisa', 'Afterwards, the council reviews')}</span>
+                  <button type="button" onClick={() => setRounds((r) => Math.max(0, r - 1))} className="flex h-6 w-6 items-center justify-center rounded-full border border-line bg-paper transition hover:border-accent hover:text-accent"><Minus size={11} /></button>
+                  <span className="w-16 text-center font-mono text-[12px] text-ink">{rounds === 0 ? T('no', 'no') : `${rounds} ${rounds === 1 ? T('ronda', 'round') : T('rondas', 'rounds')}`}</span>
+                  <button type="button" onClick={() => setRounds((r) => Math.min(3, r + 1))} className="flex h-6 w-6 items-center justify-center rounded-full border border-line bg-paper transition hover:border-accent hover:text-accent"><Plus size={11} /></button>
+                </div>
+              )}
+              <div className="ml-auto flex items-center gap-2">
+                <button onClick={() => ro && set({ showVerdict: false, pendingBuild: { buildId: ro.build_id, sessionId: ro.session_id, fde: changes.filter((c) => c.severity === 'bloqueante').map((c) => `- ${c.text}`).join('\n') } })} className={`${pill} border-gold/40 text-gold hover:border-gold hover:bg-gold/10 hover:text-gold`} title={T('Un ingeniero nuestro resuelve esto por vos, precio fijo', 'One of our engineers solves this for you, fixed price')}><HardHat size={15} /> {T('Que lo resuelva un developer', 'Have a developer solve it')}</button>
+                <button onClick={openBuild} className={pill}>{T('Abrir el constructor sin cambios', 'Open the builder without changes')}</button>
+              </div>
+            </div>
+            {chosen.length > 0 && rounds > 0 && (
+              <textarea value={priorities} onChange={(e) => setPriorities(e.target.value)} rows={2} placeholder={T('Para la próxima ronda: ¿qué querés que el consejo mire primero? (opcional)', 'For the next round: what should the council look at first? (optional)')} className="mt-3 w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[12.5px] shadow-sm outline-none transition focus:border-accent" />
             )}
           </div>
-
-          {/* ---------------- per-role verdicts */}
-          <div>
-            <div className="text-[11px] uppercase tracking-widest text-ink-3 flex items-center gap-1.5"><Gavel size={12} /> {T('Veredicto de cada rol', 'Verdict by role')}</div>
-            <div className="mt-3 space-y-2">
-              {closing.length === 0 && <div className="text-[12.5px] text-ink-3">{T('Todavía no hubo ronda de cierre.', 'No closing round yet.')}</div>}
-              {closing.map((t) => {
-                const a = map[t.agent_id]
-                const ok = /^\s*aprueb/i.test(t.message)
-                return (
-                  <motion.div key={t.turn} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-xl bg-surface border border-line px-3 py-2 text-[12.5px]" style={{ borderLeft: `3px solid ${colorOf(a)}` }}>
-                    <div className="flex items-center gap-1.5 font-semibold" style={{ color: colorOf(a) }}>
-                      <ProviderLogo provider={a?.wanted_provider ?? a?.provider} size={14} /> {a?.name}
-                      <span className={`ml-auto flex items-center gap-1 text-[10.5px] font-bold uppercase ${ok ? 'text-ok' : 'text-gold'}`}>{ok ? <CheckCircle2 size={12} /> : <XCircle size={12} />} {ok ? T('aprueba', 'approves') : T('pide cambios', 'requests changes')}</span>
-                    </div>
-                    <div className="mt-1 text-ink-2 whitespace-pre-wrap line-clamp-6">{t.message.replace(/^\s*(APRUEBO|CAMBIOS)\s*/i, '')}</div>
-                  </motion.div>
-                )
-              })}
-            </div>
-            {judge && deliberating && <div className="mt-3 font-mono text-[10.5px] text-ink-4">{T('preside:', 'chair:')} {judge.model}</div>}
-          </div>
-        </div>
-        <div className="mt-5 text-center">
-          <button className="text-sm text-ink-3 hover:text-ink" onClick={() => set({ showVerdict: false })}>{T('cerrar', 'close')}</button>
-        </div>
+        )}
       </motion.div>
     </motion.div>
   )
