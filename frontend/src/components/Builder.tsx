@@ -184,8 +184,8 @@ export default function Builder({ onBack }: { onBack: () => void }) {
         <button onClick={onBack} className={`${HBTN} px-3`}><ArrowLeft size={14} /> {T('Volver', 'Back')}</button>
         <span className="mx-1 h-7 w-px bg-line" />
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface shadow-sm" style={{ border: `1.5px solid ${color}` }}><ProviderLogo provider={b.provider} size={20} /></span>
-        <div className="min-w-0">
-          <div className="serif truncate text-[17px] leading-tight">{b.title}</div>
+        <div className="min-w-0 flex-1">
+          <div className="serif truncate text-[17px] leading-tight" title={b.title}>{b.title}</div>
           <div className="flex items-center gap-2 font-mono text-[11px] text-ink-3">
             <span>{b.model}</span>
             {b.engineSession && b.workdir && (
@@ -199,23 +199,23 @@ export default function Builder({ onBack }: { onBack: () => void }) {
             )}
           </div>
         </div>
-        <div className="ml-3 flex items-center gap-2">
+        <div className="ml-2 flex shrink-0 items-center gap-2 whitespace-nowrap">
           {reviewing ? (
             <span className="flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-[11px] font-bold text-gold"><span className="h-2 w-2 rounded-full bg-gold animate-pulse" /> {b.reviewMode === 'audit' ? T('AUDITANDO', 'AUDITING') : `${T('CONSEJO · ronda', 'COUNCIL · round')} ${b.reviewRound ?? b.reviews.length + 1}`}</span>
           ) : b.status === 'audited' ? (
             <span className="rounded-full bg-accent px-2.5 py-1 text-[11px] font-bold text-white">{T('AUDITADO · informe listo', 'AUDITED · report ready')}</span>
           ) : running ? (
-            <span className="flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent-soft px-2.5 py-1 text-[11px] font-bold text-accent"><span className="h-2 w-2 rounded-full bg-accent animate-pulse" /> {b.reviews.length ? T('APLICANDO CAMBIOS', 'APPLYING CHANGES') : T('CONSTRUYENDO', 'BUILDING')}{b.liveTurn ? ` · ${T('turno', 'turn')} ${b.liveTurn}` : ''}</span>
+            <span className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-accent/30 bg-accent-soft px-2.5 py-1 text-[11px] font-bold text-accent"><span className="h-2 w-2 rounded-full bg-accent animate-pulse" /> {b.reviews.length ? T('APLICANDO', 'APPLYING') : T('CONSTRUYENDO', 'BUILDING')}{b.liveTurn ? ` · ${T('turno', 'turn')} ${b.liveTurn}` : ''}</span>
           ) : b.status === 'approved' ? (
             <span className="flex items-center gap-1.5 rounded-full bg-ok px-2.5 py-1 text-[11px] font-bold text-white"><CheckCircle2 size={12} /> {T('APROBADO POR EL CONSEJO', 'APPROVED BY THE COUNCIL')}</span>
           ) : (
             <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${b.status === 'completed' ? 'border-ok/30 bg-ok/10 text-ok' : 'border-line bg-surface-2 text-ink-3'}`}>{b.status === 'completed' ? (b.reviews.length ? T('CAMBIOS LISTOS · pendiente de consejo', 'CHANGES READY · pending council') : <><span className="h-2 w-2 rounded-full bg-ok shadow-[0_0_0_3px_rgba(23,137,106,.18)]" /> {T('LISTO', 'DONE')}</>) : b.status.toUpperCase()}</span>
           )}
           {b.versions.length > 0 && <ReadinessBadge versions={b.versions} />}
-          {b.reviews.length > 0 && !reviewing && <span className="text-[11px] text-ink-3">{b.reviews.length} {b.reviews.length === 1 ? T('ronda', 'round') : T('rondas', 'rounds')} {T('de revisión', 'of review')}</span>}
-          {stageCount > 0 && <span className="text-[11px] text-ink-3">{stageCount} {stageCount === 1 ? T('etapa', 'stage') : T('etapas', 'stages')}</span>}
+          {b.reviews.length > 0 && !reviewing && <span className="hidden text-[11px] text-ink-3 2xl:inline">{b.reviews.length} {b.reviews.length === 1 ? T('ronda', 'round') : T('rondas', 'rounds')} {T('de revisión', 'of review')}</span>}
+          {stageCount > 0 && <span className="hidden text-[11px] text-ink-3 2xl:inline">{stageCount} {stageCount === 1 ? T('etapa', 'stage') : T('etapas', 'stages')}</span>}
           {/* what it really costs: an engine build runs on the user's subscription, so only the per-use fees count there */}
-          <span className="rounded-full border border-line bg-surface px-2.5 py-1 font-mono text-[11px] text-ink-3" title={isEngineBuild ? T('Construido con tu suscripción: los tokens no se cobran por API', 'Built on your subscription: tokens are not billed through the API') : T('Tokens por API más cargos por uso', 'API tokens plus per-use charges')}>
+          <span className="hidden rounded-full border border-line bg-surface px-2.5 py-1 font-mono text-[11px] text-ink-3 xl:inline-flex" title={isEngineBuild ? T('Construido con tu suscripción: los tokens no se cobran por API', 'Built on your subscription: tokens are not billed through the API') : T('Tokens por API más cargos por uso', 'API tokens plus per-use charges')}>
             {Object.keys(b.files).length} {T('archivos', 'files')} · {isEngineBuild && !b.fees ? T('suscripción', 'subscription') : `$${((isEngineBuild ? 0 : b.cost) + b.fees).toFixed(2)}`}
           </span>
           {b.feesDue > 0 && (
@@ -226,17 +226,18 @@ export default function Builder({ onBack }: { onBack: () => void }) {
                 setPayingFees(true)
                 try { const o = await api.checkout({ kind: 'fees', build_id: b.id, session_id: b.sessionId }); window.location.href = o.url } catch (e) { toast.error(tr('No se pudo iniciar el pago', 'Could not start the payment'), (e as Error).message); setPayingFees(false) }
               }}
-              className="flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-[11px] font-bold text-gold transition hover:bg-gold/20 disabled:opacity-50"
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-[11px] font-bold text-gold transition hover:bg-gold/20 disabled:opacity-50"
               title={T('Cargos por uso pendientes de pago (análisis profundo). Se pagan con Stripe.', 'Unpaid per-use charges (deep analysis). Paid through Stripe.')}
             >{payingFees ? <Loader2 size={11} className="animate-spin" /> : <CreditCard size={11} />} USD {b.feesDue.toFixed(2)} {T('a pagar', 'to pay')}</button>
           )}
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          <button onClick={toggleRecording} className={b.recording ? `${HBTN} border-danger/60 bg-danger/10 text-danger hover:border-danger hover:text-danger` : HBTN} title={T('Graba esta pantalla (chat + código + vista previa) y descarga el video', 'Records this screen (chat + code + preview) and downloads the video')}>
-            <Circle size={12} className={b.recording ? 'fill-danger animate-pulse' : ''} /> {b.recording ? T('Guardar video', 'Save video') : T('Grabar', 'Record')}
+        {/* actions: labels only when there is room; below 2xl the secondary ones are icon buttons with a tooltip */}
+        <div className="ml-auto flex shrink-0 items-center gap-2 whitespace-nowrap">
+          <button onClick={toggleRecording} className={`${b.recording ? `${HBTN} border-danger/60 bg-danger/10 text-danger hover:border-danger hover:text-danger` : HBTN} px-3 2xl:px-3.5`} title={b.recording ? T('Guardar el video', 'Save the video') : T('Graba esta pantalla (chat + código + vista previa) y descarga el video', 'Records this screen (chat + code + preview) and downloads the video')}>
+            <Circle size={13} className={b.recording ? 'fill-danger animate-pulse' : ''} /> <span className="hidden 2xl:inline">{b.recording ? T('Guardar video', 'Save video') : T('Grabar', 'Record')}</span>
           </button>
-          {running && b.id && <button onClick={() => api.buildStop(b.id!)} className={HBTN}><Square size={14} /> {T('Detener', 'Stop')}</button>}
-          <button onClick={downloadZip} disabled={!Object.keys(b.files).length} className={HBTN}><Download size={14} /> {T('Descargar .zip', 'Download .zip')}</button>
+          {running && b.id && <button onClick={() => api.buildStop(b.id!)} className={`${HBTN} border-danger/40 px-3 text-danger hover:border-danger hover:text-danger 2xl:px-3.5`} title={T('Detener la construcción', 'Stop the build')}><Square size={14} /> <span className="hidden 2xl:inline">{T('Detener', 'Stop')}</span></button>}
+          <button onClick={downloadZip} disabled={!Object.keys(b.files).length} className={`${HBTN} px-3 2xl:px-3.5`} title={T('Descargar el proyecto como .zip', 'Download the project as .zip')}><Download size={14} /> <span className="hidden 2xl:inline">{T('Descargar .zip', 'Download .zip')}</span></button>
           <button onClick={() => setRunOpen(true)} disabled={!Object.keys(b.files).length || running} className={HBTN_PRIMARY} title={T('Levanta la app en esta máquina y la muestra acá', 'Starts the app on this machine and shows it here')}><MonitorPlay size={14} /> {T('Correr la app', 'Run the app')}{b.appRun.status === 'running' ? <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> : null}</button>
         </div>
       </div>

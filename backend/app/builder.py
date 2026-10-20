@@ -1070,7 +1070,7 @@ class Build:
         cfg = SessionConfig(
             topic=f"Revisión pre-producción · ronda {rnd}: ¿{self.title} está listo para salir?", title=f"Consejo · {self.title} · ronda {rnd}",
             mode="review", agents=[{k: v for k, v in a.items() if k in ("id", "role", "name", "provider", "model", "persona", "wanted_provider", "skills")} for a in agents],
-            max_turns=min(60, max(4, 2 * len(agents))), min_turns=min(len(agents), 4), final_vote=False, closing_round=True, pace_ms=500, max_tokens=900,
+            max_turns=min(60, max(4, 2 * len(agents))), min_turns=min(len(agents), 4), final_vote=False, closing_round=True, pace_ms=500, max_tokens=1600,
             auto_skills=True,  # the council picks catalog skills the review needs (per role, on top of the user's)
             judge=agents[0]["id"], context=digest + prior, review_of={"build_id": self.id, "session_id": self.req.session_id, "title": self.title, "round": rnd, "version": len(self.versions), "prior_requests": prior_requests, "priorities": prio},
         )

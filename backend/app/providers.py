@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import logging
 import random
 import re
 import time
@@ -236,6 +237,10 @@ async def _openai_stream(spec, cred, model, system, user, temperature, max_token
             yield "text", delta.content
 
 
+# tokens reserved for the model's (low-effort) thinking on top of the message budget, so the message is never squeezed out
+THINKING_HEADROOM = 2048
+
+
 async def _anthropic_stream(cred, model, system, user, temperature, max_tokens, result, history=(), images=()) -> AsyncIterator[tuple[str, str]]:
     client = _anthropic(cred)
     content: str | list = user
@@ -247,11 +252,18 @@ async def _anthropic_stream(cred, model, system, user, temperature, max_tokens, 
     blocks = [b for b in system.split(CACHE_SEP) if b.strip()] or [system]
     sys_blocks = [{"type": "text", "text": b, "cache_control": {"type": "ephemeral"}} for b in blocks[:4]]
     # anthropic>=1.13 dropped `temperature` (Claude 5 models don't take it); it is ignored here.
-    # Claude 5 models think by default and that thinking eats `max_tokens`: a 700-token turn came back as 700 tokens of
-    # reasoning and an empty message. Thinking is switched off for arena turns (the protocol has its own <reflexion>);
-    # if a model rejects the parameter we retry without it and surface its thinking as "reasoning" deltas instead.
+    # Claude 5 models think by default and that thinking counts against `max_tokens`: a 900-token turn came back as
+    # 900 tokens of reasoning and an empty message. They also reject `thinking.type.disabled` (HTTP 400: "use
+    # thinking.type.adaptive and output_config.effort"), so the right call is adaptive thinking at low effort, with
+    # headroom on top of the message budget so the answer itself is never cut. Older models that do not know
+    # `output_config` get the plain call; `disabled` stays as a last resort for models that accept it.
+    headroom = max_tokens + THINKING_HEADROOM
     kwargs = dict(model=model, system=sys_blocks, max_tokens=max_tokens, messages=[*history, {"role": "user", "content": content}])
-    attempts = [dict(kwargs, thinking={"type": "disabled"}), kwargs]
+    attempts = [
+        dict(kwargs, max_tokens=headroom, thinking={"type": "adaptive"}, output_config={"effort": "low"}),
+        dict(kwargs, thinking={"type": "disabled"}),
+        kwargs,
+    ]
     for i, kw in enumerate(attempts):
         try:
             async with client.messages.stream(**kw) as s:
@@ -267,8 +279,10 @@ async def _anthropic_stream(cred, model, system, user, temperature, max_tokens, 
                 final = await s.get_final_message()
             break
         except Exception as e:  # noqa: BLE001
-            if i == 0 and "thinking" in str(e).lower():
-                continue  # this model does not take the parameter: plain call
+            msg = str(e).lower()
+            if i < len(attempts) - 1 and ("thinking" in msg or "output_config" in msg or "effort" in msg):
+                log.info("anthropic %s rejected attempt %d (%s); trying the next variant", model, i, msg[:140])
+                continue  # this model does not take the parameter: next variant
             raise
     u = final.usage
     result.cached_input_tokens = int(getattr(u, "cache_read_input_tokens", 0) or 0)
@@ -277,6 +291,8 @@ async def _anthropic_stream(cred, model, system, user, temperature, max_tokens, 
     result.output_tokens = u.output_tokens
     result.truncated = final.stop_reason == "max_tokens"
 
+
+log = logging.getLogger("arena.providers")
 
 _models_cache: dict[tuple, tuple[float, list[str]]] = {}
 
