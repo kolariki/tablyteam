@@ -7,6 +7,10 @@ import { useLang, useT } from '../lib/i18n'
 
 type Group = ServicesInfo['groups'][number]
 
+// guides already fetched in this tab: reopening one is instant (the server keeps them in its database too)
+const guideCache = new Map<string, ServiceGuideData>()
+const guideKey = (g: Group, lang: string) => `${g.service}|${g.vars.map((v) => v.var).sort().join(',')}|${lang}`
+
 /**
  * "How do I get this?": a guided walkthrough for one external service. The steps come from a model (cached per
  * build); the last step is always the form where the user pastes the values, so the whole journey ends here.
@@ -23,9 +27,12 @@ export default function ServiceGuide({ group, sessionId, buildId, onClose, onSav
   const [done, setDone] = useState(false)
 
   const load = (refresh = false) => {
+    const k = guideKey(group, lang)
+    const hit = refresh ? null : guideCache.get(k)
+    if (hit) { setData(hit); return }
     setData(null)
     setError(null)
-    api.serviceGuide(sessionId, buildId, group.service, lang, refresh).then(setData).catch((e) => setError((e as Error).message))
+    api.serviceGuide(sessionId, buildId, group.service, lang, refresh).then((d) => { guideCache.set(k, d); setData(d) }).catch((e) => setError((e as Error).message))
   }
   useEffect(() => { load() }, [group.service, lang]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {

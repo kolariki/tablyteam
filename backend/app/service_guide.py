@@ -9,13 +9,24 @@ from __future__ import annotations
 import json
 import logging
 import re
-from pathlib import Path
 
-from .auth import User, user_dir
+import asyncio
+import time
+
+from .auth import User
+from .deploy import _db
 from .providers import PROVIDERS, CallResult, stream
 from .scene_gen import _pick_model
 
 log = logging.getLogger("arena.guide")
+
+# A guide depends on the service and the variables asked for, not on the project: once written it serves every build
+# (and every user) that needs the same thing. Three layers: memory → sqlite → the model, with in-flight dedup so two
+# clicks never pay for two generations.
+with _db() as _c:
+    _c.execute("CREATE TABLE IF NOT EXISTS service_guides (key TEXT PRIMARY KEY, service TEXT NOT NULL, lang TEXT NOT NULL, data TEXT NOT NULL, generated INTEGER NOT NULL, created REAL NOT NULL)")
+_MEM: dict[str, dict] = {}
+_INFLIGHT: dict[str, asyncio.Future] = {}
 
 SYSTEM = {
     "es": """Sos un onboarding engineer. Explicás, paso a paso y sin dar nada por sabido, cómo conseguir lo que una app necesita de un servicio externo (crear cuenta, encontrar la sección correcta, generar la key, copiar el valor). Respondé SOLO con JSON válido con esta forma:
@@ -41,17 +52,6 @@ def _slug(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")[:60] or "service"
 
 
-def _cache(user: User, build_id: str) -> Path:
-    return user_dir(user.id) / f"{build_id}.guides.json"
-
-
-def _load(user: User, build_id: str) -> dict:
-    try:
-        return json.loads(_cache(user, build_id).read_text())
-    except Exception:  # noqa: BLE001
-        return {}
-
-
 def fallback(group: dict, lang: str) -> dict:
     """No model key or the model failed: a generic but still useful walkthrough from the catalogue URL."""
     url = group.get("url") or ""
@@ -72,13 +72,40 @@ def fallback(group: dict, lang: str) -> dict:
     return {"intro": group.get("purpose") or "", "cost": None, "steps": steps, "generated": False}
 
 
-async def guide(user: User, build_id: str, group: dict, title: str, stack: list[str], lang: str, refresh: bool = False) -> dict:
-    key = _slug(group["service"])
-    cached = _load(user, build_id)
-    if not refresh and key in cached and cached[key].get("lang") == lang:
-        return cached[key]
+def _key(group: dict, lang: str) -> str:
+    return f"{_slug(group['service'])}|{','.join(sorted(v['var'] for v in group.get('vars', [])))}|{lang}"
+
+
+def _load(key: str) -> dict | None:
+    if key in _MEM:
+        return _MEM[key]
+    with _db() as c:
+        row = c.execute("SELECT data FROM service_guides WHERE key=?", (key,)).fetchone()
+    if row:
+        d = json.loads(row[0])
+        _MEM[key] = d
+        return d
+    return None
+
+
+def _store(key: str, group: dict, lang: str, data: dict) -> None:
+    _MEM[key] = data
+    try:
+        with _db() as c:
+            c.execute("INSERT OR REPLACE INTO service_guides (key, service, lang, data, generated, created) VALUES (?,?,?,?,?,?)", (key, group["service"], lang, json.dumps(data, ensure_ascii=False), int(bool(data.get("generated"))), time.time()))
+    except Exception as e:  # noqa: BLE001
+        log.warning("guide cache write failed: %s", e)
+
+
+def forget(group: dict, lang: str) -> None:
+    key = _key(group, lang)
+    _MEM.pop(key, None)
+    with _db() as c:
+        c.execute("DELETE FROM service_guides WHERE key=?", (key,))
+
+
+async def _write(user: User, group: dict, title: str, stack: list[str], lang: str) -> dict:
     who = _pick_model(user, {"agents": []})
-    out: dict | None = None
     if who:
         provider, model, cred = who
         vars_txt = "\n".join(f"- {v['var']}" + (f" · {v['note']}" if v.get("note") else "") + (f" · ejemplo: {v['example']}" if v.get("example") else "") for v in group.get("vars", []))
@@ -94,15 +121,32 @@ async def guide(user: User, build_id: str, group: dict, title: str, stack: list[
             data = json.loads(m.group(0)) if m else None
             if data and isinstance(data.get("steps"), list) and data["steps"]:
                 steps = [{"title": str(s.get("title") or ""), "detail": str(s.get("detail") or ""), "url": s.get("url") if isinstance(s.get("url"), str) and s["url"].startswith("http") else None} for s in data["steps"][:8]]
-                out = {"intro": str(data.get("intro") or ""), "cost": data.get("cost"), "steps": steps, "generated": True, "model": f"{PROVIDERS[provider].label} · {model}"}
+                return {"intro": str(data.get("intro") or ""), "cost": data.get("cost"), "steps": steps, "generated": True, "model": f"{PROVIDERS[provider].label} · {model}"}
         except Exception as e:  # noqa: BLE001
-            log.warning("guide %s/%s failed: %s", build_id, key, str(e)[:200])
-    if not out:
-        out = fallback(group, lang)
-    out["lang"] = lang
-    cached[key] = out
+            log.warning("guide %s failed: %s", group["service"], str(e)[:200])
+    return fallback(group, lang)
+
+
+async def guide(user: User, build_id: str, group: dict, title: str, stack: list[str], lang: str, refresh: bool = False) -> dict:
+    key = _key(group, lang)
+    if refresh:
+        forget(group, lang)
+    else:
+        hit = _load(key)
+        if hit and (hit.get("generated") or not _pick_model(user, {"agents": []})):
+            return hit  # a generic guide is kept only while nobody has a key to write a real one
+    if key in _INFLIGHT:  # someone (or a second click) is already writing it: wait for that one
+        return await _INFLIGHT[key]
+    fut: asyncio.Future = asyncio.get_running_loop().create_future()
+    _INFLIGHT[key] = fut
     try:
-        _cache(user, build_id).write_text(json.dumps(cached, ensure_ascii=False))
-    except Exception:  # noqa: BLE001
-        pass
-    return out
+        out = await _write(user, group, title, stack, lang)
+        out["lang"] = lang
+        _store(key, group, lang, out)
+        fut.set_result(out)
+        return out
+    except Exception as e:  # noqa: BLE001
+        fut.set_exception(e)
+        raise
+    finally:
+        _INFLIGHT.pop(key, None)

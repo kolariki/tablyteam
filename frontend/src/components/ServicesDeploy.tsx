@@ -11,11 +11,14 @@ import { downloadBlob } from '../lib/recorder'
 /** Services whose logo the app already ships (so the card can show the brand instead of an initial). */
 const PROVIDER_OF: Record<string, string> = { OpenAI: 'openai', Anthropic: 'anthropic', 'Google AI Studio': 'gemini', Vercel: 'vercel', Railway: 'railway', Langfuse: 'langfuse', Mistral: 'mistral', Groq: 'groq' }
 
+// the last analysis per build: the pane opens with it at once and refreshes quietly behind
+const infoCache = new Map<string, ServicesInfo>()
+
 /** Right-pane tab: every external service / API key the built app needs, with values, plus one-click deploy. */
 export default function ServicesDeploy({ onOpenSettings }: { onOpenSettings: () => void }) {
   const T = useT()
   const b = useBuild()
-  const [info, setInfo] = useState<ServicesInfo | null>(null)
+  const [info, setInfo] = useState<ServicesInfo | null>(() => (b.id ? infoCache.get(b.id) ?? null : null))
   const [values, setValues] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
@@ -26,7 +29,9 @@ export default function ServicesDeploy({ onOpenSettings }: { onOpenSettings: () 
 
   const reload = () => {
     if (!b.sessionId || !b.id) return
+    const id = b.id
     api.services(b.sessionId, b.id).then((d) => {
+      infoCache.set(id, d)
       setInfo(d)
       setTarget((t) => (d.deploy_targets.some((x) => x.id === t) ? t : d.recommended_target))
     }).catch((e) => setError(e.message))
