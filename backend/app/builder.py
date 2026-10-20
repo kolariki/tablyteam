@@ -762,7 +762,7 @@ class Build:
         self.activity = (self.activity + [item])[-80:]
         self.emit("build.activity", turn=self.turns, **item)
 
-    async def research_phase(self) -> None:
+    async def research_phase(self, only: list[str] | None = None) -> None:
         """Level 1: visit the reference apps (headless Chrome), describe each one with a vision model, merge into research/REFERENCES.md."""
         if self.req.deep_analysis and not any(f.get("label") == DEEP_ANALYSIS_LABEL for f in self.fees):
             self.fees.append({"label": DEEP_ANALYSIS_LABEL, "usd": rsch.DEEP_ANALYSIS_FEE_USD, "ts": time.time()})
@@ -780,7 +780,7 @@ class Build:
         provider, model, cred = who
         mock = PROVIDERS.get(provider) and PROVIDERS[provider].kind == "mock"
         refs: list[dict] = []
-        for r in self.req.references[:rsch.MAX_REFERENCES]:
+        for r in (only if only is not None else self.req.references)[:rsch.MAX_REFERENCES]:
             url = rsch.normalize_reference(r)
             refs.append({"name": r.strip()[:60], "url": url, "why": ""} if url else {"name": r.strip()[:60], "url": None, "why": ""})
         named_only = [r["name"] for r in refs if not r["url"]]
@@ -1044,8 +1044,8 @@ class Build:
         before = self.status
         try:
             if new_refs:
-                self.chat.append({"role": "system", "text": f"Investigando {len(new_refs)} referente(s) nuevo(s) antes del consejo: {', '.join(new_refs)[:300]}", "ts": time.time()})
-                await self.research_phase()
+                self.chat.append({"role": "system", "text": f"Investigando {len(new_refs)} referente(s) antes del consejo: {', '.join(new_refs)[:300]}", "ts": time.time()})
+                await self.research_phase(only=new_refs)
         except Exception as e:  # noqa: BLE001
             self._note(f"La investigación de referentes falló: {str(e)[:200]}")
         finally:
