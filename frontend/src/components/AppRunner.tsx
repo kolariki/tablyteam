@@ -1,4 +1,5 @@
-import { ChevronDown, ExternalLink, Loader2, Play, RefreshCw, Square, Wrench } from 'lucide-react'
+import { ChevronDown, ExternalLink, Loader2, Maximize2, Minimize2, MonitorPlay, Play, RefreshCw, Square, Wrench } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import { useEffect, useRef, useState } from 'react'
 import { reconnectBuild, useBuild } from '../buildStore'
 import { api, type RunService } from '../lib/api'
@@ -24,6 +25,13 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
   const [logsOpen, setLogsOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [frameKey, setFrameKey] = useState(0)
+  const [full, setFull] = useState(false)
+  useEffect(() => {
+    if (!full) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFull(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [full])
   const logRef = useRef<HTMLPreElement>(null)
   const step = STEP()
 
@@ -89,25 +97,26 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
           <span className="text-[12.5px] text-ink-2">{T('No encontré nada que se pueda correr (sin package.json con script ', 'Found nothing runnable (no package.json with a ')}<code className="font-mono">dev</code>{T(', ni API Python, ni docker compose).', ' script, no Python API, no docker compose).')}</span>
         ) : (
           <>
-            <select disabled={active} value={service} onChange={(e) => setService(e.target.value)} className="rounded-lg bg-paper border border-line px-2.5 py-1.5 text-[12.5px] disabled:opacity-60">
+            <select disabled={active} value={service} onChange={(e) => setService(e.target.value)} className="h-9 rounded-full border border-line bg-paper px-3 text-[12.5px] shadow-sm disabled:opacity-60">
               {services.map((s) => <option key={s.id} value={s.id}>{s.label}{s.web ? '' : T(' (sin UI)', ' (no UI)')}</option>)}
             </select>
             {!active ? (
-              <button disabled={busy || !service} onClick={start} className="flex items-center gap-1.5 rounded-lg bg-accent text-white px-3 py-1.5 text-[12.5px] font-semibold hover:brightness-110 disabled:opacity-40">
+              <button disabled={busy || !service} onClick={start} className="flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-[12.5px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40">
                 {busy ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />} {T('Correr la app', 'Run the app')}
               </button>
             ) : (
-              <button onClick={stop} className="flex items-center gap-1.5 rounded-lg border border-danger/40 text-danger px-3 py-1.5 text-[12.5px] font-semibold hover:bg-danger/5"><Square size={13} /> {T('Detener', 'Stop')}</button>
+              <button onClick={stop} className="flex h-9 items-center gap-1.5 rounded-full border border-danger/40 bg-paper px-4 text-[12.5px] font-semibold text-danger shadow-sm transition hover:bg-danger/5"><Square size={13} /> {T('Detener', 'Stop')}</button>
             )}
-            <span className={`flex items-center gap-1.5 text-[12px] ${run.status === 'running' ? 'text-ok' : run.status === 'error' ? 'text-danger' : 'text-ink-3'}`}>
+            <span className={`flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] font-medium ${run.status === 'running' ? 'border-ok/30 bg-ok/10 text-ok' : run.status === 'error' ? 'border-danger/30 bg-danger/5 text-danger' : 'border-line bg-paper text-ink-3'}`}>
               {(run.status === 'installing' || run.status === 'starting') && <Loader2 size={12} className="animate-spin" />}
               {run.status === 'running' && <span className="w-2 h-2 rounded-full bg-ok animate-pulse" />}
               {step[run.status] ?? run.status}{run.status === 'running' && run.url ? ` ${T('en', 'at')} ${run.url}` : ''}
             </span>
             {run.status === 'running' && run.url && (
-              <div className="ml-auto flex items-center gap-1">
-                <button onClick={() => setFrameKey((k) => k + 1)} className="flex items-center gap-1 rounded-md px-2 py-1 text-[12px] text-ink-3 hover:text-ink"><RefreshCw size={12} /> {T('recargar', 'reload')}</button>
-                <a href={run.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-md px-2 py-1 text-[12px] text-ink-3 hover:text-ink"><ExternalLink size={12} /> {T('abrir en pestaña', 'open in tab')}</a>
+              <div className="ml-auto flex items-center gap-1.5">
+                <button onClick={() => setFrameKey((k) => k + 1)} className="flex h-8 items-center gap-1 rounded-full border border-line bg-paper px-2.5 text-[12px] text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent" title={T('Recargar la app', 'Reload the app')}><RefreshCw size={12} /> {T('recargar', 'reload')}</button>
+                <a href={run.url} target="_blank" rel="noreferrer" className="flex h-8 items-center gap-1 rounded-full border border-line bg-paper px-2.5 text-[12px] text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent" title={T('Abrir en una pestaña nueva', 'Open in a new tab')}><ExternalLink size={12} /> {T('pestaña', 'tab')}</a>
+                <button onClick={() => setFull(true)} className="flex h-8 w-8 items-center justify-center rounded-full border border-line bg-paper text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent" title={T('Ver la app a pantalla completa', 'View the app full screen')}><Maximize2 size={13} /></button>
               </div>
             )}
           </>
@@ -121,9 +130,15 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
       <div className="flex-1 min-h-0 flex flex-col">
         {run.status === 'running' && run.url && sel?.web !== false ? (
           <div className="flex-1 min-h-0 p-3">
-            <div className="h-full rounded-xl border border-line bg-white overflow-hidden shadow-sm">
-              <div className="flex items-center gap-1.5 px-3 h-7 border-b border-line bg-surface-2/70"><span className="w-2 h-2 rounded-full bg-[#E6A19A]" /><span className="w-2 h-2 rounded-full bg-[#E9C97A]" /><span className="w-2 h-2 rounded-full bg-[#9FCDA8]" /><span className="ml-2 text-[10px] font-mono text-ink-3">{run.url} · {T('la app real, corriendo en esta máquina', 'the real app, running on this machine')}</span></div>
-              <iframe key={frameKey} title={T('App corriendo', 'App running')} src={run.embedUrl ?? run.url} className="w-full h-[calc(100%-28px)] bg-white" />
+            <div className="flex h-full flex-col overflow-hidden rounded-xl border border-line bg-white shadow-[0_14px_30px_-18px_rgba(30,38,34,.45)]">
+              <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-line bg-surface-2/70 px-3">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#E6A19A]" /><span className="h-2.5 w-2.5 rounded-full bg-[#E9C97A]" /><span className="h-2.5 w-2.5 rounded-full bg-[#9FCDA8]" />
+                <span className="ml-3 flex h-5 items-center rounded-md border border-line bg-surface px-2 font-mono text-[10.5px] text-ink-2">{run.url}</span>
+                <span className="ml-2 text-[10.5px] text-ink-3">{T('la app real, corriendo en esta máquina', 'the real app, running on this machine')}</span>
+                <button onClick={() => setFull(true)} className="ml-auto flex h-6 w-6 items-center justify-center rounded-md text-ink-3 transition hover:bg-surface hover:text-accent" title={T('Pantalla completa', 'Full screen')}><Maximize2 size={13} /></button>
+              </div>
+              {!full && <iframe key={frameKey} title={T('App corriendo', 'App running')} src={run.embedUrl ?? run.url} className="min-h-0 w-full flex-1 bg-white" />}
+              {full && <div className="flex flex-1 items-center justify-center text-[12.5px] text-ink-3">{T('La app está a pantalla completa.', 'The app is in full screen.')}</div>}
             </div>
           </div>
         ) : run.status === 'error' ? (
@@ -144,12 +159,34 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
             <div className="mt-1 text-[12px] text-ink-3">{run.status === 'installing' ? T('La primera vez puede tardar unos minutos.', 'The first time may take a few minutes.') : T('Esperando a que el servidor responda en el puerto asignado…', 'Waiting for the server to respond on the assigned port…')}</div>
           </div>
         ) : services && services.length > 0 ? (
-          <div className="p-6 text-center text-sm text-ink-2">
-            <div className="text-3xl">🖥️</div>
-            <div className="mt-2 font-medium">{T('Corré la app real acá adentro', 'Run the real app right here')}</div>
-            <div className="mt-1 text-[12px] text-ink-3 max-w-md mx-auto">{T('Instala lo que falte, levanta el servidor de desarrollo en un puerto libre de esta máquina y la muestra en este panel. Las variables de «Servicios y deploy» se cargan como ', 'It installs what is missing, starts the dev server on a free port on this machine and shows it in this panel. The variables from "Services & deploy" are loaded as ')}<code className="font-mono">.env</code>.</div>
+          <div className="flex flex-1 items-center justify-center p-6">
+            <div className="w-full max-w-lg rounded-2xl border border-line bg-paper p-6 text-center shadow-[0_14px_30px_-18px_rgba(30,38,34,.4)]">
+              <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft text-accent"><MonitorPlay size={22} /></span>
+              <div className="mt-3 text-[17px] font-semibold text-ink">{T('Corré la app real acá adentro', 'Run the real app right here')}</div>
+              <div className="mx-auto mt-1.5 max-w-md text-[12.5px] leading-relaxed text-ink-3">{T('Se instala lo que falte, se levanta el servidor de desarrollo en un puerto libre de esta máquina y la app se muestra en este panel. Las variables de «Servicios y deploy» se cargan como ', 'What is missing is installed, the dev server starts on a free port on this machine and the app shows in this panel. The variables from "Services & deploy" are loaded as ')}<code className="font-mono">.env</code>.</div>
+              <ol className="mx-auto mt-4 grid max-w-md grid-cols-3 gap-2 text-left text-[11.5px] text-ink-2">
+                {[T('Instala dependencias', 'Installs dependencies'), T('Levanta el servidor', 'Starts the server'), T('La muestra acá', 'Shows it here')].map((t, i) => (
+                  <li key={t} className="flex items-center gap-2 rounded-lg border border-line bg-surface px-2.5 py-2"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">{i + 1}</span>{t}</li>
+                ))}
+              </ol>
+            </div>
           </div>
         ) : null}
+
+        {/* full screen: the app takes the whole window; Esc or the corner button bring it back */}
+        {full && run.status === 'running' && run.url && createPortal(
+          <div className="fixed inset-0 z-[300] flex flex-col bg-white">
+            <div className="flex h-9 shrink-0 items-center gap-2 border-b border-line bg-surface px-3">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#E6A19A]" /><span className="h-2.5 w-2.5 rounded-full bg-[#E9C97A]" /><span className="h-2.5 w-2.5 rounded-full bg-[#9FCDA8]" />
+              <span className="ml-3 flex h-6 items-center rounded-md border border-line bg-paper px-2 font-mono text-[11px] text-ink-2">{run.url}</span>
+              <span className="ml-2 text-[11px] text-ink-3">{T('App real · pantalla completa · Esc para volver', 'Real app · full screen · Esc to go back')}</span>
+              <button onClick={() => setFrameKey((k) => k + 1)} className="ml-auto flex h-7 items-center gap-1 rounded-full border border-line bg-paper px-2.5 text-[11.5px] text-ink-2 transition hover:border-accent hover:text-accent"><RefreshCw size={12} /> {T('recargar', 'reload')}</button>
+              <button onClick={() => setFull(false)} className="flex h-7 items-center gap-1 rounded-full bg-accent px-3 text-[11.5px] font-semibold text-white transition hover:brightness-110"><Minimize2 size={12} /> {T('Volver', 'Back')}</button>
+            </div>
+            <iframe key={`full-${frameKey}`} title={T('App corriendo', 'App running')} src={run.embedUrl ?? run.url} className="min-h-0 w-full flex-1 bg-white" />
+          </div>,
+          document.body,
+        )}
 
         {/* logs */}
         {(run.logs.length > 0 || active) && (

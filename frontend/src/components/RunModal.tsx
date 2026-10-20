@@ -51,13 +51,13 @@ export default function RunModal({ onClose, onDownload }: { onClose: () => void;
           </div>
           {b.versions.length > 0 && <ReadinessBadge versions={b.versions} />}
           {approved ? (
-            <span className="rounded-full bg-ok text-white px-2.5 py-0.5 text-[11px] font-bold">{T('✓ APROBADA POR EL CONSEJO', '✓ APPROVED BY THE COUNCIL')}</span>
+            <span className="flex items-center gap-1.5 rounded-full border border-ok/30 bg-ok/10 px-2.5 py-1 text-[11px] font-bold text-ok"><span className="h-2 w-2 rounded-full bg-ok" /> {T('APROBADA POR EL CONSEJO', 'APPROVED BY THE COUNCIL')}</span>
           ) : rounds > 0 ? (
-            <span className="rounded-full bg-gold/15 text-gold px-2.5 py-0.5 text-[11px] font-bold">{rounds} {rounds === 1 ? T('ronda', 'round') : T('rondas', 'rounds')} {T('de revisión · sin aprobar', 'of review · not approved')}</span>
+            <span className="rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-[11px] font-bold text-gold">{rounds} {rounds === 1 ? T('ronda', 'round') : T('rondas', 'rounds')} {T('de revisión · sin aprobar', 'of review · not approved')}</span>
           ) : (
-            <span className="rounded-full bg-surface-2 text-ink-3 px-2.5 py-0.5 text-[11px] font-bold">{T('SIN REVISAR', 'NOT REVIEWED')}</span>
+            <span className="rounded-full border border-line bg-surface-2 px-2.5 py-1 text-[11px] font-bold text-ink-3">{T('SIN REVISAR', 'NOT REVIEWED')}</span>
           )}
-          <button onClick={onClose} className="ml-auto text-ink-3 hover:text-ink"><X size={18} /></button>
+          <button onClick={onClose} className="ml-auto rounded-full p-1.5 text-ink-3 transition hover:bg-surface-2 hover:text-ink" aria-label={T('Cerrar', 'Close')}><X size={18} strokeWidth={2.5} /></button>
         </div>
 
         <div className="flex-1 min-h-0 flex flex-col">
