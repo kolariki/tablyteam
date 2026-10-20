@@ -101,8 +101,8 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
       <div className="relative z-10">
       {/* header */}
       <header className="sticky top-0 z-20 flex items-center gap-3 px-6 h-14 border-b border-line bg-paper/80 backdrop-blur">
-        <img src="/icon.svg" alt="" aria-hidden className="h-7 w-7 rounded-lg shadow-sm" draggable={false} />
-        <span className="serif text-lg">Tably <em className="text-accent">Team</em></span>
+        <img data-brand-icon src="/icon.svg" alt="" aria-hidden className="h-7 w-7 rounded-lg shadow-sm" draggable={false} />
+        <span className="serif text-lg"><span data-brand-text>Tably</span> <em data-brand-text className="text-accent">Team</em></span>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={onLogin} className="rounded-lg px-3 py-1.5 text-sm text-ink-2 hover:text-ink">{T('Iniciar sesión', 'Sign in')}</button>
           <button onClick={onSignup} className="rounded-lg bg-accent text-white px-3.5 py-1.5 text-sm font-medium hover:brightness-110">{T('Crear cuenta', 'Create account')}</button>
@@ -110,11 +110,19 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
       </header>
 
       {/* hero */}
-      <section className="max-w-[1400px] mx-auto px-6 pt-16 pb-10 grid lg:grid-cols-[0.75fr_1.45fr] gap-12 items-center">
+      <section className="relative max-w-[1400px] mx-auto px-6 pt-16 pb-10 grid lg:grid-cols-[0.75fr_1.45fr] gap-12 items-center">
+        {/* the logos that fly in and fuse into "Tably" (positioned by lib/anim.ts) */}
+        <div data-fuse-layer className="pointer-events-none absolute inset-0 z-20" aria-hidden>
+          {['anthropic', 'openai', 'deepseek', 'gemini', 'kimi', 'xai', 'mistral'].map((id) => (
+            <span key={id} data-fuse-logo className="absolute left-0 top-0 flex h-14 w-14 items-center justify-center rounded-full border border-line bg-surface opacity-0 shadow-[0_14px_30px_-10px_rgba(30,38,34,.5)]"><ProviderLogo provider={id} size={28} /></span>
+          ))}
+          <span data-fuse-orb className="absolute left-0 top-0 h-20 w-20 rounded-full opacity-0" style={{ background: 'radial-gradient(circle, #FFFFFF 0%, #7FD1B9 30%, #2F6B5D 55%, rgba(47,107,93,0) 72%)', boxShadow: '0 0 80px 26px rgba(47,107,93,.45)' }} />
+          <span data-fuse-spark className="absolute left-0 top-0 h-3.5 w-3.5 rounded-full bg-accent opacity-0" style={{ boxShadow: '0 0 20px 8px rgba(47,107,93,.65)' }} />
+        </div>
         <div>
           <div data-hero-kicker className="text-xs uppercase tracking-[0.5em] text-accent">{T('tu equipo que diseña y construye', 'your team that designs and builds')}</div>
           <h1 data-hero-title className="mt-3 text-6xl md:text-7xl leading-[0.95] tracking-tight opacity-0">
-            {T('Escribí tu idea.', 'Write your idea.')} <em className="text-accent">Tably</em> {T('la construye.', 'builds it.')}
+            {T('Escribí tu idea.', 'Write your idea.')} <em data-hero-word className="text-accent">Tably</em> {T('la construye.', 'builds it.')}
           </h1>
           <p data-hero-copy className="mt-5 text-lg text-ink-2 leading-relaxed max-w-lg">
             {T('Describís la app que querés y elegís qué IA ocupa cada rol: CEO, CTO, ingeniería, producto, diseño y QA. El equipo debate tu idea, estudia apps de referencia, diseña las pantallas, escribe el código y lo revisa antes de entregarte un producto listo para correr. Vos aprobás cada paso.', 'Describe the app you want and choose which AI takes each role: CEO, CTO, engineering, product, design and QA. The team debates your idea, studies reference apps, designs the screens, writes the code and reviews it before handing you a product ready to run. You approve every step.')}
@@ -143,7 +151,7 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
       </section>
 
       {/* features */}
-      <section className="max-w-6xl mx-auto px-6 pb-20 grid md:grid-cols-3 gap-5">
+      <section className="max-w-[1400px] mx-auto px-6 pb-20 grid md:grid-cols-3 gap-5">
         {[
           { title: T('Un equipo completo', 'A full team'), text: T('CEO, CTO, Head of Engineering, Product, Diseño y QA, cada uno con una IA distinta, con su rol, su prompt y sus skills. Debaten tu idea, se contradicen, votan y cierran decisiones con un responsable por cada paso.', 'CEO, CTO, Head of Engineering, Product, Design and QA, each on a different AI, with their role, prompt and skills. They debate your idea, push back on each other, vote and close decisions with an owner for every step.') },
           { title: T('Diseñan y construyen', 'They design and build'), text: T('El equipo estudia apps de referencia, el diseñador entrega sistema, pantallas y mockup, y recién cuando lo aprobás el constructor escribe el código con Claude Code o Codex, al nivel de un producto profesional.', 'The team studies reference apps, the designer delivers system, screens and mockup, and only once you approve it does the builder write the code with Claude Code or Codex, at the level of a professional product.') },
