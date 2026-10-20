@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, ChevronLeft, ChevronRight, Play } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { countTo, gsap, heroIntro, sceneIn, scrollReveal, useGSAP } from '../lib/anim'
 import { useT } from '../lib/i18n'
@@ -68,19 +68,28 @@ const SCENE_START = SCENES.map((_, i) => SCENES.slice(0, i).reduce((a, s) => a +
 /** The demo clock loops through the scenes; ‹ › jump to the previous / next scene (the loop keeps playing from there). */
 function useClock() {
   const [t, setT] = useState(0)
+  const [paused, setPaused] = useState(false)
   const start = useRef(performance.now())
+  const frozen = useRef(0)  // where the clock stopped, so resuming continues from the same frame
   useEffect(() => {
-    const id = window.setInterval(() => setT((performance.now() - start.current) % TOTAL), 40)
+    if (paused) return
+    start.current = performance.now() - frozen.current
+    const id = window.setInterval(() => {
+      const now = (performance.now() - start.current) % TOTAL
+      frozen.current = now
+      setT(now)
+    }, 40)
     return () => window.clearInterval(id)
-  }, [])
+  }, [paused])
   let scene = 0
   for (let i = 0; i < SCENES.length; i++) if (t >= SCENE_START[i]) scene = i
   const jump = (i: number) => {
     const target = ((i % SCENES.length) + SCENES.length) % SCENES.length
+    frozen.current = SCENE_START[target]
     start.current = performance.now() - SCENE_START[target]
     setT(SCENE_START[target])
   }
-  return { scene, local: t - SCENE_START[scene], key: SCENES[scene].key, jump }
+  return { scene, local: t - SCENE_START[scene], key: SCENES[scene].key, jump, paused, toggle: () => setPaused((p) => !p) }
 }
 
 const ease = (x: number) => Math.min(1, Math.max(0, x))
@@ -205,7 +214,7 @@ function Demo({ clock }: { clock: ReturnType<typeof useClock> }) {
       <div className="flex items-center gap-2 px-4 h-10 border-b border-line bg-surface-2">
         <span className="w-2.5 h-2.5 rounded-full bg-[#E6A19A]" /><span className="w-2.5 h-2.5 rounded-full bg-[#E9C97A]" /><span className="w-2.5 h-2.5 rounded-full bg-[#9FCDA8]" />
         <span className="ml-3 text-[11px] font-mono text-ink-3">tablyteam · {T('app del clima', 'weather app')}</span>
-        <span className="ml-auto flex items-center gap-1.5 text-[11px] font-bold text-danger"><span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse" /> {T('EN VIVO', 'LIVE')}</span>
+        <span className={`ml-auto flex items-center gap-1.5 text-[11px] font-bold ${clock.paused ? 'text-ink-3' : 'text-danger'}`}><span className={`w-1.5 h-1.5 rounded-full ${clock.paused ? 'bg-ink-3' : 'bg-danger animate-pulse'}`} /> {clock.paused ? T('EN PAUSA', 'PAUSED') : T('EN VIVO', 'LIVE')}</span>
       </div>
       {/* what is happening on screen, with ‹ › to go back or skip ahead */}
       <div className="flex items-center gap-3 border-b border-line bg-accent-soft px-4 py-2.5">
@@ -227,6 +236,9 @@ function Demo({ clock }: { clock: ReturnType<typeof useClock> }) {
             ))}
           </div>
         </div>
+        <button type="button" onClick={clock.toggle} className="flex h-7 w-7 items-center justify-center rounded-full border border-accent bg-accent text-white shadow-sm transition hover:brightness-110" aria-label={clock.paused ? T('Reanudar', 'Resume') : T('Pausar', 'Pause')} title={clock.paused ? T('Reanudar', 'Resume') : T('Pausar para leer', 'Pause to read')}>
+          {clock.paused ? <Play size={13} /> : <Pause size={13} />}
+        </button>
         <button type="button" onClick={() => clock.jump(clock.scene + 1)} className={btn} aria-label={T('Paso siguiente', 'Next step')}><ChevronRight size={15} /></button>
       </div>
       <div ref={stage} className="relative h-[470px] bg-surface">
@@ -471,7 +483,7 @@ function SceneRefs({ t: raw }: { t: number }) {
       <div className="mt-3 grid grid-cols-[1.1fr_1fr] gap-x-6 gap-y-2">
         <Check on={research}>{T('Investigar apps de referencia', 'Research reference apps')} <span className="text-ink-3">{T('(capturas y notas: qué emular, qué evitar)', '(screenshots and notes: what to emulate, what to avoid)')}</span></Check>
         <Check on={t > 1000}>{T('Diseño UX/UI primero', 'UX/UI design first')} <span className="text-ink-3">{T('(aprobás el mockup)', '(you approve the mockup)')}</span></Check>
-        <Check on={deep}>{T('Análisis profundo e ingeniería inversa', 'Deep analysis and reverse engineering')} <span className="rounded-full border border-gold/50 bg-gold/10 px-2 py-[1px] text-[10.5px] font-semibold text-gold">{T('pago por uso', 'pay per use')}</span></Check>
+        <Check on={deep}>{T('Análisis profundo e ingeniería inversa', 'Deep analysis and reverse engineering')} <span className="text-ink-3">{T('(REA entiende cómo están hechas)', '(REA understands how they are built)')}</span></Check>
         <Check on={t > 1400}>{T('Revisión pre-producción', 'Pre-production review')} <span className="text-ink-3">{T('(hasta 3 rondas)', '(up to 3 rounds)')}</span></Check>
       </div>
       {/* the benchmark: one card per reference, screenshot on top, what the team wrote underneath */}
