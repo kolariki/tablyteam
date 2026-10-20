@@ -331,7 +331,7 @@ export default function Builder({ onBack }: { onBack: () => void }) {
                     {b.livePhase === 'report' && <div className="text-[10px] font-bold uppercase tracking-widest text-accent mb-1">{T('📄 Escribiendo el informe de auditoría', '📄 Writing the audit report')}</div>}
                     {b.livePhase === 'design' && <div className="text-[10px] font-bold uppercase tracking-widest text-accent mb-1">{T('🎨 El Product Designer diseña la interfaz (sistema, pantallas, mockup) antes de escribir código', '🎨 The Product Designer designs the interface (system, screens, mockup) before writing code')}</div>}
                     {b.engineSession !== undefined && (b.activity.length > 0 || b.todos.length > 0) && b.livePhase === 'build' && (
-                      <LiveActivity activity={b.activity} todos={b.todos} elapsed={elapsed} files={Object.keys(b.files).length} thinking={b.thinking} lastEventTs={b.lastEventTs} previewHtml={b.previewHtml ?? b.designHtml} />
+                      <LiveActivity activity={b.activity} todos={b.todos} elapsed={elapsed} files={Object.keys(b.files).length} lastEventTs={b.lastEventTs} />
                     )}
                     {live.say ? (
                       <div className={`md text-[14px] ${b.activity.length ? 'mt-3 pt-3 border-t border-line' : ''}`} dangerouslySetInnerHTML={{ __html: md(live.say) }} />
@@ -634,8 +634,21 @@ function LiveStatusBar() {
   const Icon = (last && ICON[last.kind]) || Loader2
   const phase = b.livePhase === 'research' ? T('investigando referentes', 'researching references') : b.livePhase === 'design' ? T('diseñando', 'designing') : b.livePhase === 'preview' ? T('armando la vista previa', 'building the preview') : b.livePhase === 'report' ? T('escribiendo el informe', 'writing the report') : T('construyendo', 'building')
   const chips: [string, number | undefined][] = [[T('leídos', 'read'), counts.read], [T('escritos', 'written'), (counts.write ?? 0) + (counts.edit ?? 0) || undefined], [T('comandos', 'commands'), counts.run], [T('tests', 'tests'), counts.test]]
+  const [open, setOpen] = useState(false)
   return (
-    <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }} className="mt-2 flex items-center gap-2 overflow-hidden rounded-xl border border-accent/30 bg-accent-soft/60 px-3 py-2 text-[12px]">
+    <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }} className="relative mt-2">
+      {/* the step log, opening upward from the bar */}
+      <AnimatePresence>
+        {open && acts.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} className="absolute inset-x-0 bottom-full mb-2 max-h-64 overflow-y-auto scroll-thin rounded-xl border border-line bg-[#1E2622] p-3 font-mono text-[11.5px] text-[#E6ECE8] shadow-[0_18px_40px_-18px_rgba(30,38,34,.6)]">
+            {acts.slice(-14).reverse().map((a, i) => {
+              const I = ICON[a.kind] ?? Search
+              return <div key={`${a.ts}-${i}`} className={`flex items-center gap-2 ${i ? 'opacity-70' : ''}`}><span className="text-[#5E6B65]">{new Date(a.ts * (a.ts < 1e12 ? 1000 : 1)).toLocaleTimeString()}</span><I size={11} className="shrink-0 text-[#8FD3B0]" /><span className="truncate">{a.label}</span>{a.path && <span className="truncate text-[#7F8C86]">{a.path}</span>}</div>
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <button type="button" onClick={() => setOpen((v) => !v)} title={open ? T('Ocultar los pasos', 'Hide the steps') : T('Ver los últimos pasos', 'See the last steps')} className="flex w-full items-center gap-2 overflow-hidden rounded-xl border border-accent/30 bg-accent-soft/60 px-3 py-2 text-left text-[12px] transition hover:bg-accent-soft">
       <span className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-white"><Icon size={11} className={last ? '' : 'animate-spin'} /><span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent ring-2 ring-paper animate-pulse" /></span>
       <span className="shrink-0 text-[10.5px] uppercase tracking-[0.2em] text-accent">{phase}{b.liveTurn ? ` · ${T('turno', 'turn')} ${b.liveTurn}` : ''}</span>
       <span className="h-3 w-px shrink-0 bg-accent/30" />
@@ -646,6 +659,8 @@ function LiveStatusBar() {
         {chips.filter(([, n]) => n).map(([l, n]) => <span key={l} className="rounded-full border border-line bg-surface px-2 py-0.5 text-[10.5px] text-ink-2"><b className="text-ink">{n}</b> {l}</span>)}
       </span>
       <span className="shrink-0 font-mono text-[11px] text-ink-3">{clock}</span>
+      <ChevronDown size={13} className={`shrink-0 text-ink-3 transition ${open ? '' : 'rotate-180'}`} />
+      </button>
     </motion.div>
   )
 }
@@ -694,104 +709,66 @@ function Bubble({ c, color, provider, onOpen }: { c: ChatItem; color: string; pr
   )
 }
 
-const ACT_ICON: Record<Activity['kind'], string> = { read: '📖', write: '✍️', edit: '✏️', search: '🔍', run: '⚙️', test: '🧪', install: '📦', build: '🛠️', git: '💾', plan: '🗂️', think: '💭' }
 
 /** What the local agent is doing, as cards: current step, its plan, the files it touched, the last steps, and a live thumbnail. */
-function LiveActivity({ activity, todos, elapsed, files, thinking, lastEventTs, previewHtml }: { activity: Activity[]; todos: Todo[]; elapsed: number; files: number; thinking: string; lastEventTs: number; previewHtml: string | null }) {
+function LiveActivity({ activity, todos, elapsed, files, lastEventTs }: { activity: Activity[]; todos: Todo[]; elapsed: number; files: number; lastEventTs: number; thinking?: string; previewHtml?: string | null }) {
   const T = useT()
-  const [open, setOpen] = useState(false)
+  const [showPlan, setShowPlan] = useState(false)
   // heartbeat: seconds since the agent last said/did anything (so a long tool call never looks like a crash)
   const [quiet, setQuiet] = useState(0)
   useEffect(() => {
     const id = setInterval(() => setQuiet(lastEventTs ? Math.round((Date.now() - lastEventTs) / 1000) : 0), 1000)
     return () => clearInterval(id)
   }, [lastEventTs])
-  const cur = activity[activity.length - 1]
   const done = todos.filter((t) => t.status === 'completed').length
   const pct = todos.length ? Math.round((done / todos.length) * 100) : 0
   const inProgress = todos.find((t) => t.status === 'in_progress')
   const counts = activity.reduce((a, x) => ({ ...a, [x.kind]: (a[x.kind] ?? 0) + 1 }), {} as Record<string, number>)
   const touched = [...new Set(activity.filter((a) => (a.kind === 'write' || a.kind === 'edit') && a.path).map((a) => a.path))]
-  const card = 'rounded-xl border border-line bg-paper px-3 py-2.5 min-w-0'
-  const label = 'text-[10px] uppercase tracking-widest text-ink-3 mb-1.5'
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0')
+  const ss = String(elapsed % 60).padStart(2, '0')
   return (
     <div className="text-[13px]">
-      {/* now */}
-      <div className={`${card} border-accent/40 bg-accent-soft/40`}>
-        <div className="flex items-center gap-2">
-          <span className="flex gap-1 shrink-0">{[0, 1, 2].map((i) => <span key={i} className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />)}</span>
-          <span className="shrink-0 text-base">{cur ? (ACT_ICON[cur.kind] ?? '⚙️') : '💭'}</span>
-          <span className="font-semibold truncate">{cur ? cur.label : T('Arrancando', 'Starting')}{cur?.path ? <span className="font-mono font-normal text-ink-2"> {cur.path}</span> : ''}</span>
-          <span className="ml-auto font-mono text-[11px] text-ink-3 shrink-0">{elapsed}s</span>
-        </div>
-        {cur?.kind === 'think' && (
-          <div className="mt-1.5 rounded-lg bg-surface/80 px-3 py-2 text-[12px] italic text-ink-2 max-h-20 overflow-hidden">
-            {thinking.trim() ? <span className="whitespace-pre-wrap">…{thinking.slice(-280)}</span> : T('Razonando el próximo paso…', 'Reasoning about the next step…')}
-          </div>
-        )}
-        {quiet >= 12 && cur?.kind !== 'think' && (
-          <div className="mt-1.5 text-[11.5px] text-ink-3">{T('Sigue trabajando', 'Still working')} ({cur?.kind === 'install' ? T('instalar dependencias', 'installing dependencies') : cur?.kind === 'test' ? T('correr los tests', 'running the tests') : cur?.kind === 'build' ? T('compilar', 'compiling') : T('este paso', 'this step')} {T('puede tardar', 'can take a while')}) · {T('sin novedades hace', 'no news for')} {quiet}s</div>
-        )}
+      {/* header: the turn is alive */}
+      <div className="flex items-center gap-2.5">
+        <span className="relative flex h-5 w-5 shrink-0 items-center justify-center"><span className="absolute inset-0 rounded-full border-2 border-accent/25" /><span className="absolute inset-0 animate-spin rounded-full border-2 border-accent border-t-transparent" /></span>
+        <span className="text-[10.5px] font-semibold uppercase tracking-[0.2em] text-accent">{T('Trabajando', 'Working')}</span>
+        {quiet >= 12 && <span className="text-[11px] text-ink-3">· {T('este paso puede tardar', 'this step can take a while')} · {T('sin novedades hace', 'no news for')} {quiet}s</span>}
+        <span className="ml-auto font-mono text-[11px] text-ink-3">{mm}:{ss}</span>
       </div>
-
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        {/* plan */}
-        <div className={`${card} ${todos.length ? '' : 'opacity-70'}`}>
-          <div className={label}>{T('Plan del constructor', 'Builder plan')}{todos.length ? ` · ${done}/${todos.length}` : ''}</div>
-          {todos.length ? (
-            <>
-              <div className="h-2 rounded-full bg-surface-2 overflow-hidden"><div className="h-full rounded-full bg-accent transition-all duration-700" style={{ width: `${Math.max(pct, inProgress ? 4 : 0)}%` }} /></div>
-              <ul className="mt-2 space-y-0.5 max-h-32 overflow-y-auto scroll-thin">
-                {todos.map((t, i) => (
-                  <li key={i} className={`flex items-start gap-1.5 text-[11.5px] ${t.status === 'completed' ? 'text-ink-3 line-through' : t.status === 'in_progress' ? 'text-ink font-medium' : 'text-ink-2'}`}>
-                    {t.status === 'completed' ? <CheckCircle2 size={12} className="text-ok shrink-0 mt-0.5" /> : t.status === 'in_progress' ? <span className="w-3 h-3 rounded-full border-2 border-accent border-t-transparent animate-spin shrink-0 mt-0.5" /> : <Circle size={12} className="text-ink-4 shrink-0 mt-0.5" />}
-                    <span className="line-clamp-2">{t.text}</span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : (
-            <div className="text-[11.5px] text-ink-3">{T('Todavía no armó su lista de pasos.', 'It has not put together its step list yet.')}</div>
-          )}
-        </div>
-        {/* files touched */}
-        <div className={card}>
-          <div className={label}>{T('Archivos tocados', 'Files touched')} · {touched.length}{files ? ` ${T('de', 'of')} ${files}` : ''}</div>
-          {touched.length ? (
-            <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto scroll-thin">
-              {touched.slice(-14).map((p) => <span key={p} className="rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-[10.5px] text-ink-2 truncate max-w-full" title={p}>{p.split('/').slice(-2).join('/')}</span>)}
-            </div>
-          ) : (
-            <div className="text-[11.5px] text-ink-3">{T('Leyendo el proyecto antes de escribir.', 'Reading the project before writing.')}</div>
-          )}
-          <div className="mt-2 flex flex-wrap gap-1 text-[10.5px]">
-            {counts.test ? <span className="rounded-full bg-gold/15 text-gold px-1.5 py-0.5">🧪 tests ×{counts.test}</span> : null}
-            {counts.install ? <span className="rounded-full bg-surface-2 text-ink-2 px-1.5 py-0.5">{T('📦 dependencias', '📦 dependencies')}</span> : null}
-            {counts.build ? <span className="rounded-full bg-surface-2 text-ink-2 px-1.5 py-0.5">{T('🛠️ compila', '🛠️ builds')} ×{counts.build}</span> : null}
-            <span className="rounded-full bg-surface-2 text-ink-2 px-1.5 py-0.5">{activity.length} {activity.length === 1 ? T('paso', 'step') : T('pasos', 'steps')}</span>
+      {/* plan: a bar and the current step; the list is one click away */}
+      {todos.length > 0 && (
+        <div className="mt-2.5">
+          <div className="flex items-center gap-2 text-[11.5px]">
+            <span className="text-ink-3">{T('Plan', 'Plan')} {done}/{todos.length}</span>
+            <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2"><span className="block h-full rounded-full bg-accent transition-all duration-700" style={{ width: `${Math.max(pct, inProgress ? 4 : 0)}%` }} /></span>
+            <button type="button" onClick={() => setShowPlan((v) => !v)} className="flex items-center gap-1 text-ink-3 transition hover:text-accent"><ChevronDown size={11} className={`transition ${showPlan ? 'rotate-180' : ''}`} /> {showPlan ? T('ocultar', 'hide') : T('ver plan', 'see plan')}</button>
           </div>
-        </div>
-        {/* last steps */}
-        <div className={card}>
-          <div className={label}>{T('Últimos pasos', 'Last steps')}</div>
-          <ul className="space-y-0.5 text-[11.5px] text-ink-2">
-            {activity.slice(-5).reverse().map((a, i) => <li key={i} className="flex gap-1.5 truncate"><span>{ACT_ICON[a.kind] ?? '⚙️'}</span><span className="truncate">{a.label}{a.path ? <span className="font-mono text-ink-3"> {a.path}</span> : ''}</span></li>)}
-          </ul>
-          {activity.length > 5 && <button onClick={() => setOpen(!open)} className="mt-1.5 flex items-center gap-1 text-[10.5px] text-ink-3 hover:text-ink"><ChevronDown size={11} className={`transition ${open ? 'rotate-180' : ''}`} /> {open ? T('menos', 'less') : `${T('ver', 'see')} ${Math.min(30, activity.length)}`}</button>}
-          {open && <ul className="mt-1 space-y-0.5 text-[11px] text-ink-3 font-mono max-h-40 overflow-y-auto scroll-thin">{activity.slice(-30).reverse().map((a, i) => <li key={i} className="truncate">{ACT_ICON[a.kind] ?? '⚙️'} {a.label}{a.path ? ` ${a.path}` : ''}</li>)}</ul>}
-        </div>
-        {/* live thumbnail of the product */}
-        <div className={`${card} p-0 overflow-hidden`}>
-          <div className={`${label} px-3 pt-2.5`}>{T('Cómo va quedando', 'How it is shaping up')}</div>
-          {previewHtml ? (
-            <button onClick={() => useBuild.getState().set({ paneOpen: true, pane: 'preview' })} className="block w-full h-28 relative bg-white" title={T('Abrir la vista previa', 'Open the preview')}>
-              <iframe title={T('miniatura', 'thumbnail')} sandbox="allow-scripts" srcDoc={previewHtml} className="absolute top-0 left-0 w-[400%] h-[400%] origin-top-left scale-[0.25] pointer-events-none" />
-            </button>
-          ) : (
-            <div className="px-3 pb-3 text-[11.5px] text-ink-3">{T('La miniatura aparece cuando el constructor genera la vista previa (al final de la etapa).', 'The thumbnail appears when the builder generates the preview (at the end of the stage).')}</div>
+          {inProgress && !showPlan && <div className="mt-1 truncate text-[12.5px] text-ink">{inProgress.text}</div>}
+          {showPlan && (
+            <ul className="mt-1.5 max-h-40 space-y-0.5 overflow-y-auto scroll-thin">
+              {todos.map((t, i) => (
+                <li key={i} className={`flex items-start gap-1.5 text-[12px] ${t.status === 'completed' ? 'text-ink-3 line-through' : t.status === 'in_progress' ? 'font-medium text-ink' : 'text-ink-2'}`}>
+                  {t.status === 'completed' ? <CheckCircle2 size={12} className="mt-0.5 shrink-0 text-ok" /> : t.status === 'in_progress' ? <span className="mt-0.5 h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent" /> : <Circle size={12} className="mt-0.5 shrink-0 text-ink-4" />}
+                  <span className="line-clamp-2">{t.text}</span>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
-      </div>
+      )}
+      {/* files touched this turn, as chips, with the turn's counters */}
+      {(touched.length > 0 || activity.length > 0) && (
+        <div className="mt-2.5 flex flex-wrap items-center gap-1">
+          {touched.slice(-12).map((p) => <button key={p} type="button" onClick={() => useBuild.getState().set({ selected: p, pane: 'code', paneOpen: true })} className="max-w-full truncate rounded-md border border-line bg-surface px-1.5 py-0.5 font-mono text-[10.5px] text-ink-2 transition hover:border-accent hover:text-accent" title={p}>{p.split('/').slice(-2).join('/')}</button>)}
+          {touched.length > 12 && <span className="text-[10.5px] text-ink-3">+{touched.length - 12}</span>}
+          <span className="ml-auto flex items-center gap-1 text-[10.5px] text-ink-3">
+            {touched.length ? <span>{touched.length}{files ? `/${files}` : ''} {T('archivos', 'files')}</span> : <span>{T('leyendo el proyecto', 'reading the project')}</span>}
+            {counts.run ? <span>· {counts.run} {T('comandos', 'commands')}</span> : null}
+            {counts.test ? <span>· {counts.test} tests</span> : null}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
