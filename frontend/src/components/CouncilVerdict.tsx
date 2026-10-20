@@ -171,9 +171,9 @@ export default function CouncilVerdict() {
         {/* footer: what to do with the list */}
         {!deliberating && ro && (
           <div className="border-t border-line bg-paper px-7 py-4">
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-nowrap items-center gap-2 overflow-x-auto scroll-thin">
               {chosen.length > 0 ? (
-                <button disabled={busy} onClick={build} className={primary}>
+                <button disabled={busy} onClick={build} className={`${primary} shrink-0`}>
                   {busy ? <Loader2 size={16} className="animate-spin" /> : <Hammer size={16} />} {T('Construir con estos', 'Build with these')} {chosen.length} {chosen.length === 1 ? T('cambio', 'change') : T('cambios', 'changes')}
                 </button>
               ) : council.approved ? (
@@ -182,16 +182,16 @@ export default function CouncilVerdict() {
                 <button onClick={openBuild} className={primary}><Hammer size={16} /> {T('Volver al constructor', 'Back to the builder')}</button>
               )}
               {chosen.length > 0 && (
-                <div className="flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-[12px] text-ink-2 shadow-sm">
-                  <span>{T('Después, el consejo revisa', 'Afterwards, the council reviews')}</span>
+                <div className="flex h-11 shrink-0 items-center gap-2 rounded-full border border-line bg-surface px-3 text-[12px] text-ink-2 shadow-sm">
+                  <span className="whitespace-nowrap">{T('Luego revisa', 'Then reviews')}</span>
                   <button type="button" onClick={() => setRounds((r) => Math.max(0, r - 1))} className="flex h-6 w-6 items-center justify-center rounded-full border border-line bg-paper transition hover:border-accent hover:text-accent"><Minus size={11} /></button>
-                  <span className="w-16 text-center font-mono text-[12px] text-ink">{rounds === 0 ? T('no', 'no') : `${rounds} ${rounds === 1 ? T('ronda', 'round') : T('rondas', 'rounds')}`}</span>
+                  <span className="w-14 whitespace-nowrap text-center font-mono text-[12px] text-ink">{rounds === 0 ? T('no', 'no') : `${rounds}×`}</span>
                   <button type="button" onClick={() => setRounds((r) => Math.min(3, r + 1))} className="flex h-6 w-6 items-center justify-center rounded-full border border-line bg-paper transition hover:border-accent hover:text-accent"><Plus size={11} /></button>
                 </div>
               )}
-              <div className="ml-auto flex items-center gap-2">
-                <button onClick={() => ro && set({ showVerdict: false, pendingBuild: { buildId: ro.build_id, sessionId: ro.session_id, fde: changes.filter((c) => c.severity === 'bloqueante').map((c) => `- ${c.text}`).join('\n') } })} className={`${pill} border-gold/40 text-gold hover:border-gold hover:bg-gold/10 hover:text-gold`} title={T('Un ingeniero nuestro resuelve esto por vos, precio fijo', 'One of our engineers solves this for you, fixed price')}><HardHat size={15} /> {T('Que lo resuelva un developer', 'Have a developer solve it')}</button>
-                <button onClick={openBuild} className={pill}>{T('Abrir el constructor sin cambios', 'Open the builder without changes')}</button>
+              <div className="ml-auto flex shrink-0 items-center gap-2">
+                <button onClick={() => ro && set({ showVerdict: false, pendingBuild: { buildId: ro.build_id, sessionId: ro.session_id, fde: changes.filter((c) => c.severity === 'bloqueante').map((c) => `- ${c.text}`).join('\n') } })} className={`${pill} h-11 whitespace-nowrap border-gold/40 text-gold hover:border-gold hover:bg-gold/10 hover:text-gold`} title={T('Un ingeniero nuestro resuelve esto por vos, precio fijo', 'One of our engineers solves this for you, fixed price')}><HardHat size={15} /> {T('Pedir un developer', 'Request a developer')}</button>
+                <button onClick={openBuild} className={`${pill} h-11 whitespace-nowrap`} title={T('Abrir el constructor sin aplicar cambios', 'Open the builder without applying changes')}><Hammer size={15} /> {T('Constructor sin cambios', 'Builder, no changes')}</button>
               </div>
             </div>
             {chosen.length > 0 && rounds > 0 && (
