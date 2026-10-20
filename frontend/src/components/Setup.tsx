@@ -427,7 +427,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
               </div>
             </div>
           </div>
-          <div ref={teamRef} className="panel rounded-2xl p-5">
+          <div ref={teamRef} className="panel flex h-full flex-col rounded-2xl p-5">
             <div className="flex items-center">
               <span className="text-xs uppercase tracking-widest text-ink-3">{T('Agentes', 'Agents')} ({cfg.agents.length}/8)</span>
               <button
@@ -518,17 +518,32 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                 )
               })}
             </div>
-            <div className="mt-3 text-xs text-ink-3">{T('Arranca: ', 'Starts: ')}<select className="bg-transparent text-ink-2" value={cfg.starter ?? ''} onChange={(e) => setCfg({ ...cfg, starter: e.target.value || null })}>
-              <option value="">{cfg.agents[0]?.name ?? '—'} {T('(primero)', '(first)')}</option>
-              {cfg.agents.slice(1).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select></div>
-            {cfg.final_vote && (
-              <div className="mt-2 text-xs text-ink-3">{T('Juez que explica el veredicto (usa el modelo de): ', 'Judge that explains the verdict (uses the model of): ')}<select className="bg-transparent text-ink-2" value={cfg.judge ?? ''} onChange={(e) => setCfg({ ...cfg, judge: e.target.value || null })}>
-                <option value="">{cfg.agents[0] ? `${cfg.agents[0].name} · ${cfg.agents[0].model}` : '—'}</option>
-                {cfg.agents.slice(1).map((a) => <option key={a.id} value={a.id}>{a.name} · {a.model}</option>)}
-                <option value="none">{T('sin juez', 'no judge')}</option>
-              </select></div>
+            {/* with a small team the panel has room to spare: invite more roles instead of leaving it blank */}
+            {cfg.agents.length < 4 && (
+              <button type="button" onClick={addAgent} className="mt-3 flex w-full flex-1 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line px-4 py-8 text-center transition hover:border-accent hover:bg-accent-soft/40">
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-accent-soft text-accent"><Plus size={20} /></span>
+                <span className="text-[14px] font-semibold text-ink">{T('Sumá más roles al equipo', 'Add more roles to the team')}</span>
+                <span className="max-w-sm text-[12.5px] leading-snug text-ink-3">{T('Con 4 a 6 roles el debate cubre producto, técnica, diseño y calidad. Cada rol puede ser de una IA distinta.', 'With 4 to 6 roles the debate covers product, engineering, design and quality. Each role can be a different AI.')}</span>
+              </button>
             )}
+            {/* the table rules: who opens, who judges */}
+            <div className="mt-4 grid gap-3 border-t border-line pt-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="flex items-center gap-1 text-xs uppercase tracking-widest text-ink-3">{T('Quién arranca', 'Who opens')} <Hint text={T('El rol que abre el debate con la primera intervención. Después, cada agente elige a quién le pasa la palabra.', 'The role that opens the debate with the first intervention. After that, each agent chooses who gets the floor next.')} /></span>
+                <select className={`${input} mt-1`} value={cfg.starter ?? ''} onChange={(e) => setCfg({ ...cfg, starter: e.target.value || null })}>
+                  <option value="">{cfg.agents[0]?.name ?? '—'} {T('(primero de la lista)', '(first in the list)')}</option>
+                  {cfg.agents.slice(1).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </label>
+              <label className={`block ${cfg.final_vote ? '' : 'opacity-50'}`}>
+                <span className="flex items-center gap-1 text-xs uppercase tracking-widest text-ink-3">{T('Juez del veredicto', 'Verdict judge')} <Hint text={T('Al terminar, cada agente vota y un juez neutral explica por qué ganó quien ganó y qué se decidió. Acá elegís qué modelo hace de juez: usa el modelo del rol que marques. Requiere "Votación final" activada.', 'At the end each agent votes and a neutral judge explains why the winner won and what was decided. Pick which model acts as judge: it uses the model of the role you choose. Requires "Final vote" on.')} /></span>
+                <select className={`${input} mt-1`} disabled={!cfg.final_vote} value={cfg.judge ?? ''} onChange={(e) => setCfg({ ...cfg, judge: e.target.value || null })}>
+                  <option value="">{cfg.agents[0] ? `${cfg.agents[0].name} · ${cfg.agents[0].model}` : '—'}</option>
+                  {cfg.agents.slice(1).map((a) => <option key={a.id} value={a.id}>{a.name} · {a.model}</option>)}
+                  <option value="none">{T('sin juez', 'no judge')}</option>
+                </select>
+              </label>
+            </div>
           </div>
         </div>
 
