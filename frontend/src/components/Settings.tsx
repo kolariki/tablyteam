@@ -137,7 +137,9 @@ function DeploySettings() {
           const k = st[t.id as 'vercel' | 'railway']
           return (
             <div key={t.id} className="relative overflow-hidden rounded-2xl border p-5 shadow-[0_14px_30px_-18px_rgba(30,38,34,.45)] transition hover:shadow-[0_18px_40px_-18px_rgba(30,38,34,.5)]" style={{ background: brandTheme(t.id).bg, borderColor: t.installed && (t.token || t.logged_in) ? brandTheme(t.id).accent : brandTheme(t.id).border }}>
-              <LogoWatermark provider={t.id} opacity={0.1} />
+              {t.id === 'vercel'
+                ? <img src="/logos/vercel-mark.png" alt="" aria-hidden draggable={false} className="pointer-events-none absolute -right-[12%] -bottom-[22%] w-[68%] max-w-[260px] rotate-[-8deg] select-none" style={{ opacity: 0.1 }} />
+                : <LogoWatermark provider={t.id} opacity={0.1} />}
               <div className="relative">
               <div className="flex items-center gap-3">
                 {t.id === 'vercel' ? (
