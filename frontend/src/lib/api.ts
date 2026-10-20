@@ -65,11 +65,14 @@ export const api = {
   login: (email: string, password: string) => j<{ token: string; user: User }>(post('/api/auth/login', { email, password })),
   logout: () => j(post('/api/auth/logout', {})),
   me: () => j<{ user: User }>(authed('/api/auth/me')),
-  health: () => j<{ ok: boolean; langfuse: boolean; langfuse_host: string | null }>(fetch('/api/health')),
+  health: () => j<{ ok: boolean; langfuse: boolean; langfuse_host: string | null; stripe?: StripeStatus }>(fetch('/api/health')),
   providers: () => j<Provider[]>(authed('/api/providers')),
   models: (p: string) => j<{ models: string[]; error?: string }>(authed(`/api/providers/${p}/models`)),
   roles: () => j<{ groups: string[]; roles: Role[] }>(authed('/api/roles')),
-  fdePackages: () => j<{ packages: FdePackage[]; booking_url: string | null }>(authed('/api/fde/packages')),
+  fdePackages: () => j<{ packages: FdePackage[]; booking_url: string | null; stripe: StripeStatus }>(authed('/api/fde/packages')),
+  checkout: (body: { kind: 'fde' | 'fees'; ref?: string; build_id?: string; session_id?: string; hours?: number }) => j<Order & { url: string }>(post('/api/billing/checkout', body)),
+  confirmCheckout: (checkout: string) => j<Order>(post('/api/billing/confirm', { checkout })),
+  orders: (buildId?: string | null) => j<Order[]>(authed(`/api/billing/orders${buildId ? `?build_id=${encodeURIComponent(buildId)}` : ''}`)),
   fdeRequests: (sessionId?: string | null) => j<FdeRequest[]>(authed(`/api/fde/requests${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ''}`)),
   fdeCreate: (body: { session_id: string; build_id: string; package: string; notes: string; contact: string }) => j<FdeRequest>(post('/api/fde/requests', body)),
   fdeUpdate: (id: string, body: { status?: string; notes?: string }) => j<FdeRequest>(authed(`/api/fde/requests/${id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })),
@@ -290,6 +293,23 @@ export interface AppRunState {
   logs?: string[]
 }
 
+export interface StripeStatus { enabled: boolean; mode: 'test' | 'live' | 'off'; webhook: boolean; app_url: string }
+
+export interface Order {
+  id: string
+  user_id: string
+  kind: 'fde' | 'fees'
+  ref: string
+  build_id: string
+  session_id: string
+  name: string
+  amount_usd: number
+  status: 'pending' | 'paid' | 'expired' | 'cancelled'
+  stripe_session: string
+  created: number
+  paid_at: number | null
+}
+
 export interface FdePackage {
   id: string
   name: string
@@ -365,6 +385,7 @@ export interface BuildSummary {
   model: string
   status: string
   fees_usd?: number  // per-use charges (deep analysis) on top of tokens
+  fees_due_usd?: number  // the part of those not paid yet
   turns: number
   cost_usd: number
   files: number

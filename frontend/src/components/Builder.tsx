@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, CheckCircle2, ChevronDown, ChevronLeft, Circle, Copy, Download, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2 } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2 } from 'lucide-react'
 import { marked } from 'marked'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { reconnectBuild, useBuild, type Activity, type ChatItem, type Todo } from '../buildStore'
@@ -149,6 +149,7 @@ export default function Builder({ onBack }: { onBack: () => void }) {
   const stageCount = b.stages.length
   const isEngineBuild = b.provider === 'claude-code' || b.provider === 'codex'
   const codeTheme = useEditorTheme((s) => s.theme)
+  const [payingFees, setPayingFees] = useState(false)
   const codeDark = codeTheme.dark
   // the side panel takes ~60% of the row (at least 640px), leaving the chat its minimum; measured so the spring can animate pixels
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -208,6 +209,18 @@ export default function Builder({ onBack }: { onBack: () => void }) {
           <span className="rounded-full border border-line bg-surface px-2.5 py-1 font-mono text-[11px] text-ink-3" title={isEngineBuild ? T('Construido con tu suscripción: los tokens no se cobran por API', 'Built on your subscription: tokens are not billed through the API') : T('Tokens por API más cargos por uso', 'API tokens plus per-use charges')}>
             {Object.keys(b.files).length} {T('archivos', 'files')} · {isEngineBuild && !b.fees ? T('suscripción', 'subscription') : `$${((isEngineBuild ? 0 : b.cost) + b.fees).toFixed(2)}`}
           </span>
+          {b.feesDue > 0 && (
+            <button
+              disabled={payingFees}
+              onClick={async () => {
+                if (!b.sessionId || !b.id) return
+                setPayingFees(true)
+                try { const o = await api.checkout({ kind: 'fees', build_id: b.id, session_id: b.sessionId }); window.location.href = o.url } catch (e) { toast.error(tr('No se pudo iniciar el pago', 'Could not start the payment'), (e as Error).message); setPayingFees(false) }
+              }}
+              className="flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-[11px] font-bold text-gold transition hover:-translate-y-0.5 hover:bg-gold/20 disabled:opacity-50"
+              title={T('Cargos por uso pendientes de pago (análisis profundo). Se pagan con Stripe.', 'Unpaid per-use charges (deep analysis). Paid through Stripe.')}
+            >{payingFees ? <Loader2 size={11} className="animate-spin" /> : <CreditCard size={11} />} USD {b.feesDue.toFixed(2)} {T('a pagar', 'to pay')}</button>
+          )}
         </div>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={toggleRecording} className={b.recording ? `${HBTN} border-danger/60 bg-danger/10 text-danger hover:border-danger hover:text-danger` : HBTN} title={T('Graba esta pantalla (chat + código + vista previa) y descarga el video', 'Records this screen (chat + code + preview) and downloads the video')}>

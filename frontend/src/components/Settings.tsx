@@ -79,6 +79,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
           ))}
         </div>
         <DeploySettings />
+        <StripeSettings />
         <LangfuseSettings />
       </div>
     </div>
@@ -86,6 +87,35 @@ export default function Settings({ onBack }: { onBack: () => void }) {
 }
 
 /** Tracing: whether every model call lands in Langfuse, and where. Configured in the backend .env (LANGFUSE_*). */
+/** Payments: Stripe is configured in the backend .env; this card only shows whether it is on and in which mode. */
+function StripeSettings() {
+  const T = useT()
+  const [st, setSt] = useState<{ enabled: boolean; mode: string; webhook: boolean; app_url: string } | null | undefined>(undefined)
+  useEffect(() => { api.health().then((h) => setSt(h.stripe ?? null)).catch(() => setSt(null)) }, [])
+  const on = !!st?.enabled
+  return (
+    <div className="mt-8">
+      <h2 className="text-2xl">{T('Pagos · Stripe', 'Payments · Stripe')}</h2>
+      <p className="mt-1 text-[13px] text-ink-2">{T('Los paquetes de developer y los cargos por uso (análisis profundo) se cobran con Stripe Checkout. La tarjeta nunca pasa por este servidor.', 'Developer packages and per-use charges (deep analysis) are paid through Stripe Checkout. The card never touches this server.')}</p>
+      <div className="relative mt-3 overflow-hidden rounded-2xl border p-5 shadow-[0_14px_30px_-18px_rgba(30,38,34,.45)]" style={{ background: 'linear-gradient(135deg, #F3F0FF 0%, #E9E3FD 100%)', borderColor: on ? '#635BFF' : '#D6CFF5' }}>
+        <div className="pointer-events-none absolute -bottom-10 -right-6 select-none font-mono text-[160px] font-bold leading-none text-[#635BFF]" style={{ opacity: 0.08 }}>S</div>
+        <div className="relative flex items-center gap-4">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface font-mono text-[22px] font-bold text-[#635BFF] shadow-sm" style={{ border: '1.5px solid #635BFF' }}>S</span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[15px] font-semibold">Stripe</div>
+            <div className="truncate text-[12px] text-ink-3">{st === undefined ? '…' : on ? `${T('modo', 'mode')} ${st?.mode} · ${st?.webhook ? T('webhook configurado', 'webhook configured') : T('sin webhook (se confirma al volver de Stripe)', 'no webhook (confirmed on return from Stripe)')}` : T('Agregá STRIPE_SECRET_KEY al .env del backend (y STRIPE_WEBHOOK_SECRET si usás webhooks).', 'Add STRIPE_SECRET_KEY to the backend .env (and STRIPE_WEBHOOK_SECRET if you use webhooks).')}</div>
+          </div>
+          <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11.5px] font-medium ${on ? 'bg-ok/10 text-ok border-ok/30' : 'bg-surface-2 text-ink-3 border-line'}`}>
+            {on && <span className="h-2 w-2 rounded-full bg-ok shadow-[0_0_0_3px_rgba(23,137,106,.18)]" />}
+            {st === undefined ? '…' : on ? T('Conectado', 'Connected') : T('Desactivado', 'Off')}
+          </span>
+          <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noreferrer" className="flex h-8 items-center gap-1 rounded-lg border border-line bg-surface px-3 text-sm shadow-sm hover:bg-surface-2"><ExternalLink size={14} /> {T('Keys', 'Keys')}</a>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function LangfuseSettings() {
   const T = useT()
   const [h, setH] = useState<{ langfuse: boolean; langfuse_host: string | null } | null>(null)

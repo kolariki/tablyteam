@@ -42,6 +42,7 @@ from .builder import BUILDS, Build, BuildRequest, list_builds, load_build, rehyd
 from .local_engine import ENGINES, engine_status, is_engine, snapshot_dir
 from . import deploy as deploymod
 from . import service_guide
+from . import billing
 from . import runner as runmod
 from . import skills as skillmod
 from . import skills_catalog as catalog
@@ -59,6 +60,8 @@ from .providers import PROVIDERS, Cred, available_models, list_models
 from .schemas import SessionConfig
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+log = logging.getLogger("arena.api")
+
 app = FastAPI(title="Tably Team", version="1.0.0", docs_url="/api/docs", redoc_url=None, openapi_url="/api/openapi.json")
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 
@@ -105,7 +108,7 @@ def _check_capacity(user_id: str) -> None:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "langfuse": obs.ENABLED, "langfuse_host": (env("LANGFUSE_BASE_URL") or env("LANGFUSE_HOST")) if obs.ENABLED else None}
+    return {"ok": True, "langfuse": obs.ENABLED, "langfuse_host": (env("LANGFUSE_BASE_URL") or env("LANGFUSE_HOST")) if obs.ENABLED else None, "stripe": billing.status()}
 
 
 @app.post("/api/auth/register")
@@ -1566,7 +1569,7 @@ def build_team_skills(build_id: str, agent_id: str, body: dict, user: User = Cur
 
 @app.get("/api/fde/packages")
 def fde_packages(_: User = CurrentUser):
-    return {"packages": [p | fdemod.links(p["id"]) for p in fdemod.PACKAGES], "booking_url": fdemod.links("x")["booking_url"]}
+    return {"packages": [p | fdemod.links(p["id"]) for p in fdemod.PACKAGES], "booking_url": fdemod.links("x")["booking_url"], "stripe": billing.status()}
 
 
 @app.post("/api/fde/requests")
@@ -1587,6 +1590,99 @@ def fde_create(body: dict, user: User = CurrentUser):
     b.chat.append({"role": "system", "text": f"Pedido de developer creado: {pkg['name']} ({req['id']}).", "ts": __import__("time").time()})
     b._save()
     return req | fdemod.links(pkg["id"])
+
+
+# --------------------------------------------------------------------------- billing (Stripe Checkout)
+
+def _fees_due(b) -> list[dict]:
+    return [f for f in b.fees if not f.get("paid")]
+
+
+@app.post("/api/billing/checkout")
+async def billing_checkout(body: dict, user: User = CurrentUser):
+    """Starts a Stripe Checkout for a developer request (kind=fde, ref=request id) or for a build's unpaid per-use
+    fees (kind=fees, build_id + session_id). Returns the hosted page URL."""
+    if not billing.enabled():
+        raise HTTPException(503, "Pagos no configurados: falta STRIPE_SECRET_KEY en el .env del backend")
+    kind = str(body.get("kind") or "")
+    session_id, build_id = str(body.get("session_id") or ""), str(body.get("build_id") or "")
+    back = f"#live={session_id}" if session_id else ""
+    if kind == "fde":
+        r = fdemod.get_request(user.id, str(body.get("ref") or ""))
+        if not r:
+            raise HTTPException(404, "pedido no encontrado")
+        pkg = fdemod.package(r["package"]) or {}
+        hours = max(4, int(body.get("hours") or 4)) if r["package"] == "hours" else 1
+        amount = float(pkg.get("price_usd", 0)) * hours
+        name = f"Tably Team · {pkg.get('name', r['package'])}" + (f" × {hours} h" if hours > 1 else "")
+        try:
+            o = await billing.create_checkout(user.id, user.email, "fde", r["id"], name, f"Pedido {r['id']} · {r['ticket'].get('project', {}).get('title', '')}", amount, back, r["build_id"], r["session_id"])
+        except RuntimeError as e:
+            raise HTTPException(502, str(e))
+        return o
+    if kind == "fees":
+        b = _build_any(user, session_id, build_id)
+        due = _fees_due(b)
+        total = round(sum(float(f.get("usd") or 0) for f in due), 2)
+        if total <= 0:
+            raise HTTPException(400, "no hay cargos pendientes")
+        try:
+            o = await billing.create_checkout(user.id, user.email, "fees", build_id, "Tably Team · cargos por uso", " · ".join(f.get("label", "") for f in due)[:300], total, back, build_id, session_id)
+        except RuntimeError as e:
+            raise HTTPException(502, str(e))
+        return o
+    raise HTTPException(400, "kind inválido")
+
+
+async def _settle(o: dict) -> None:
+    """A paid order takes effect: the request moves to 'paid'; the build's fees are marked paid."""
+    if o.get("status") != "paid":
+        return
+    if o["kind"] == "fde":
+        fdemod.update_request(o["user_id"], o["ref"], status="paid")
+    elif o["kind"] == "fees":
+        b = BUILDS.get(o["build_id"])
+        if b is not None:
+            for f in b.fees:
+                f["paid"] = True
+            b._save()
+        else:  # finished build only on disk: flip the flags in its saved file
+            p = auth.user_dir(o["user_id"]) / f"{o['session_id']}.build.{o['build_id']}.json"
+            try:
+                d = json.loads(p.read_text())
+                for f in d.get("fees", []):
+                    f["paid"] = True
+                p.write_text(json.dumps(d, ensure_ascii=False))
+            except Exception as e:  # noqa: BLE001
+                log.warning("could not settle fees on %s: %s", p, e)
+
+
+@app.post("/api/billing/confirm")
+async def billing_confirm(body: dict, user: User = CurrentUser):
+    """Back from Stripe: read the session and settle. Safe to call many times."""
+    o = await billing.confirm(str(body.get("checkout") or ""))
+    if not o or o["user_id"] != user.id:
+        raise HTTPException(404, "orden no encontrada")
+    await _settle(o)
+    return o
+
+
+@app.get("/api/billing/orders")
+def billing_orders(build_id: str | None = None, user: User = CurrentUser):
+    return billing.list_orders(user.id, build_id)
+
+
+@app.post("/api/billing/webhook")
+async def billing_webhook(request: Request):
+    payload = await request.body()
+    ev = billing.verify_webhook(payload, request.headers.get("stripe-signature", ""))
+    if ev is None:
+        raise HTTPException(400, "firma inválida o webhook no configurado")
+    if ev.get("type") in ("checkout.session.completed", "checkout.session.async_payment_succeeded"):
+        o = await billing.confirm(ev["data"]["object"]["id"])
+        if o:
+            await _settle(o)
+    return {"ok": True}
 
 
 @app.get("/api/fde/requests")

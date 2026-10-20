@@ -286,7 +286,7 @@ class Build:
             "activity": self.activity[-60:], "todos": self.todos,
             "app_run": self.app_run.state() if self.app_run else None,
             "design_review": self.status == "design_review", "design_rounds": self.design_rounds,
-            "research": self.research_refs, "fees": self.fees, "fees_usd": round(sum(float(f.get("usd") or 0) for f in self.fees), 2),
+            "research": self.research_refs, "fees": self.fees, "fees_usd": round(sum(float(f.get("usd") or 0) for f in self.fees), 2), "fees_due_usd": round(sum(float(f.get("usd") or 0) for f in self.fees if not f.get("paid")), 2),
             "council_sessions": self.council_sessions, "council": self.req.council,
             "versions": self.versions, "version": len(self.versions), "pending_council": self.pending_council(),
             "mode": self.mode, "audit_report": self.audit_report, "deploys": self.deploys,

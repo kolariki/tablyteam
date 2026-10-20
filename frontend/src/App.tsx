@@ -401,6 +401,19 @@ function AppInner() {
     useArena.getState().set({ user: null })
   }
 
+  // back from Stripe Checkout: ?checkout=<session>&order=<id> → confirm, tell the user, clean the URL (the hash stays)
+  useEffect(() => {
+    if (!user) return
+    const q = new URLSearchParams(location.search)
+    const checkout = q.get('checkout')
+    if (!checkout) return
+    history.replaceState(null, '', `${location.pathname}${location.hash}`)
+    if (checkout === 'cancel') { toast.info(tr('Pago cancelado', 'Payment cancelled'), tr('No se cobró nada. Podés retomarlo cuando quieras.', 'Nothing was charged. You can resume whenever you want.')); return }
+    api.confirmCheckout(checkout)
+      .then((o) => { if (o.status === 'paid') toast.ok(tr('Pago recibido', 'Payment received'), `${o.name} · USD ${o.amount_usd}`); else toast.info(tr('Pago pendiente', 'Payment pending'), tr('Stripe todavía no lo confirmó; lo vemos en unos minutos.', 'Stripe has not confirmed it yet; we will check again in a few minutes.')) })
+      .catch((e) => toast.error(tr('No pude confirmar el pago', 'Could not confirm the payment'), (e as Error).message))
+  }, [user?.id])
+
   // deep links: #replay=<id> / #live=<id>  (handy for re-recording a take)
   useEffect(() => {
     if (!user) return
