@@ -1,5 +1,5 @@
-import { motion } from 'framer-motion'
-import { ArrowLeft, FileArchive, Gavel, Loader2, Plus, Puzzle, Trash2, UploadCloud } from 'lucide-react'
+import PageHeader from './PageHeader'
+import { FileArchive, Gavel, Loader2, Plus, Puzzle, Trash2, UploadCloud } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { api, type EngineStatus } from '../lib/api'
 import { PALETTE, brandTheme } from '../lib/brand'
@@ -106,17 +106,12 @@ export default function AuditSetup({ onBack, onStart }: Props) {
     }
   }
 
-  const input = 'w-full rounded-lg bg-surface border border-line px-3 py-2 text-sm outline-none focus:border-accent transition'
+  const input = 'w-full rounded-lg bg-surface border border-line px-3 py-2 text-sm outline-none focus:border-accent transition shadow-sm'
 
   return (
     <div className="h-full overflow-y-auto scroll-thin arena-bg">
-      <div className="max-w-5xl mx-auto px-6 py-10">
-        <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-ink-3 hover:text-ink"><ArrowLeft size={15} /> {T('Volver', 'Back')}</button>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="mt-4 text-xs uppercase tracking-[0.4em] text-accent">{T('Auditoría de proyecto', 'Project audit')}</div>
-          <h1 className="text-5xl mt-1">{T('Que el equipo evalúe tu proyecto', 'Let the team evaluate your project')}</h1>
-          <p className="mt-3 text-ink-2 max-w-2xl">{T('Subí tu código y cada rol lo revisa desde su área: qué está bien, qué hay que mejorar y propuestas concretas con prioridad. Después podés aplicar las mejoras con el constructor y que el consejo las apruebe.', 'Upload your code and each role reviews it from its own area: what is right, what needs improving and concrete, prioritised proposals. Then you can apply the improvements with the builder and have the council approve them.')}</p>
-        </motion.div>
+      <div className="w-full px-8 py-8 2xl:px-12">
+        <PageHeader onBack={onBack} kicker={T('Auditoría de proyecto', 'Project audit')} title={T('Que el equipo evalúe tu proyecto', 'Let the team evaluate your project')} subtitle={T('Subí tu código y cada rol lo revisa desde su área: qué está bien, qué hay que mejorar y propuestas concretas con prioridad. Después podés aplicar las mejoras con el constructor y que el consejo las apruebe.', 'Upload your code and each role reviews it from its own area: what is right, what needs improving and concrete, prioritised proposals. Then you can apply the improvements with the builder and have the council approve them.')} />
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_1.2fr]">
           <div className="panel relative flex flex-col rounded-2xl p-5" style={{ clipPath: 'inset(0 round 1rem)' }}>
@@ -201,7 +196,7 @@ export default function AuditSetup({ onBack, onStart }: Props) {
 
           <div className="panel rounded-2xl p-5">
             <div className="flex items-center">
-              <span className="text-xs uppercase tracking-widest text-ink-3">{T('Equipo auditor', 'Audit team')} ({team.length}/8)</span>
+              <span className="text-xs uppercase tracking-widest text-ink-3">{T('Equipo auditor', 'Audit team')} <span className="ml-1 rounded-full border border-line bg-surface px-1.5 py-0.5 text-[10px] text-ink-2">{team.length}/8</span></span>
               <button
                 type="button"
                 disabled={suggesting || !(name.trim() || description.trim())}
@@ -220,15 +215,15 @@ export default function AuditSetup({ onBack, onStart }: Props) {
                     setSuggesting(false)
                   }
                 }}
-                className="ml-auto flex items-center gap-1 text-xs text-accent disabled:opacity-30"
+                className="ml-auto flex h-8 items-center gap-1.5 rounded-full border border-accent/40 bg-surface px-3 text-xs font-medium text-accent shadow-sm transition hover:-translate-y-0.5 hover:border-accent hover:bg-accent/5 disabled:opacity-30 disabled:hover:translate-y-0"
                 title={T('Elegir del catálogo las skills que mejor encajan con el proyecto, rol por rol', 'Pick from the catalog the skills that best fit the project, role by role')}
-              >{suggesting ? <Loader2 size={13} className="animate-spin" /> : <Puzzle size={13} />} {T('sugerir skills', 'suggest skills')}</button>
+              >{suggesting ? <Loader2 size={13} className="animate-spin" /> : <Puzzle size={13} />} {T('Sugerir skills', 'Suggest skills')}</button>
               <button
                 disabled={team.length >= 8}
                 onClick={() => setTeam((t) => [...t, { id: `rol-${t.length + 1}`, name: `Auditor ${t.length + 1}`, role: 'devils-advocate', provider: isEngine ? 'mock' : provider, model: isEngine ? 'mock-1' : model, persona: personaOf('devils-advocate'), color: PALETTE[t.length % PALETTE.length] }])}
-                className="ml-4 flex items-center gap-1 text-xs text-accent disabled:opacity-30"
+                className="ml-2 flex h-8 items-center gap-1.5 rounded-full border border-accent/40 bg-surface px-3 text-xs font-medium text-accent shadow-sm transition hover:-translate-y-0.5 hover:border-accent hover:bg-accent/5 disabled:opacity-30 disabled:hover:translate-y-0"
               >
-                <Plus size={14} /> {T('agregar rol', 'add role')}
+                <Plus size={14} /> {T('Agregar rol', 'Add role')}
               </button>
             </div>
             <label className="mt-2 flex h-7 items-center gap-2 text-sm leading-none whitespace-nowrap">
@@ -240,7 +235,7 @@ export default function AuditSetup({ onBack, onStart }: Props) {
               {team.map((a, i) => {
                 const r = roles.roles.find((x) => x.id === a.role)
                 return (
-                  <div key={i} className="relative overflow-hidden rounded-xl border p-3" style={{ background: brandTheme(a.provider).bg, borderColor: brandTheme(a.provider).border }}>
+                  <div key={i} className="relative overflow-hidden rounded-xl border p-3 shadow-[0_10px_24px_-16px_rgba(30,38,34,.45)] transition hover:shadow-[0_14px_30px_-16px_rgba(30,38,34,.5)]" style={{ background: brandTheme(a.provider).bg, borderColor: brandTheme(a.provider).border }}>
                     <LogoWatermark provider={a.provider} opacity={0.1} />
                     <div className="relative">
                     <div className={`grid gap-2 items-center ${isEngine ? 'grid-cols-[auto_1fr_1.4fr_auto]' : 'grid-cols-[auto_1fr_1.4fr_1fr_1.3fr_auto]'}`}>

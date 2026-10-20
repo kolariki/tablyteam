@@ -1,10 +1,12 @@
 import { motion } from 'framer-motion'
-import { ArrowLeft, Check, ExternalLink, KeyRound, Loader2, ShieldCheck, Trash2 } from 'lucide-react'
+import { Check, ExternalLink, KeyRound, Loader2, ShieldCheck, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api, type ProviderSetting } from '../lib/api'
 import { tr, useT } from '../lib/i18n'
 import ModelSelect, { invalidateModels } from './ModelSelect'
 import ProviderLogo, { LogoWatermark } from './ProviderLogo'
+import PageHeader from './PageHeader'
+import { brandTheme } from '../lib/brand'
 import SubscriptionPanel from './SubscriptionPanel'
 
 const KEY_URL: Record<string, string> = {
@@ -36,16 +38,27 @@ export default function Settings({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="h-full overflow-y-auto scroll-thin arena-bg">
-      <div className="max-w-5xl mx-auto px-6 py-10">
-        <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-ink-3 hover:text-ink"><ArrowLeft size={15} /> {T('Volver', 'Back')}</button>
-        <div className="mt-4 flex flex-wrap items-end gap-4">
-          <div>
-            <div className="text-xs uppercase tracking-[0.4em] text-accent">{T('Configuración', 'Settings')}</div>
-            <h1 className="text-5xl mt-1">{T('Modelos y API keys', 'Models and API keys')}</h1>
-          </div>
-          <div className="ml-auto text-sm text-ink-2">{ready} {T('de', 'of')} {items.length} {T('proveedores listos', 'providers ready')}</div>
-        </div>
-        <div className="mt-4 flex items-start gap-2 rounded-xl border border-line bg-surface px-4 py-3 text-[13px] text-ink-2 max-w-3xl">
+      <div className="w-full px-8 py-8 2xl:px-12">
+        <PageHeader
+          onBack={onBack}
+          kicker={T('Configuración', 'Settings')}
+          title={T('Modelos y API keys', 'Models and API keys')}
+          right={
+            <span className="flex h-9 items-center gap-2 rounded-full border border-line bg-surface pl-2 pr-3.5 text-sm text-ink-2 shadow-sm">
+              {items.filter((p) => p.configured && p.id !== 'mock').length > 0 ? (
+                <span className="flex items-center">
+                  {items.filter((p) => p.configured && p.id !== 'mock').map((p, i) => (
+                    <span key={p.id} title={p.label} className="flex h-7 w-7 items-center justify-center rounded-full border bg-surface shadow-sm" style={{ marginLeft: i ? -9 : 0, zIndex: 20 - i, borderColor: brandTheme(p.id).accent }}>
+                      <ProviderLogo provider={p.id} size={16} />
+                    </span>
+                  ))}
+                </span>
+              ) : <span className="ml-1.5 h-2 w-2 rounded-full bg-ok" />}
+              {ready} {T('de', 'of')} {items.length} {T('proveedores listos', 'providers ready')}
+            </span>
+          }
+        />
+        <div className="mt-5 inline-flex w-fit max-w-full items-start gap-2 rounded-xl border border-line bg-surface py-3 pl-4 pr-[calc(1rem+16px+0.5rem)] text-[13px] text-ink-2 shadow-sm">
           <ShieldCheck size={17} className="text-ok shrink-0 mt-0.5" />
           <span>
             {T('Tus keys se guardan', 'Your keys are stored')} <b>{T('cifradas', 'encrypted')}</b> {T('en el servidor y nunca vuelven al navegador: solo se muestran los últimos 4 caracteres. Las usan únicamente tus experimentos.', 'on the server and never return to the browser: only the last 4 characters are shown. Only your experiments use them.')}
@@ -56,9 +69,9 @@ export default function Settings({ onBack }: { onBack: () => void }) {
         <div className="mt-10">
           <div className="text-xs uppercase tracking-[0.3em] text-ink-3">API keys</div>
           <h2 className="text-3xl mt-1">{T('Modelos por API, para los debates', 'API models, for the debates')}</h2>
-          <p className="mt-1 text-[13px] text-ink-2 max-w-3xl">{T('Los agentes del equipo (CEO, CTO, QA…) hablan por API y cada proveedor factura por uso. Cargá solo los que quieras usar.', 'The team agents (CEO, CTO, QA…) talk through APIs and each provider bills per use. Add only the ones you want to use.')}</p>
+          <p className="mt-1 text-[13px] text-ink-2">{T('Los agentes del equipo (CEO, CTO, QA…) hablan por API y cada proveedor factura por uso. Cargá solo los que quieras usar.', 'The team agents (CEO, CTO, QA…) talk through APIs and each provider bills per use. Add only the ones you want to use.')}</p>
         </div>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <div className="mt-4 grid gap-4 grid-cols-[repeat(auto-fill,minmax(440px,1fr))]">
           {items.map((p, i) => (
             <motion.div key={p.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
               <ProviderCard p={p} onSaved={replace} />
@@ -142,6 +155,7 @@ function ProviderCard({ p, onSaved }: { p: ProviderSetting; onSaved: (p: Provide
   const [model, setModel] = useState(p.default_model)
   const [state, setState] = useState<{ kind: 'idle' | 'busy' | 'ok' | 'error'; msg?: string }>({ kind: 'idle' })
   const isOllama = p.id === 'ollama'
+  const theme = brandTheme(p.id)
 
   const test = async (k?: string) => {
     setState({ kind: 'busy', msg: tr('probando…', 'testing…') })
@@ -173,28 +187,28 @@ function ProviderCard({ p, onSaved }: { p: ProviderSetting; onSaved: (p: Provide
 
   const badge =
     p.source === 'user'
-      ? { text: `${T('Tu key', 'Your key')} ··${p.user_key_last4 ?? ''}`, cls: 'bg-ok/10 text-ok border-ok/30' }
+      ? { text: T('Conectado', 'Connected'), hint: `${T('Tu key', 'Your key')} ··${p.user_key_last4 ?? ''}`, dot: true, cls: 'bg-ok/10 text-ok border-ok/30' }
       : p.source === 'server'
-        ? { text: T('Key del servidor', 'Server key'), cls: 'bg-accent-soft text-accent border-accent/30' }
-        : { text: T('Sin key', 'No key'), cls: 'bg-surface-2 text-ink-3 border-line' }
+        ? { text: T('Conectado', 'Connected'), hint: T('Key del servidor', 'Server key'), dot: true, cls: 'bg-ok/10 text-ok border-ok/30' }
+        : { text: T('Sin key', 'No key'), hint: '', dot: false, cls: 'bg-surface-2 text-ink-3 border-line' }
 
-  const input = 'w-full rounded-lg bg-surface/80 backdrop-blur-[1px] border border-line px-3 py-2 text-sm outline-none focus:border-accent transition'
+  const input = 'w-full rounded-lg bg-surface border border-line px-3 py-2 text-sm outline-none focus:border-accent transition shadow-sm'
 
   return (
-    <div className="panel rounded-2xl p-5 h-full relative overflow-hidden">
-      <LogoWatermark provider={p.id} />
+    <div className="relative h-full overflow-hidden rounded-2xl border p-5 shadow-[0_14px_30px_-18px_rgba(30,38,34,.45)] transition hover:shadow-[0_18px_40px_-18px_rgba(30,38,34,.5)]" style={{ background: theme.bg, borderColor: p.configured ? theme.accent : theme.border }}>
+      <LogoWatermark provider={p.id} opacity={0.1} />
       <div className="relative">
       <div className="flex items-center gap-3">
-        <span className="w-11 h-11 rounded-xl bg-surface border border-line flex items-center justify-center shadow-sm">
+        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface shadow-sm" style={{ border: `1.5px solid ${theme.accent}` }}>
           <ProviderLogo provider={p.id} size={28} />
         </span>
         <div className="min-w-0">
-          <div className="font-semibold">{p.label}</div>
+          <div className="text-[15px] font-semibold">{p.label}</div>
           <a href={KEY_URL[p.id]} target="_blank" rel="noreferrer" className="text-[12px] text-ink-3 hover:text-accent inline-flex items-center gap-1">
             {isOllama ? T('descargar Ollama', 'download Ollama') : T('conseguir una key', 'get a key')} <ExternalLink size={11} />
           </a>
         </div>
-        <span className={`ml-auto rounded-full border px-2.5 py-0.5 text-[11.5px] font-medium whitespace-nowrap ${badge.cls}`}>{badge.text}</span>
+        <span title={badge.hint} className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11.5px] font-medium whitespace-nowrap ${badge.cls}`}>{badge.dot && <span className="h-2 w-2 rounded-full bg-ok shadow-[0_0_0_3px_rgba(23,137,106,.18)]" />}{badge.text}</span>
       </div>
 
       {isOllama ? (
@@ -202,7 +216,7 @@ function ProviderCard({ p, onSaved }: { p: ProviderSetting; onSaved: (p: Provide
           <label className="text-[11px] uppercase tracking-widest text-ink-3">{T('URL del servidor', 'Server URL')}</label>
           <div className="mt-1 flex gap-2">
             <input className={`${input} font-mono`} placeholder="http://localhost:11434/v1" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
-            <button className="rounded-lg bg-accent text-white px-3 text-sm font-medium" onClick={async () => (await test()) && save({ base_url: baseUrl }, tr('Servidor guardado', 'Server saved'))}>{T('Guardar', 'Save')}</button>
+            <button className="rounded-lg bg-accent px-3.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-110" onClick={async () => (await test()) && save({ base_url: baseUrl }, tr('Servidor guardado', 'Server saved'))}>{T('Guardar', 'Save')}</button>
           </div>
         </div>
       ) : (
@@ -221,7 +235,7 @@ function ProviderCard({ p, onSaved }: { p: ProviderSetting; onSaved: (p: Provide
                 onKeyDown={(e) => e.key === 'Enter' && saveKey()}
               />
             </div>
-            <button disabled={!key.trim() || state.kind === 'busy'} onClick={saveKey} className="rounded-lg bg-accent text-white px-3 text-sm font-medium disabled:opacity-40">
+            <button disabled={!key.trim() || state.kind === 'busy'} onClick={saveKey} className="rounded-lg bg-accent px-3.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40">
               {T('Guardar', 'Save')}
             </button>
           </div>

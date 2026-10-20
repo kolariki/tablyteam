@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, Copy, Loader2, RefreshCw, Terminal } from 'lucide-react'
+import { CheckCircle2, Circle, Copy, Loader2, Terminal } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { api, type EngineStatus } from '../lib/api'
 import { tr, useT } from '../lib/i18n'
@@ -40,12 +40,10 @@ function Cmd({ text }: { text: string }) {
 export default function SubscriptionPanel() {
   const T = useT()
   const [engines, setEngines] = useState<EngineStatus[] | null>(null)
-  const [checking, setChecking] = useState(false)
   const [watching, setWatching] = useState(false)
   const prev = useRef<EngineStatus[] | null>(null)
 
   const check = async (silent = false) => {
-    if (!silent) setChecking(true)
     try {
       const es = await api.engines()
       // diff against the last poll outside the state updater (StrictMode runs updaters twice → duplicate toasts)
@@ -57,8 +55,6 @@ export default function SubscriptionPanel() {
       setEngines(es)
     } catch (e) {
       if (!silent) toast.error(tr('No pude consultar los agentes locales', 'Could not check the local agents'), (e as Error).message)
-    } finally {
-      setChecking(false)
     }
   }
   useEffect(() => { check(true) }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -78,7 +74,6 @@ export default function SubscriptionPanel() {
   }, [engines])
 
   if (!engines) return null
-  const connected = engines.filter((e) => e.ok).length
 
   return (
     <section className="mt-8">
@@ -87,14 +82,8 @@ export default function SubscriptionPanel() {
           <div className="text-xs uppercase tracking-[0.3em] text-ink-3">{T('Tu suscripción', 'Your subscription')}</div>
           <h2 className="text-3xl mt-1">{T('Construir con tu plan pago, sin API', 'Build with your paid plan, no API')}</h2>
         </div>
-        <div className="ml-auto flex items-center gap-2 text-sm text-ink-2">
-          <span>{connected} {T('de', 'of')} {engines.length} {T('conectados', 'connected')}</span>
-          <button onClick={() => check()} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs hover:bg-surface-2">
-            {checking ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} {T('Verificar', 'Verify')}
-          </button>
-        </div>
       </div>
-      <p className="mt-1 text-[13px] text-ink-2 max-w-3xl">
+      <p className="mt-1 w-full text-[13px] text-ink-2">
         {T('Si ya pagás Claude o ChatGPT, la app puede', 'If you already pay for Claude or ChatGPT, the app can')} <b>{T('construir y revisar', 'build and review')}</b> {T('el producto usando ese plan a través de su agente oficial instalado en esta máquina. Nada sale de tu computadora hacia terceros; la app solo le pasa el brief y lee los archivos que escribe.', 'the product using that plan through its official agent installed on this machine. Nothing leaves your computer to third parties; the app only hands it the brief and reads the files it writes.')}
       </p>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
