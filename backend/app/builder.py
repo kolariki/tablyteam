@@ -784,10 +784,14 @@ class Build:
             url = rsch.normalize_reference(r)
             refs.append({"name": r.strip()[:60], "url": url, "why": ""} if url else {"name": r.strip()[:60], "url": None, "why": ""})
         named_only = [r["name"] for r in refs if not r["url"]]
-        done_urls = {(r.get("url") or "").rstrip("/").lower() for r in self.research_refs if r.get("ok")}
-        refs = [r for r in refs if r["url"] and r["url"].rstrip("/").lower() not in done_urls]  # already benchmarked: keep its notes
+        user_gave = bool(refs)
+        # what the user asked for is captured fresh every time (a previous capture may have been an error page); the
+        # earlier entry for the same site is replaced so the notes do not duplicate
+        refs = [r for r in refs if r["url"]]
+        fresh = {r["url"].rstrip("/").lower() for r in refs}
+        self.research_refs = [r for r in self.research_refs if (r.get("url") or "").rstrip("/").lower() not in fresh]
         shot_base = len(self.research_refs)
-        if not refs or named_only:
+        if (not refs and not user_gave) or named_only:
             # the user's list is respected as is: the team only proposes references when nothing was given, and
             # otherwise just resolves the public URL of apps the user typed by name
             if named_only and refs:
