@@ -447,10 +447,10 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                     setSuggesting(false)
                   }
                 }}
-                className="ml-auto flex items-center gap-1 text-xs text-accent hover:text-accent disabled:opacity-30"
+                className="ml-auto flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft px-3 py-1.5 text-[13px] font-semibold text-accent shadow-sm transition hover:bg-accent hover:text-white disabled:opacity-40 disabled:hover:bg-accent-soft disabled:hover:text-accent"
                 title={T('Elegir del catálogo las skills que mejor encajan con la tarea, rol por rol', 'Pick from the catalog the skills that best fit the task, role by role')}
-              >{suggesting ? <Loader2 size={13} className="animate-spin" /> : <Puzzle size={13} />} {T('sugerir skills', 'suggest skills')}</button>
-              <button disabled={cfg.agents.length >= 8} onClick={addAgent} className="ml-4 flex items-center gap-1 text-xs text-accent hover:text-accent disabled:opacity-30"><Plus size={14} />{T(' agregar', ' add')}</button>
+              >{suggesting ? <Loader2 size={14} className="animate-spin" /> : <Puzzle size={14} />} {T('Sugerir skills', 'Suggest skills')}</button>
+              <button disabled={cfg.agents.length >= 8} onClick={addAgent} className="ml-2 flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40" title={T('Sumar un rol al equipo (hasta 8)', 'Add a role to the team (up to 8)')}><Plus size={15} />{T('Agregar rol', 'Add role')}</button>
             </div>
             <div className="mt-3 space-y-3">
               {cfg.agents.map((a, i) => {
