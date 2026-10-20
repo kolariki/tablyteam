@@ -783,17 +783,27 @@ class Build:
             refs.append({"name": r.strip()[:60], "url": url, "why": ""} if url else {"name": r.strip()[:60], "url": None, "why": ""})
         named_only = [r["name"] for r in refs if not r["url"]]
         refs = [r for r in refs if r["url"]]
-        if len(refs) < 2 or named_only:
-            # the team proposes the leaders of the category (and resolves names the user typed without a URL)
-            self._note("El equipo propone apps de referencia para esta categoría…")
-            self._activity("search", "Buscando referentes")
-            ask = f"BRIEF:\n{self.brief[:6000]}\n\n" + (f"El usuario nombró estas apps (buscá su URL pública): {', '.join(named_only)}\n" if named_only else "") + f"Proponé {max(3, 5 - len(refs))} referentes (JSON)."
+        if not refs or named_only:
+            # the user's list is respected as is: the team only proposes references when nothing was given, and
+            # otherwise just resolves the public URL of apps the user typed by name
+            if named_only and refs:
+                self._note("Buscando la URL de: " + ", ".join(named_only))
+                self._activity("search", "Resolviendo referentes nombrados")
+                ask = f"BRIEF:\n{self.brief[:6000]}\n\nEl usuario nombró estas apps (devolvé solo ellas, con su URL pública): {', '.join(named_only)}\nProponé exactamente {len(named_only)} referentes (JSON)."
+                want = len(named_only)
+            else:
+                self._note("El equipo propone apps de referencia para esta categoría…" if not named_only else "El equipo busca las apps que nombraste y completa con referentes de la categoría…")
+                self._activity("search", "Buscando referentes")
+                ask = f"BRIEF:\n{self.brief[:6000]}\n\n" + (f"El usuario nombró estas apps (buscá su URL pública e incluilas primero): {', '.join(named_only)}\n" if named_only else "") + f"Proponé {max(3, len(named_only))} referentes (JSON)."
+                want = rsch.MAX_REFERENCES
             text = await self._ask(rsch.PROPOSE_SYSTEM, ask, provider, model, cred, max_tokens=1200, mock_text='[{"name":"Open-Meteo","url":"https://open-meteo.com","why":"API de clima abierta"},{"name":"Windy","url":"https://www.windy.com","why":"mapas"}]' if mock else "")
             seen = {r["url"] for r in refs}
+            added = 0
             for pr in rsch.parse_proposals(text):
-                if pr["url"] not in seen and len(refs) < rsch.MAX_REFERENCES:
+                if pr["url"] not in seen and len(refs) < rsch.MAX_REFERENCES and added < want:
                     refs.append(pr)
                     seen.add(pr["url"])
+                    added += 1
         if not refs:
             self._note("No se encontraron referentes para investigar; el diseño sigue solo con el brief.")
             self.live = None
