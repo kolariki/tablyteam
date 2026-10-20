@@ -140,6 +140,7 @@ interface BuildState {
   liveFile: { path: string; content: string } | null
   selected: string | null
   cost: number
+  fees: number  // per-use charges (deep analysis…) that are billed on top of the tokens
   tokens: number
   done: string
   error: string | null
@@ -194,6 +195,7 @@ const empty = {
   liveFile: null,
   selected: null,
   cost: 0,
+  fees: 0,
   tokens: 0,
   done: '',
   error: null,
@@ -237,7 +239,7 @@ export const useBuild = create<BuildState>((set, get) => ({
           activity: b.activity ?? s.activity, todos: b.todos ?? s.todos, versions: b.versions ?? s.versions, pendingCouncil: b.pending_council ?? null, designRounds: b.design_rounds ?? s.designRounds, designHtml: b.design_html ?? s.designHtml,
           appRun: b.app_run ? { status: b.app_run.status, service: b.app_run.service, label: b.app_run.label, url: b.app_run.url, embedUrl: b.app_run.embed_url ?? null, port: b.app_run.port, error: b.app_run.error, logs: b.app_run.logs ?? [] } : s.appRun,
           status: b.status === 'running' ? 'running' : b.status, files: { ...s.files, ...b.files }, chat: b.chat, stages: b.stages,
-          cost: b.cost_usd, tokens: b.tokens, done: b.done, selected: s.selected ?? Object.keys(b.files)[0] ?? null,
+          cost: b.cost_usd, fees: (b as { fees_usd?: number }).fees_usd ?? 0, tokens: b.tokens, done: b.done, selected: s.selected ?? Object.keys(b.files)[0] ?? null,
           ...(b.live ? { liveTurn: b.live.turn, livePhase: b.live.phase, liveRaw: b.live.raw, liveFile: liveFileFrom(b.live.raw) } : {}),
           team: b.team ?? s.team, reviews: b.reviews ?? s.reviews, reviewPlan: b.review_plan ?? null,
           liveReviews: b.live_reviews ?? {}, reviewRound: b.status === 'reviewing' ? (b.reviews?.length ?? 0) + 1 : null,
@@ -318,7 +320,7 @@ export const useBuild = create<BuildState>((set, get) => ({
         set({ status: 'approved' })
         break
       case 'pass.completed':
-        set({ status: ev.status, cost: ev.build.cost_usd, tokens: ev.build.tokens, done: ev.build.done, liveRaw: '', liveFile: null, liveTurn: null, livePhase: null })
+        set({ status: ev.status, cost: ev.build.cost_usd, fees: (ev.build as { fees_usd?: number }).fees_usd ?? 0, tokens: ev.build.tokens, done: ev.build.done, liveRaw: '', liveFile: null, liveTurn: null, livePhase: null })
         break
       case 'preview.ready':
         set({ previewHtml: ev.html, pane: 'preview' })
@@ -355,7 +357,7 @@ export const useBuild = create<BuildState>((set, get) => ({
         set({ error: ev.error })
         break
       case 'build.completed':
-        set({ status: ev.status, cost: ev.build.cost_usd, tokens: ev.build.tokens, done: ev.build.done, liveRaw: '', liveFile: null, liveTurn: null, livePhase: null })
+        set({ status: ev.status, cost: ev.build.cost_usd, fees: (ev.build as { fees_usd?: number }).fees_usd ?? 0, tokens: ev.build.tokens, done: ev.build.done, liveRaw: '', liveFile: null, liveTurn: null, livePhase: null })
         break
     }
   },

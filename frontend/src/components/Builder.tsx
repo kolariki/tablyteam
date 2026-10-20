@@ -149,6 +149,7 @@ export default function Builder({ onBack }: { onBack: () => void }) {
   const shownFile = b.liveFile && b.selected === b.liveFile.path ? b.liveFile.content : b.files[b.selected ?? '']?.content
   const tree = useMemo(() => buildTree(Object.keys(b.files).concat(b.liveFile ? [b.liveFile.path] : [])), [b.files, b.liveFile?.path])
   const stageCount = b.stages.length
+  const isEngineBuild = b.provider === 'claude-code' || b.provider === 'codex'
   // the side panel takes ~60% of the row (at least 640px), leaving the chat its minimum; measured so the spring can animate pixels
   const wrapRef = useRef<HTMLDivElement>(null)
   const [wrapW, setWrapW] = useState(0)
@@ -203,7 +204,10 @@ export default function Builder({ onBack }: { onBack: () => void }) {
           {b.versions.length > 0 && <ReadinessBadge versions={b.versions} />}
           {b.reviews.length > 0 && !reviewing && <span className="text-[11px] text-ink-3">{b.reviews.length} {b.reviews.length === 1 ? T('ronda', 'round') : T('rondas', 'rounds')} {T('de revisión', 'of review')}</span>}
           {stageCount > 0 && <span className="text-[11px] text-ink-3">{stageCount} {stageCount === 1 ? T('etapa', 'stage') : T('etapas', 'stages')}</span>}
-          <span className="rounded-full border border-line bg-surface px-2.5 py-1 font-mono text-[11px] text-ink-3">{Object.keys(b.files).length} {T('archivos', 'files')} · ${b.cost.toFixed(3)}</span>
+          {/* what it really costs: an engine build runs on the user's subscription, so only the per-use fees count there */}
+          <span className="rounded-full border border-line bg-surface px-2.5 py-1 font-mono text-[11px] text-ink-3" title={isEngineBuild ? T('Construido con tu suscripción: los tokens no se cobran por API', 'Built on your subscription: tokens are not billed through the API') : T('Tokens por API más cargos por uso', 'API tokens plus per-use charges')}>
+            {Object.keys(b.files).length} {T('archivos', 'files')} · {isEngineBuild && !b.fees ? T('suscripción', 'subscription') : `$${((isEngineBuild ? 0 : b.cost) + b.fees).toFixed(2)}`}
+          </span>
         </div>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={toggleRecording} className={b.recording ? `${HBTN} border-danger/60 bg-danger/10 text-danger hover:border-danger hover:text-danger` : HBTN} title={T('Graba esta pantalla (chat + código + vista previa) y descarga el video', 'Records this screen (chat + code + preview) and downloads the video')}>
