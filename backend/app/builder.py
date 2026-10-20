@@ -1012,6 +1012,31 @@ class Build:
                 out.append(dict(a) | {"provider": self.req.provider, "model": self.req.model})
         return out
 
+    def add_references(self, references: list[str], deep_analysis: bool = False) -> list[str]:
+        """Reference apps / URLs added later (council, verdict…): the new ones join the build and are returned."""
+        have = {r.strip().lower() for r in self.req.references}
+        new = [r.strip() for r in references if isinstance(r, str) and r.strip() and r.strip().lower() not in have]
+        self.req.references = (self.req.references + new)[:12]
+        if deep_analysis:
+            self.req.deep_analysis = True
+        return new
+
+    async def research_then_council(self, priorities: str | None, new_refs: list[str]) -> None:
+        """New references before a council round: benchmark them (research/REFERENCES.md grows), then open the council."""
+        before = self.status
+        try:
+            if new_refs:
+                self.chat.append({"role": "system", "text": f"Investigando {len(new_refs)} referente(s) nuevo(s) antes del consejo: {', '.join(new_refs)[:300]}", "ts": time.time()})
+                await self.research_phase()
+        except Exception as e:  # noqa: BLE001
+            self._note(f"La investigación de referentes falló: {str(e)[:200]}")
+        finally:
+            self.status = before if before not in ("running", "reviewing") else "completed"
+            self.live = None
+            self.emit("build.status", status=self.status, build=self.snapshot())
+            self._save()
+        self.start_council(priorities=priorities)
+
     def start_council(self, priorities: str | None = None) -> str | None:
         """Launches the pre-production review as an arena session (same UI as the debate). Returns the session id."""
         if priorities is not None:
@@ -1023,7 +1048,7 @@ class Build:
         if len(agents) < 2:
             return None
         rnd = len(self.council_sessions) + 1
-        digest = f"BRIEF (resumen):\n{self.brief[:6000]}\n\n{self._project_digest()[:50000]}"
+        digest = f"BRIEF (resumen):\n{self.brief[:6000]}{research_context(self.research_md)}\n\n{self._project_digest()[:50000]}"
         prior = ""
         prior_requests = list(self.versions[-1]["requested"]) if self.versions else []
         if prior_requests:

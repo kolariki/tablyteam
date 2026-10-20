@@ -125,7 +125,7 @@ export const api = {
   sceneStatus: (sessionId: string) => j<{ ready: boolean; pending: boolean; failed_recently: boolean }>(authed(`/api/sessions/${sessionId}/scene/status`)),
   sceneRegenerate: (sessionId: string) => j<{ ready: boolean; pending: boolean }>(authed(`/api/sessions/${sessionId}/scene/regenerate`, { method: 'POST' })),
   researchStatus: () => j<{ chrome: string | null; rea: { ok: boolean; cli: string | null; registered: boolean; fee_usd: number }; deep_fee_usd: number; max_references: number }>(authed('/api/research/status')),
-  buildCouncil: (id: string, session_id: string | null, max_rounds: number, priorities = '') => j<{ session_id: string }>(post(`/api/builds/${id}/council`, { session_id, max_rounds, priorities })),
+  buildCouncil: (id: string, session_id: string | null, max_rounds: number, priorities = '', references: string[] = [], deep_analysis = false) => j<{ session_id: string | null; researching?: number }>(post(`/api/builds/${id}/council`, { session_id, max_rounds, priorities, references, deep_analysis })),
   councilApply: (id: string, session_id: string | null, changes: { severity: string; role: string; text: string }[], max_rounds: number, council_session: string | null, priorities = '') =>
     j(post(`/api/builds/${id}/council/apply`, { session_id, changes, max_rounds, council_session, priorities })),
   buildReview: (id: string, session_id: string | null, max_rounds: number) => j(post(`/api/builds/${id}/review`, { session_id, max_rounds })),

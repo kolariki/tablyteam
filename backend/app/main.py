@@ -1217,6 +1217,12 @@ async def build_council(build_id: str, body: dict, user: User = CurrentUser):
         raise HTTPException(400, "Hacen falta al menos 2 roles con API key para que el consejo debata")
     _check_capacity(user.id)
     b.review_plan = b.review_plan or {"max_rounds": min(3, max(1, int(body.get("max_rounds") or 1)))}
+    refs = body.get("references") if isinstance(body.get("references"), list) else []
+    new_refs = b.add_references(refs, bool(body.get("deep_analysis")))
+    if new_refs:  # benchmark the new references first (takes a while): the council opens by itself when it is done
+        b._save()
+        spawn(b.research_then_council(str(body.get("priorities") or ""), new_refs))
+        return {"ok": True, "session_id": None, "researching": len(new_refs)}
     sid = b.start_council(priorities=str(body.get("priorities") or ""))
     return {"ok": True, "session_id": sid}
 

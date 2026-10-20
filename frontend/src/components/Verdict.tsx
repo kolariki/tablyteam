@@ -9,6 +9,7 @@ import ProviderLogo from './ProviderLogo'
 import { agentMap, useAgentColor, useArena } from '../store'
 
 import CouncilVerdict from './CouncilVerdict'
+import ReferencesField from './ReferencesField'
 
 export default function Verdict({ onRedebate, onRerun }: { onRedebate?: (note: string, decisions: string) => Promise<void>; onRerun?: () => Promise<void> } = {}) {
   const T = useT()
@@ -18,6 +19,8 @@ export default function Verdict({ onRedebate, onRerun }: { onRedebate?: (note: s
   const [edits, setEdits] = useState<Record<string, string>>({})
   const [editing, setEditing] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [refs, setRefs] = useState<string[]>(() => useArena.getState().config?.references ?? [])
+  const [deep, setDeep] = useState<boolean>(() => !!useArena.getState().config?.deep_analysis)
   const verdict = useArena((s) => s.verdict)
   const show = useArena((s) => s.showVerdict)
   const votes = useArena((s) => s.votes)
@@ -71,12 +74,16 @@ export default function Verdict({ onRedebate, onRerun }: { onRedebate?: (note: s
   const textOf = (d: { agent: { id: string } | undefined; text: string }) => edits[d.agent!.id] ?? d.text
   const decisionsText = decisions.map((d) => `- ${d.agent!.name}: ${textOf(d)}`).join('\n')
   const edited = Object.keys(edits).some((k) => { const d = decisions.find((x) => x.agent!.id === k); return d && edits[k] !== d.text })
-  const goBuild = () => set({ showVerdict: false, showBriefExport: true, decisionNotes: edited ? decisionsText : '' })
+  /** The references live on the session config: the brief, the build and the next debate all read them from there. */
+  const saveRefs = () => { const cfg = useArena.getState().config; if (cfg) set({ config: { ...cfg, references: refs, deep_analysis: deep } }) }
+  const goBuild = () => { saveRefs(); set({ showVerdict: false, showBriefExport: true, decisionNotes: edited ? decisionsText : '' }) }
   const redebate = async () => {
     if (!onRedebate || !note.trim()) return
     setRedebating(true)
+    saveRefs()
     try {
-      await onRedebate(note.trim(), decisionsText)
+      const refNote = refs.length ? `\n\n${T('Referencias a tener en cuenta', 'References to consider')}: ${refs.join(', ')}` : ''
+      await onRedebate(note.trim() + refNote, decisionsText)
     } finally {
       setRedebating(false)
     }
@@ -209,7 +216,8 @@ export default function Verdict({ onRedebate, onRerun }: { onRedebate?: (note: s
               <div className="flex items-center gap-1.5 text-[10.5px] uppercase tracking-[0.25em] text-ink-3"><MessageSquarePlus size={12} className="text-accent" /> {T('Tu punto de vista', 'Your point of view')}</div>
               <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-3">{T('Si querés cambiar algo o agregar tu mirada, el consejo vuelve a debatir con estas decisiones como punto de partida y tu pedido como prioridad.', 'If you want to change something or add your view, the council debates again with these decisions as the starting point and your request as the priority.')}</p>
               <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={T('ej.: no quiero backend propio, usen Supabase; que el QA priorice tests de pagos; el nombre tiene que ser corto…', 'e.g.: no custom backend, use Supabase; QA should prioritise payment tests; the name must be short…')} className="mt-2 h-28 w-full resize-none rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm shadow-sm outline-none transition focus:border-accent" />
-              <button type="button" onClick={redebate} disabled={!note.trim() || redebating || !onRedebate} className={`${pill} mt-2 border-accent/40 text-accent`}>{redebating ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />} {T('Pedir cambios y volver a debatir', 'Request changes and debate again')}</button>
+              <div className="mt-3"><ReferencesField value={refs} onChange={setRefs} deep={deep} onDeep={setDeep} compact /></div>
+              <button type="button" onClick={redebate} disabled={!note.trim() || redebating || !onRedebate} className={`${pill} mt-3 border-accent/40 text-accent`}>{redebating ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />} {T('Pedir cambios y volver a debatir', 'Request changes and debate again')}</button>
             </div>
           </div>
         </div>

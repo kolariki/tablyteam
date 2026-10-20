@@ -243,11 +243,12 @@ export default function Builder({ onBack }: { onBack: () => void }) {
       {runOpen && <RunModal onClose={() => setRunOpen(false)} onDownload={downloadZip} />}
       {fdeOpen !== null && <FdeModal onClose={() => setFdeOpen(null)} prefill={fdeOpen ? `${T('Resolver los bloqueantes del consejo:', 'Resolve the council blockers:')}\n${fdeOpen}` : ''} />}
       {councilOpen && (
-        <CouncilLaunch team={b.team} startEditing={councilOpen === 'edit'} onClose={() => setCouncilOpen(false)} onLaunch={async (priorities, rounds) => {
+        <CouncilLaunch team={b.team} startEditing={councilOpen === 'edit'} onClose={() => setCouncilOpen(false)} onLaunch={async (priorities, rounds, references, deep) => {
           if (!b.id) return
           try {
-            const r = await api.buildCouncil(b.id, b.sessionId, rounds, priorities)
-            useBuild.getState().set({ councilSession: r.session_id })
+            const r = await api.buildCouncil(b.id, b.sessionId, rounds, priorities, references, deep)
+            if (r.session_id) useBuild.getState().set({ councilSession: r.session_id })
+            else toast.ok(tr('Investigando las referencias', 'Researching the references'), tr(`El equipo mira ${r.researching ?? references.length} referente(s); el consejo se abre solo cuando termina.`, `The team looks at ${r.researching ?? references.length} reference(s); the council opens by itself when done.`))
             setCouncilOpen(false)
           } catch (e) {
             useBuild.getState().set({ error: (e as Error).message })

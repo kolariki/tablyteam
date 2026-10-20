@@ -7,16 +7,19 @@ import { api } from '../lib/api'
 import { brandTheme } from '../lib/brand'
 import { tr, useT } from '../lib/i18n'
 import CouncilTeamEditor from './CouncilTeamEditor'
+import ReferencesField from './ReferencesField'
 import ProviderLogo from './ProviderLogo'
 import SkillPicker from './SkillPicker'
 import { toast } from './Toast'
 
 /** Before sending the project to the council: what the user wants treated first, who sits at the table, skills per role. */
-export default function CouncilLaunch({ team, onLaunch, onClose, defaultRounds = 3, startEditing = false }: { team: TeamMember[]; onLaunch: (priorities: string, rounds: number) => Promise<void>; onClose: () => void; defaultRounds?: number; startEditing?: boolean }) {
+export default function CouncilLaunch({ team, onLaunch, onClose, defaultRounds = 3, startEditing = false }: { team: TeamMember[]; onLaunch: (priorities: string, rounds: number, references: string[], deep: boolean) => Promise<void>; onClose: () => void; defaultRounds?: number; startEditing?: boolean }) {
   const T = useT()
   const [editing, setEditing] = useState(startEditing)
   const [priorities, setPriorities] = useState('')
   const [rounds, setRounds] = useState(defaultRounds)
+  const [refs, setRefs] = useState<string[]>([])
+  const [deep, setDeep] = useState(false)
   const [busy, setBusy] = useState(false)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -26,7 +29,7 @@ export default function CouncilLaunch({ team, onLaunch, onClose, defaultRounds =
   const go = async () => {
     setBusy(true)
     try {
-      await onLaunch(priorities.trim(), rounds)
+      await onLaunch(priorities.trim(), rounds, refs, deep)
     } finally {
       setBusy(false)
     }
@@ -58,6 +61,10 @@ export default function CouncilLaunch({ team, onLaunch, onClose, defaultRounds =
             className="mt-1.5 w-full resize-none rounded-2xl border border-line bg-paper px-4 py-3 text-[13.5px] shadow-sm outline-none transition focus:border-accent"
           />
           <div className="mt-1 text-[11.5px] text-ink-4">{T('Si no escribís nada, el equipo decide qué revisar.', 'If you write nothing, the team decides what to review.')}</div>
+
+          {/* references the council should look at (researched before the round) */}
+          <div className="mt-5"><ReferencesField value={refs} onChange={setRefs} deep={deep} onDeep={setDeep} compact /></div>
+          {refs.length > 0 && <div className="mt-1 text-[11.5px] text-ink-3">{T('Antes de abrir el consejo, el equipo investiga estas referencias y las usa como vara en la revisión.', 'Before the council opens, the team researches these references and uses them as the bar in the review.')}</div>}
 
           {/* who sits at the table */}
           <div className="mt-5 rounded-2xl border border-line bg-paper shadow-[0_12px_28px_-18px_rgba(30,38,34,.35)]">

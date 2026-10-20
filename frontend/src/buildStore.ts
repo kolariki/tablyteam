@@ -297,6 +297,9 @@ export const useBuild = create<BuildState>((set, get) => ({
       case 'build.team':
         set({ team: ev.team ?? s.team })
         break
+      case 'build.status':
+        set({ status: ev.status, liveTurn: null, livePhase: null, liveRaw: '', liveFile: null })
+        break
       case 'build.council':
         set({ councilSession: ev.session_id, status: 'completed', liveTurn: null, livePhase: null })
         break
