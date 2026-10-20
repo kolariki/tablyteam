@@ -105,8 +105,8 @@ export default function SubscriptionPanel() {
               </div>
 
               {e.ok ? (
-                <div className="relative mt-4 flex items-start gap-2 rounded-xl border border-ok/30 bg-ok/5 px-3 py-2.5 text-[13px]">
-                  <CheckCircle2 size={16} className="text-ok shrink-0 mt-0.5" />
+                <div className="relative mt-4 flex items-center gap-2 rounded-xl border border-ok/30 bg-ok/5 px-3 py-2.5 text-[13px]">
+                  <CheckCircle2 size={16} className="text-ok shrink-0" />
                   <div>
                     <b>{T('Listo.', 'Ready.')}</b> {T('Sesión activa', 'Active session')}{e.auth ? `: ${e.auth}` : ''}. {T('Al construir elegí «', 'When building, pick «')}{e.label}{T('» como constructor; la revisión pre-prod también puede usarlo.', '» as the builder; the pre-prod review can use it too.')}
                     {e.hint && <div className="mt-1 text-gold">{e.hint}</div>}
