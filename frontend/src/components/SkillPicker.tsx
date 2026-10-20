@@ -81,7 +81,7 @@ export default function SkillPicker({ value, onChange, compact = false, busy = f
     Promise.all(missing.map((id) => api.skill(id).then((sk) => catalogSeen.set(id, sk as unknown as CatalogSkill)).catch(() => {}))).then(() => bump((n) => n + 1))
   }, [value])
   const all = [...(data?.skills ?? []), ...(data?.templates ?? [])]
-  const selected = value.map((id) => all.find((s) => s.id === id) ?? catalogSeen.get(id)).filter(Boolean) as { id: string; name: string }[]
+  const selected = value.map((id) => all.find((s) => s.id === id) ?? catalogSeen.get(id)).filter(Boolean) as (Partial<CatalogSkill> & SkillSummary)[]
   const needle = q.trim().toLowerCase()
   const match = (sk: SkillSummary) => !needle || `${sk.name} ${sk.description} ${sk.tags}`.toLowerCase().includes(needle)
   const byCat = (catalog?.skills ?? []).reduce<Record<string, CatalogSkill[]>>((acc, sk) => { (acc[sk.category] ||= []).push(sk); return acc }, {})
@@ -109,9 +109,15 @@ export default function SkillPicker({ value, onChange, compact = false, busy = f
       <button type="button" onClick={() => setOpen(!open)} className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11.5px] ${value.length ? 'border-accent/40 bg-accent-soft text-accent' : 'border-line bg-surface text-ink-3 hover:text-ink'} ${compact ? '' : 'w-full'}`} title={T('Skills: conocimiento que este rol aplica (guías, convenciones, datos)', 'Skills: knowledge this role applies (guides, conventions, data)')}>
         {busy ? <Loader2 size={12} className="animate-spin" /> : <Puzzle size={12} />}
         {value.length ? `${value.length} skill${value.length === 1 ? '' : 's'}` : 'skills'}
-        {!compact && selected.length > 0 && <span className="truncate text-ink-2 font-normal">· {selected.map((s) => pick(s, 'name')).join(', ')}</span>}
+        {compact && selected.length > 0 && <span className="truncate text-ink-2 font-normal">· {selected.map((s) => pick(s, 'name')).join(', ')}</span>}
         <ChevronDown size={11} className="ml-auto" />
       </button>
+      {/* the chosen skills, one chip each: hover (or tap) tells what it does, × takes it off the role */}
+      {!compact && selected.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {selected.map((sk) => <SkillChip key={sk.id} skill={sk} onRemove={() => toggle(sk.id)} />)}
+        </div>
+      )}
       {open && createPortal(
         <div ref={popRef} style={{ position: 'fixed', top: pos.up ? undefined : pos.top, bottom: pos.up ? window.innerHeight - pos.top : undefined, left: pos.left }} className="z-[200] flex w-[420px] max-h-[460px] flex-col rounded-xl border border-line bg-paper shadow-lg text-[12.5px]">
           {/* search + category filter over everything (your skills, templates and the public catalog) */}
@@ -217,5 +223,50 @@ export default function SkillPicker({ value, onChange, compact = false, busy = f
         document.body,
       )}
     </div>
+  )
+}
+
+/** One chosen skill: name on a chip; hovering or tapping opens a card with what it does, where it comes from and a link. */
+function SkillChip({ skill, onRemove }: { skill: Partial<CatalogSkill> & SkillSummary; onRemove: () => void }) {
+  const T = useT()
+  const [show, setShow] = useState(false)
+  const ref = useRef<HTMLSpanElement>(null)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+  const open = () => {
+    const r = ref.current?.getBoundingClientRect()
+    if (r) setPos({ top: r.bottom + 6, left: Math.min(Math.max(8, r.left), window.innerWidth - 340) })
+    setShow(true)
+  }
+  const desc = pick(skill, 'description') || ''
+  const isCatalog = String(skill.id).startsWith('cat-')
+  return (
+    <>
+      <span
+        ref={ref}
+        tabIndex={0}
+        onMouseEnter={open}
+        onMouseLeave={() => setShow(false)}
+        onFocus={open}
+        onBlur={() => setShow(false)}
+        onClick={(e) => { e.stopPropagation(); show ? setShow(false) : open() }}
+        className="group inline-flex max-w-full cursor-help items-center gap-1 rounded-full border border-accent/30 bg-accent-soft py-0.5 pl-2 pr-1 text-[11px] text-accent"
+      >
+        <Puzzle size={10} className="shrink-0" />
+        <span className="truncate">{pick(skill, 'name')}</span>
+        <button type="button" onClick={(e) => { e.stopPropagation(); onRemove() }} className="ml-0.5 rounded-full p-0.5 text-accent/60 hover:bg-accent hover:text-white" title={T('Quitar esta skill', 'Remove this skill')} aria-label={T('Quitar esta skill', 'Remove this skill')}><X size={10} /></button>
+      </span>
+      {show && createPortal(
+        <div role="tooltip" style={{ position: 'fixed', top: pos.top, left: pos.left }} className="pointer-events-none z-[300] w-[330px] rounded-xl border border-line bg-surface p-3 text-[12px] leading-snug text-ink shadow-[0_18px_40px_-16px_rgba(30,38,34,.45)]">
+          <div className="flex items-center gap-1.5 font-semibold"><Puzzle size={12} className="text-accent" /> {pick(skill, 'name')}</div>
+          <div className="mt-1 text-ink-2">{desc || T('Esta skill no trae descripción; su contenido se suma al prompt del rol tal cual.', 'This skill has no description; its content is added to the role prompt as is.')}</div>
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[10.5px] text-ink-3">
+            {skill.category && <span>{T('Categoría', 'Category')}: {skill.category}</span>}
+            {isCatalog && skill.repo ? <span>{T('Fuente', 'Source')}: {skill.repo}</span> : <span>{isCatalog ? T('Catálogo público', 'Public catalog') : T('Tu biblioteca', 'Your library')}</span>}
+          </div>
+          <div className="mt-1.5 text-[10.5px] text-ink-4">{T('Qué hace: su contenido se inyecta en el prompt de este rol para que trabaje con ese conocimiento.', 'What it does: its content is injected into this role’s prompt so it works with that knowledge.')}</div>
+        </div>,
+        document.body,
+      )}
+    </>
   )
 }
