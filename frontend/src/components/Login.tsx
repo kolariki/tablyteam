@@ -119,13 +119,15 @@ export default function Login({ onAuthed, onBack, initialMode = 'login' }: { onA
           <p className="mt-4 text-ink-2 text-lg leading-relaxed max-w-md">
             {T('Escribí tu idea, elegí qué IA ocupa cada rol y el equipo la debate, la diseña, la construye y la revisa. Vos aprobás cada paso.', 'Write your idea, choose which AI takes each role, and the team debates it, designs it, builds it and reviews it. You approve every step.')}
           </p>
-          <div className="mt-6 flex gap-2">
-            {['anthropic', 'openai', 'deepseek', 'gemini', 'kimi'].map((id, i) => (
-              <motion.span key={id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 + i * 0.07 }} className="w-11 h-11 rounded-full bg-surface border border-line flex items-center justify-center">
+          {/* every company the app can seat at the table */}
+          <div className="mt-6 flex flex-wrap gap-2">
+            {[['anthropic', 'Anthropic · Claude'], ['openai', 'OpenAI · GPT'], ['deepseek', 'DeepSeek'], ['gemini', 'Google · Gemini'], ['xai', 'xAI · Grok'], ['groq', 'Groq · Llama'], ['kimi', 'Moonshot · Kimi'], ['mistral', 'Mistral'], ['openrouter', 'OpenRouter · 300+ modelos'], ['ollama', 'Ollama · modelos locales']].map(([id, label], i) => (
+              <motion.span key={id} title={label} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 + i * 0.06 }} className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-surface shadow-sm transition hover:-translate-y-0.5 hover:border-accent">
                 <ProviderLogo provider={id} size={24} />
               </motion.span>
             ))}
           </div>
+          <div className="mt-2 text-[12px] text-ink-3">{T('Claude, GPT, DeepSeek, Gemini, Grok, Llama, Kimi, Mistral, OpenRouter y Ollama local.', 'Claude, GPT, DeepSeek, Gemini, Grok, Llama, Kimi, Mistral, OpenRouter and local Ollama.')}</div>
         </div>
 
         {verify ? (
