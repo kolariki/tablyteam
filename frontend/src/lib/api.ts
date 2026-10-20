@@ -18,7 +18,10 @@ export const auth = {
     token = t
     try {
       if (t) localStorage.setItem(TOKEN_KEY, t)
-      else localStorage.removeItem(TOKEN_KEY)
+      else {
+        localStorage.removeItem(TOKEN_KEY)
+        for (let i = localStorage.length - 1; i >= 0; i--) { const k = localStorage.key(i); if (k?.startsWith('arena.cache.')) localStorage.removeItem(k) }
+      }
     } catch {
       /* storage blocked: session lasts until reload */
     }

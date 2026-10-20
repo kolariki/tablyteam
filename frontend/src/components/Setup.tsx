@@ -8,6 +8,7 @@ import { api, type User } from '../lib/api'
 import { fmtUsd } from '../lib/parse'
 import Dashboard from './Dashboard'
 import HomeLoader from './HomeLoader'
+import { readCache, writeCache } from '../lib/cache'
 import ModelSelect, { invalidateModels } from './ModelSelect'
 import ArenaIntro, { ICON_STEP, PLAY_OUT, iconExitAt, introTeam } from './ArenaIntro'
 import Intake from './Intake'
@@ -60,9 +61,9 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
     return () => window.removeEventListener('keydown', onKey)
   }, [chooser])
   const lang = useLang()
-  const [providers, setProviders] = useState<Provider[]>([])
+  const [providers, setProviders] = useState<Provider[]>(() => readCache<Provider[]>('providers') ?? [])
   const [roles, setRoles] = useState<{ groups: string[]; groups_en?: string[]; roles: Role[] }>({ groups: [], roles: [] })
-  const [presets, setPresets] = useState<Preset[]>([])
+  const [presets, setPresets] = useState<Preset[]>(() => readCache<Preset[]>('presets') ?? [])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [launching, setLaunching] = useState(false) // intro animation (button → arena)
@@ -85,14 +86,18 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   })
 
   // the loader stays until providers, experiments and projects are in (or 8 s, whichever comes first)
-  const [loaded, setLoaded] = useState({ providers: false, presets: false, dashboard: false, timeout: false })
+  // what was remembered from the last visit counts as loaded: the page paints at once and refreshes quietly behind
+  const [loaded, setLoaded] = useState(() => ({ providers: !!readCache('providers'), presets: !!readCache('presets'), dashboard: !!readCache('dashboard'), timeout: false }))
   const mark = (k: keyof typeof loaded) => setLoaded((l) => (l[k] ? l : { ...l, [k]: true }))
   const booting = !loaded.timeout && !(loaded.providers && loaded.presets && loaded.dashboard)
   useEffect(() => {
-    api.providers().then(setProviders).catch((e) => setError(`${tr('No hay backend', 'No backend')}: ${e.message}`)).finally(() => mark('providers'))
+    const cachedPresets = readCache<Preset[]>('presets')
+    if (cachedPresets?.[0]) applyPreset(cachedPresets[0])
+    api.providers().then((p) => { if (writeCache('providers', p)) setProviders(p) }).catch((e) => setError(`${tr('No hay backend', 'No backend')}: ${e.message}`)).finally(() => mark('providers'))
     api.presets().then((p) => {
-      setPresets(p)
-      if (p[0]) applyPreset(p[0])
+      const changed = writeCache('presets', p)
+      if (changed) setPresets(p)
+      if (!cachedPresets?.[0] && p[0]) applyPreset(p[0])
     }).catch(() => {}).finally(() => mark('presets'))
     api.roles().then(setRoles).catch(() => {})
     const t = setTimeout(() => mark('timeout'), 8000)

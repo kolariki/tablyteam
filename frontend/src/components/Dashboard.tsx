@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { ChevronDown, Gavel, Pencil, Play, Search, Trash2, Video } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, getToken, type DashboardData } from '../lib/api'
+import { readCache, writeCache } from '../lib/cache'
 import { fmtUsd } from '../lib/parse'
 import { BrandLogoRow, BrandStripes } from './ProviderLogo'
 import TeamEditor from './TeamEditor'
@@ -61,7 +62,7 @@ function SceneThumb({ sessionId }: { sessionId: string }) {
 export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refreshKey, onLoaded }: Props) {
   const T = useT()
   const statusLabel = (code: string) => (STATUS[code] ? T(STATUS[code].es, STATUS[code].en) : code)
-  const [data, setData] = useState<DashboardData | null>(null)
+  const [data, setData] = useState<DashboardData | null>(() => readCache<DashboardData>('dashboard'))
   const [q, setQ] = useState('')
   const [editing, setEditing] = useState<string | null>(null)
   const [title, setTitle] = useState('')
@@ -69,7 +70,7 @@ export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refres
   const { confirm, dialog } = useConfirm()
 
   const load = () => {
-    api.dashboard().then((d) => { setData(d); onLoaded?.() }).catch(() => onLoaded?.())
+    api.dashboard().then((d) => { if (writeCache('dashboard', d)) setData(d); onLoaded?.() }).catch(() => onLoaded?.())
   }
   useEffect(load, [refreshKey])
   useEffect(() => {
