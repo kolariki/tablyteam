@@ -18,6 +18,8 @@ import VersionsPanel, { ReadinessBadge } from './VersionsPanel'
 import CouncilLaunch from './CouncilLaunch'
 import FdeModal from './FdeModal'
 import { useArena } from '../store'
+import CodeEditor from './CodeEditor'
+import { useEditorTheme } from '../lib/editorThemes'
 
 /** Header buttons share the home page's language: pills that lift on hover. */
 const HBTN = 'flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-sm text-ink-2 shadow-sm transition hover:-translate-y-0.5 hover:border-accent hover:text-accent disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:border-line disabled:hover:text-ink-2'
@@ -71,7 +73,6 @@ export default function Builder({ onBack }: { onBack: () => void }) {
     return () => clearInterval(id)
   }, [b.liveTurn])
   const chatRef = useRef<HTMLDivElement>(null)
-  const codeRef = useRef<HTMLPreElement>(null)
   const live = useMemo(() => liveParts(b.liveRaw), [b.liveRaw])
   const running = b.status === 'running' || b.status === 'connecting' || b.status === 'reviewing'
   const reviewing = b.status === 'reviewing'
@@ -80,9 +81,6 @@ export default function Builder({ onBack }: { onBack: () => void }) {
     chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: 'smooth' })
   }, [b.chat.length, live.say.length, live.files.length])
 
-  useEffect(() => {
-    if (b.liveFile && codeRef.current) codeRef.current.scrollTop = codeRef.current.scrollHeight
-  }, [b.liveFile?.content.length])
 
   // fetch a file's content lazily when selected (contents aren't streamed into the tree)
   useEffect(() => {
@@ -150,6 +148,8 @@ export default function Builder({ onBack }: { onBack: () => void }) {
   const tree = useMemo(() => buildTree(Object.keys(b.files).concat(b.liveFile ? [b.liveFile.path] : [])), [b.files, b.liveFile?.path])
   const stageCount = b.stages.length
   const isEngineBuild = b.provider === 'claude-code' || b.provider === 'codex'
+  const codeTheme = useEditorTheme((s) => s.theme)
+  const codeDark = codeTheme.dark
   // the side panel takes ~60% of the row (at least 640px), leaving the chat its minimum; measured so the spring can animate pixels
   const wrapRef = useRef<HTMLDivElement>(null)
   const [wrapW, setWrapW] = useState(0)
@@ -401,15 +401,11 @@ export default function Builder({ onBack }: { onBack: () => void }) {
             </motion.div>
 
             {/* the pane */}
-            <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${b.pane !== 'code' ? 'bg-paper' : 'bg-[#1E2622]'}`}>
-              <div className={`flex h-10 shrink-0 items-center gap-2 overflow-x-auto whitespace-nowrap border-b px-3 text-[12px] ${b.pane !== 'code' ? 'border-line bg-surface' : 'border-white/10 text-[#B9C4BE]'}`}>
-                {(() => { const cur = PANES.find((x) => x.id === b.pane); const Icon = cur?.icon ?? FileCode2; return <span className={`flex items-center gap-1.5 font-semibold ${b.pane === 'code' ? 'text-white' : 'text-ink'}`}><Icon size={14} className={b.pane === 'code' ? 'text-[#8FD3B0]' : 'text-accent'} /> {cur ? T(cur.es, cur.en) : ''}</span> })()}
+            <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${b.pane !== 'code' ? 'bg-paper' : ''}`} style={b.pane === 'code' ? { background: codeTheme.bg } : undefined}>
+              <div className={`flex h-10 shrink-0 items-center gap-2 overflow-x-auto whitespace-nowrap border-b px-3 text-[12px] ${b.pane !== 'code' ? 'border-line bg-surface' : codeDark ? 'border-white/10 text-[#B9C4BE]' : 'border-black/10 bg-black/[0.03] text-ink-2'}`}>
+                {(() => { const cur = PANES.find((x) => x.id === b.pane); const Icon = cur?.icon ?? FileCode2; return <span className={`flex items-center gap-1.5 font-semibold ${b.pane === 'code' ? (codeDark ? 'text-white' : 'text-ink') : 'text-ink'}`}><Icon size={14} className={b.pane === 'code' && codeDark ? 'text-[#8FD3B0]' : 'text-accent'} /> {cur ? T(cur.es, cur.en) : ''}</span> })()}
                 {b.pane === 'code' ? (
-                  <>
-                    <span className="ml-2 truncate font-mono">{b.selected ?? '—'}</span>
-                    {b.liveFile && b.selected === b.liveFile.path && <span className="ml-2 text-[10px] font-bold text-[#8FD3B0] animate-pulse">{T('● escribiendo', '● writing')}</span>}
-                    {b.selected && b.files[b.selected] && <span className="ml-auto font-mono text-ink-4">{b.files[b.selected].lines} {T('líneas', 'lines')}</span>}
-                  </>
+                  <span className="ml-auto text-[11px] opacity-70">{running ? T('solo lectura mientras el constructor escribe', 'read-only while the builder writes') : T('editá y guardá con ⌘S: el constructor sigue desde tu versión', 'edit and save with ⌘S: the builder continues from your version')}</span>
                 ) : b.pane === 'deploy' ? (
                   <span className="ml-auto text-[11px] text-ink-3">{T('keys, variables y hosting', 'keys, variables and hosting')}</span>
                 ) : b.pane === 'app' ? (
@@ -428,7 +424,7 @@ export default function Builder({ onBack }: { onBack: () => void }) {
                     <button onClick={openPreviewTab} className={PBTN}><ExternalLink size={12} /> {T('abrir en pestaña', 'open in tab')}</button>
                   </div>
                 )}
-                <button onClick={() => useBuild.getState().set({ paneOpen: false })} title={T('Cerrar el panel', 'Close the panel')} className={`ml-1 shrink-0 rounded-md p-1 transition ${b.pane === 'code' ? 'text-[#B9C4BE] hover:bg-white/10 hover:text-white' : 'text-ink-3 hover:bg-surface-2 hover:text-ink'}`}><PanelRightClose size={14} /></button>
+                <button onClick={() => useBuild.getState().set({ paneOpen: false })} title={T('Cerrar el panel', 'Close the panel')} className={`ml-1 shrink-0 rounded-md p-1 transition ${b.pane === 'code' && codeDark ? 'text-[#B9C4BE] hover:bg-white/10 hover:text-white' : 'text-ink-3 hover:bg-surface-2 hover:text-ink'}`}><PanelRightClose size={14} /></button>
               </div>
               <AnimatePresence mode="wait" initial={false}>
                 <motion.div key={b.pane} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -6 }} transition={{ duration: 0.18, ease: 'easeOut' }} className="flex min-h-0 flex-1 flex-col">
@@ -455,9 +451,27 @@ export default function Builder({ onBack }: { onBack: () => void }) {
                   </div>
                 </div>
               ) : (
-                <pre ref={codeRef} className="flex-1 min-h-0 overflow-auto scroll-thin p-4 text-[12.5px] leading-[1.55] text-[#E6ECE8] font-mono">
-                  {shownFile !== undefined ? <Code text={shownFile} /> : <span className="text-[#7F8C86]">{b.selected ? T('cargando…', 'loading…') : T('Elegí un archivo del árbol o esperá a que el constructor empiece a escribir.', 'Pick a file from the tree or wait for the builder to start writing.')}</span>}
-                </pre>
+                shownFile !== undefined && b.selected ? (
+                  <CodeEditor
+                    path={b.selected}
+                    content={shownFile}
+                    live={!!b.liveFile && b.selected === b.liveFile.path}
+                    readOnly={running}
+                    onSave={async (content) => {
+                      if (!b.sessionId || !b.id || !b.selected) return
+                      try {
+                        const r = await api.saveFile(b.sessionId, b.id, b.selected, content)
+                        useBuild.getState().set({ files: { ...useBuild.getState().files, [r.path]: { ...useBuild.getState().files[r.path], size: r.size, lines: r.lines, content } } })
+                        toast.ok(tr('Archivo guardado', 'File saved'), r.path)
+                      } catch (e) {
+                        toast.error(tr('No se pudo guardar', 'Could not save'), (e as Error).message)
+                        throw e
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className="flex flex-1 items-center justify-center p-8 text-center text-sm" style={{ color: codeTheme.dark ? '#7F8C86' : '#6B7A72' }}>{b.selected ? T('cargando…', 'loading…') : T('Elegí un archivo del árbol o esperá a que el constructor empiece a escribir.', 'Pick a file from the tree or wait for the builder to start writing.')}</div>
+                )
               )}
                     </motion.div>
               </AnimatePresence>
@@ -494,20 +508,6 @@ export default function Builder({ onBack }: { onBack: () => void }) {
         </div>
       </div>
     </div>
-  )
-}
-
-function Code({ text }: { text: string }) {
-  const lines = text.split('\n')
-  return (
-    <code className="grid grid-cols-[auto_1fr] gap-x-4">
-      {lines.map((l, i) => (
-        <span key={i} className="contents">
-          <span className="select-none text-right text-[#5E6B65]">{i + 1}</span>
-          <span className="whitespace-pre">{l}</span>
-        </span>
-      ))}
-    </code>
   )
 }
 

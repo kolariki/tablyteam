@@ -19,6 +19,7 @@ All session endpoints are scoped to the signed-in user.
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 import copy
 import json
 import logging
@@ -36,6 +37,7 @@ from .tasks import spawn
 from . import research
 from . import scene_gen
 from .auth import CurrentUser, Credentials, User
+from . import builder as buildermod
 from .builder import BUILDS, Build, BuildRequest, list_builds, load_build, rehydrate, start_build
 from .local_engine import ENGINES, engine_status, is_engine, snapshot_dir
 from . import deploy as deploymod
@@ -1129,6 +1131,28 @@ def get_build(session_id: str, build_id: str, user: User = CurrentUser):
     if not d:
         raise HTTPException(404)
     return d
+
+
+@app.put("/api/sessions/{session_id}/builds/{build_id}/files")
+def build_file_save(session_id: str, build_id: str, body: dict, user: User = CurrentUser):
+    """The user edited a file in the editor: it replaces the build's copy (and the working folder on disk, when the
+    build has one), so the next turn, the zip, the preview and the deploy all see the edit."""
+    b = _build(user, build_id, session_id)
+    path, content = str(body.get("path") or ""), body.get("content")
+    if not isinstance(content, str) or not buildermod._safe_path(path):
+        raise HTTPException(400, "path o contenido inválidos")
+    if len(content) > buildermod.MAX_FILE_BYTES:
+        raise HTTPException(413, "archivo demasiado grande")
+    b._write(path, content)
+    if b.workdir:
+        dest = Path(b.workdir) / path
+        try:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(b.files[path])
+        except OSError as e:
+            raise HTTPException(500, f"no pude escribir en disco: {e}")
+    b._save()
+    return {"ok": True, "path": path, "lines": b.files[path].count("\n"), "size": len(b.files[path])}
 
 
 @app.post("/api/builds/{build_id}/message")

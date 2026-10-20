@@ -129,6 +129,8 @@ export const api = {
   buildApply: (id: string, session_id: string | null, requests: { role_label: string; name: string; text: string }[], max_rounds: number) =>
     j(post(`/api/builds/${id}/apply`, { session_id, requests, max_rounds })),
   services: (sessionId: string, id: string) => j<ServicesInfo>(authed(`/api/sessions/${sessionId}/builds/${id}/services`)),
+  saveFile: (sessionId: string, id: string, path: string, content: string) =>
+    j<{ ok: boolean; path: string; lines: number; size: number }>(authed(`/api/sessions/${sessionId}/builds/${id}/files`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path, content }) })),
   serviceGuide: (sessionId: string, id: string, service: string, lang: string, refresh = false) =>
     j<ServiceGuideData>(authed(`/api/sessions/${sessionId}/builds/${id}/services/guide?service=${encodeURIComponent(service)}&lang=${lang}${refresh ? '&refresh=true' : ''}`)),
   saveServices: (sessionId: string, id: string, values: Record<string, string>) =>
