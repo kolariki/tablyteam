@@ -39,7 +39,39 @@ const PANES: { id: BuildState['pane']; icon: typeof FileCode2; es: string; en: s
   { id: 'report', icon: FileText, es: 'Informe', en: 'Report', off: (b) => !b.auditReport },
 ]
 
-const md = (s: string) => DOMPurify.sanitize(marked.parse(s, { async: false }) as string)
+/** Chat Markdown with semantic colour: inline code becomes a typed chip (file path, command, number, hash, keyword) and
+ * plain-text measurements get a quiet highlight, so a turn reads like a changelog instead of a wall of text. */
+const CMD_RE = /^(npm|npx|pnpm|yarn|bun|git|node|uv|python3?|pip|claude|codex|docker|make|cargo|go|rm|cd|ls|cat|curl)\b/
+const PATH_RE = /^(?:[\w.@-]+\/)+[\w.@-]+$|^[\w.-]+\.(tsx?|jsx?|mjs|cjs|json|md|css|scss|html|py|toml|ya?ml|sh|svg|png|env|txt|sql|lock)$/i
+const NUM_RE = /^[-+]?\d[\d.,]*\s?(%|px|ms|s|KB|MB|GB|h|min|kt|°)?$/
+const HASH_RE = /^[0-9a-f]{7,40}$/
+const classify = (t: string) => (CMD_RE.test(t) ? 'cmd' : PATH_RE.test(t) ? 'path' : HASH_RE.test(t) ? 'hash' : NUM_RE.test(t) ? 'num' : 'kw')
+const md = (s: string) => {
+  const html = DOMPurify.sanitize(marked.parse(s, { async: false }) as string)
+  const el = document.createElement('div')
+  el.innerHTML = html
+  el.querySelectorAll('code').forEach((c) => {
+    if (c.parentElement?.tagName === 'PRE') return
+    const t = (c.textContent ?? '').trim()
+    const kind = classify(t)
+    c.classList.add('tok', `tok-${kind}`)
+    if (kind === 'path') c.setAttribute('data-path', t.replace(/^\.\//, ''))
+  })
+  // measurements in prose: "36.8 KB", "227 tests", "2184 palabras", "0.9 s"
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+  const todo: Text[] = []
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) if (!(n.parentElement && ['CODE', 'PRE', 'A'].includes(n.parentElement.tagName))) todo.push(n as Text)
+  const MEAS = /(\b\d[\d.,]*\s?(?:%|px|ms|KB|MB|GB|k|tests?|archivos?|files?|palabras|words|líneas|lines|pasos|steps|turnos?|comandos?|errores?|warnings?)\b|\b\d[\d.,]*\/\d+\b)/g
+  for (const n of todo) {
+    const txt = n.textContent ?? ''
+    if (!MEAS.test(txt)) continue
+    MEAS.lastIndex = 0
+    const span = document.createElement('span')
+    span.innerHTML = txt.replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch]!).replace(MEAS, '<span class="meas">$1</span>')
+    n.replaceWith(...Array.from(span.childNodes))
+  }
+  return el.innerHTML
+}
 
 /** Live-parse the streaming turn: the <say> text so far and which files are closed/open. */
 function liveParts(raw: string) {
@@ -277,7 +309,17 @@ export default function Builder({ onBack }: { onBack: () => void }) {
       <div ref={wrapRef} className="flex min-h-0 flex-1">
         {/* chat */}
         <div className={`flex min-h-0 min-w-0 flex-1 flex-col border-r border-line transition-opacity duration-300 ${paneFull && b.paneOpen ? 'pointer-events-none opacity-0' : ''}`}>
-          <div ref={chatRef} className="flex-1 overflow-y-auto scroll-thin px-5 py-5 space-y-4">
+          <div
+            ref={chatRef}
+            className="flex-1 overflow-y-auto scroll-thin px-5 py-5 space-y-4"
+            onClick={(e) => {
+              const chip = (e.target as HTMLElement).closest('code[data-path]') as HTMLElement | null
+              const path = chip?.getAttribute('data-path')
+              if (!path) return
+              const hit = b.files[path] ? path : Object.keys(b.files).find((f) => f.endsWith('/' + path) || f === path)
+              if (hit) useBuild.getState().set({ selected: hit, pane: 'code', paneOpen: true })
+            }}
+          >
             <AnimatePresence initial={false}>
               {b.chat.map((c, i) => (c.role === 'review' ? <ReviewRoundCard key={i} round={{ round: c.round!, approved: !!c.approved, results: c.results ?? [], mode: c.mode, ts: c.ts }} team={b.team} /> : <Bubble key={i} c={c} color={color} provider={b.provider} onOpen={(p) => useBuild.getState().set({ selected: p })} />))}
               {reviewing && <LiveReview round={b.reviewRound ?? b.reviews.length + 1} team={b.team} raws={b.liveReviews} audit={b.reviewMode === 'audit'} />}

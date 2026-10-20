@@ -67,6 +67,14 @@ input[type="color"] { border: 1px solid var(--color-line); padding: 2px; }
 .md li { margin: .2rem 0; } .md li input[type="checkbox"] { accent-color: var(--color-accent); margin-right: .4rem; }
 .md blockquote { border-left: 3px solid var(--color-accent); padding: .1rem 0 .1rem .9rem; color: var(--color-ink-2); }
 .md code { font-family: var(--font-mono); font-size: .85em; background: var(--color-surface-2); border: 1px solid var(--color-line); border-radius: 5px; padding: .05rem .3rem; }
+/* semantic chips in chat Markdown (see md() in Builder): what kind of thing a piece of code is */
+.md code.tok-path { color: #2B5FB3; background: #EAF0FB; border-color: #C9D8F2; cursor: pointer; }
+.md code.tok-path:hover { background: #DCE7F8; }
+.md code.tok-cmd { color: #E6ECE8; background: #1E2622; border-color: #1E2622; }
+.md code.tok-num { color: #8A5A00; background: #FFF4DD; border-color: #F1DDA8; font-weight: 600; }
+.md code.tok-hash { color: #6E3FB0; background: #F2EBFB; border-color: #DCCBF3; }
+.md code.tok-kw { color: var(--color-accent); background: var(--color-accent-soft); border-color: rgba(47,107,93,.25); }
+.md .meas { color: #8A5A00; font-weight: 600; font-variant-numeric: tabular-nums; }
 .md pre { background: #1E2622; color: #E6ECE8; border-radius: 12px; padding: 1rem 1.1rem; overflow-x: auto; }
 .md pre code { background: none; border: 0; padding: 0; color: inherit; font-size: 12.5px; white-space: pre-wrap; }
 .md table { border-collapse: collapse; width: 100%; font-size: 13px; }
