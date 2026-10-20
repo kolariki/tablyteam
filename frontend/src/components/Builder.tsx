@@ -20,7 +20,6 @@ import FdeModal from './FdeModal'
 import { useArena } from '../store'
 import CodeEditor from './CodeEditor'
 import DesignPanel from './DesignPanel'
-import ResearchOverlay from './ResearchOverlay'
 import { useEditorTheme } from '../lib/editorThemes'
 
 /** Header buttons share the home page's language: pills that lift on hover. */
@@ -241,7 +240,6 @@ export default function Builder({ onBack }: { onBack: () => void }) {
           <button onClick={() => setRunOpen(true)} disabled={!Object.keys(b.files).length || running} className={HBTN_PRIMARY} title={T('Levanta la app en esta máquina y la muestra acá', 'Starts the app on this machine and shows it here')}><MonitorPlay size={14} /> {T('Correr la app', 'Run the app')}{b.appRun.status === 'running' ? <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> : null}</button>
         </div>
       </div>
-      <AnimatePresence>{(b.researching || (running && b.livePhase === 'research')) && <ResearchOverlay key="research" />}</AnimatePresence>
       {runOpen && <RunModal onClose={() => setRunOpen(false)} onDownload={downloadZip} />}
       {fdeOpen !== null && <FdeModal onClose={() => setFdeOpen(null)} prefill={fdeOpen ? `${T('Resolver los bloqueantes del consejo:', 'Resolve the council blockers:')}\n${fdeOpen}` : ''} />}
       {councilOpen && (

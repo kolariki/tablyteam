@@ -127,7 +127,7 @@ interface BuildState {
   deploying: boolean
   deployLogs: string[]
   councilSession: string | null
-  researching: { refs: string[]; started: number; visited: { name?: string; url?: string | null; ok?: boolean }[]; finished: boolean } | null  // references being benchmarked before a council round
+  researching: { refs: string[]; started: number; visited: { name?: string; url?: string | null; ok?: boolean }[]; finished: boolean; opening?: boolean } | null  // references being benchmarked before a council round; opening = the council is up, play the fusion and leave
   councilSessionsKnown: number  // how many council rounds the build had when the research started (the poll detects the new one)
   pendingCouncil: string | null
   versions: BuildVersion[]
@@ -179,7 +179,7 @@ const empty = {
   deploying: false,
   deployLogs: [] as string[],
   councilSession: null as string | null,
-  researching: null as { refs: string[]; started: number; visited: { name?: string; url?: string | null; ok?: boolean }[]; finished: boolean } | null,
+  researching: null as { refs: string[]; started: number; visited: { name?: string; url?: string | null; ok?: boolean }[]; finished: boolean; opening?: boolean } | null,
   councilSessionsKnown: 0,
   pendingCouncil: null as string | null,
   versions: [] as BuildVersion[],
@@ -311,7 +311,7 @@ export const useBuild = create<BuildState>((set, get) => ({
         set({ status: ev.status, liveTurn: null, livePhase: null, liveRaw: '', liveFile: null })
         break
       case 'build.council':
-        set({ councilSession: ev.session_id, status: 'completed', liveTurn: null, livePhase: null, researching: null })
+        set({ councilSession: ev.session_id, status: 'completed', liveTurn: null, livePhase: null, researching: s.researching ? { ...s.researching, finished: true, opening: true } : null })
         break
       case 'app.status':
         set({ appRun: { ...s.appRun, status: ev.status, service: ev.service, label: ev.label, url: ev.url ?? null, embedUrl: ev.embed_url ?? null, port: ev.port ?? null, error: ev.error ?? null, logs: ev.status === 'installing' ? [] : s.appRun.logs } })

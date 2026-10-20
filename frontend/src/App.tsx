@@ -1,3 +1,4 @@
+import { AnimatePresence } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import ArenaGraph from './components/ArenaGraph'
 import AgentDrawer from './components/AgentDrawer'
@@ -442,7 +443,10 @@ function AppInner() {
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
-  const demoLayer = demo === 'research' ? <ResearchOverlay demo onClose={() => { history.replaceState(null, '', location.pathname); setDemo(null) }} /> : null
+  const researching = useBuild((s) => s.researching)
+  const demoLayer = demo === 'research'
+    ? <ResearchOverlay demo onClose={() => { history.replaceState(null, '', location.pathname); setDemo(null) }} />
+    : <AnimatePresence>{researching && <ResearchOverlay key="research" />}</AnimatePresence>
 
   const banner = <OfflineBanner />
   if (!authChecked) return <div className="h-full arena-bg">{banner}</div>
@@ -454,17 +458,19 @@ function AppInner() {
     return (
       <div data-capture="builder" className="h-full">
         {banner}
+        {demoLayer}
         {intro ? <BuilderIntro provider={intro.provider} model={intro.model} title={intro.title} onDone={() => setIntro(null)} /> : <Builder onBack={leaveBuilder} />}
       </div>
     )
   }
-  if (view === 'audit') return <>{banner}<AuditSetup onBack={() => useArena.getState().set({ view: 'setup' })} onStart={startAudit} /></>
-  if (view === 'settings') return <>{banner}<Settings onBack={() => useArena.getState().set({ view: 'setup' })} /></>
+  if (view === 'audit') return <>{banner}{demoLayer}<AuditSetup onBack={() => useArena.getState().set({ view: 'setup' })} onStart={startAudit} /></>
+  if (view === 'settings') return <>{banner}{demoLayer}<Settings onBack={() => useArena.getState().set({ view: 'setup' })} /></>
   if (view === 'setup') return <>{banner}{demoLayer}<Setup key={user.id} user={user} onLogout={logout} onSettings={() => useArena.getState().set({ view: 'settings' })} onAudit={() => useArena.getState().set({ view: 'audit' })} onStart={start} onReplay={startReplay} onOpen={(id) => openSaved(id).catch((e) => toast.error(tr('No se pudo abrir', 'Could not open'), (e as Error).message))} /></>
 
   const exporter = (
     <>
       {banner}
+      {demoLayer}
       {showTeam && <TeamModal onClose={() => useArena.getState().set({ showTeam: false })} />}
       <AgentDrawer />
       {showVideoExport && <VideoExport onClose={() => useArena.getState().set({ showVideoExport: false })} onRecord={recordVideo} />}
