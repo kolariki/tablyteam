@@ -6,6 +6,7 @@ import { useT } from '../lib/i18n'
 import LogoMarquee from './LogoMarquee'
 import TeamBackdrop from './TeamBackdrop'
 import ProviderLogo, { LogoWatermark } from './ProviderLogo'
+import ProviderRow from './ProviderRow'
 import { brandTheme } from '../lib/brand'
 
 /* ------------------------------------------------------------------ the looping demo
@@ -145,13 +146,7 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
               <Play size={16} /> {T('Ver cómo funciona', 'See how it works')}
             </a>
           </div>
-          <div className="mt-8 flex flex-wrap items-center gap-2">
-            {PROVIDERS_ALL.map(([id, label]) => (
-              <span data-hero-logo key={id} title={label} className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-surface shadow-sm transition hover:-translate-y-0.5 hover:border-accent">
-                <ProviderLogo provider={id} size={22} />
-              </span>
-            ))}
-          </div>
+          <div data-hero-row><ProviderRow className="mt-8" size="sm" /></div>
         </div>
 
         <div id="demo" data-hero-demo>

@@ -6,7 +6,7 @@ import TeamBackdrop from './TeamBackdrop'
 import { useT } from '../lib/i18n'
 import LogoMarquee from './LogoMarquee'
 import { MadeWith } from './Landing'
-import ProviderLogo from './ProviderLogo'
+import ProviderRow from './ProviderRow'
 
 export default function Login({ onAuthed, onBack, initialMode = 'login' }: { onAuthed: (u: User) => void; onBack: () => void; initialMode?: 'login' | 'register' }) {
   const T = useT()
@@ -119,15 +119,8 @@ export default function Login({ onAuthed, onBack, initialMode = 'login' }: { onA
           <p className="mt-4 text-ink-2 text-lg leading-relaxed max-w-md">
             {T('Escribí tu idea, elegí qué IA ocupa cada rol y el equipo la debate, la diseña, la construye y la revisa. Vos aprobás cada paso.', 'Write your idea, choose which AI takes each role, and the team debates it, designs it, builds it and reviews it. You approve every step.')}
           </p>
-          {/* every company the app can seat at the table */}
-          <div className="mt-6 flex flex-wrap gap-2">
-            {[['anthropic', 'Anthropic · Claude'], ['openai', 'OpenAI · GPT'], ['deepseek', 'DeepSeek'], ['gemini', 'Google · Gemini'], ['xai', 'xAI · Grok'], ['groq', 'Groq · Llama'], ['kimi', 'Moonshot · Kimi'], ['mistral', 'Mistral'], ['openrouter', 'OpenRouter · 300+ modelos'], ['ollama', 'Ollama · modelos locales']].map(([id, label], i) => (
-              <motion.span key={id} title={label} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 + i * 0.06 }} className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-surface shadow-sm transition hover:-translate-y-0.5 hover:border-accent">
-                <ProviderLogo provider={id} size={24} />
-              </motion.span>
-            ))}
-          </div>
-          <div className="mt-2 text-[12px] text-ink-3">{T('Claude, GPT, DeepSeek, Gemini, Grok, Llama, Kimi, Mistral, OpenRouter y Ollama local.', 'Claude, GPT, DeepSeek, Gemini, Grok, Llama, Kimi, Mistral, OpenRouter and local Ollama.')}</div>
+          {/* every company the app can seat at the table: hover lifts, click opens a note */}
+          <ProviderRow className="mt-6" />
         </div>
 
         {verify ? (

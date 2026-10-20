@@ -40,7 +40,7 @@ export function heroIntro(root: HTMLElement) {
   tl.from(root.querySelectorAll('[data-hero-kicker]'), { y: 10, opacity: 0, duration: 0.6 }, 0)
     .from(root.querySelectorAll('[data-hero-copy]'), { y: 18, opacity: 0, filter: 'blur(6px)', duration: 0.8 }, 0.7)
     .from(root.querySelectorAll('[data-hero-cta]'), { y: 16, opacity: 0, scale: 0.96, duration: 0.6, stagger: 0.08 }, 1.0)
-    .from(root.querySelectorAll('[data-hero-logo]'), { y: 10, opacity: 0, scale: 0.6, duration: 0.5, stagger: 0.05, ease: 'back.out(2)' }, 1.2)
+    .from(root.querySelectorAll('[data-hero-row]'), { y: 12, opacity: 0, duration: 0.6 }, 1.2)
     // the demo frame rises into place (no rotation, no blur: transform + opacity only, so it never stutters)
     .from(root.querySelectorAll('[data-hero-demo]'), { opacity: 0, y: 36, scale: 0.97, duration: 1.0, ease: 'power3.out', force3D: true, clearProps: 'transform' }, 0.4)
 
