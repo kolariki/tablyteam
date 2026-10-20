@@ -5,7 +5,8 @@ import { countTo, gsap, heroIntro, sceneIn, scrollReveal, useGSAP } from '../lib
 import { useT } from '../lib/i18n'
 import LogoMarquee from './LogoMarquee'
 import TeamBackdrop from './TeamBackdrop'
-import ProviderLogo from './ProviderLogo'
+import ProviderLogo, { LogoWatermark } from './ProviderLogo'
+import { brandTheme } from '../lib/brand'
 
 /* ------------------------------------------------------------------ the looping demo
  * One clock (ms since loop start) drives four scenes. Everything is derived from `t`,
@@ -25,14 +26,14 @@ const BRIEF_LINES: [string, string][] = [
   ['## Fuera: radar, cuentas, widgets', '## Out: radar, accounts, widgets'],
   ['## Criterios de aceptación: 12 historias', '## Acceptance criteria: 12 stories'],
 ]
-type Member = { id: string; name: string; name_en: string; role: string; role_en: string; provider: string; model: string; color: string; persona: string; persona_en: string }
+type Member = { id: string; name: string; name_en: string; role: string; role_en: string; provider: string; model: string; color: string; persona: string; persona_en: string; skills: string[] }
 const TEAM: Member[] = [
-  { id: 'ceo', name: 'CEO', name_en: 'CEO', role: 'Dirección', role_en: 'Leadership', provider: 'anthropic', model: 'claude-opus-5-5', color: '#C0603F', persona: 'visionario pero concreto', persona_en: 'visionary but concrete' },
-  { id: 'cto', name: 'CTO', name_en: 'CTO', role: 'Dirección', role_en: 'Leadership', provider: 'openai', model: 'gpt-5.6', color: '#17896A', persona: 'escéptico del hype', persona_en: 'hype sceptic' },
-  { id: 'eng', name: 'Head of Eng', name_en: 'Head of Eng', role: 'Ingeniería', role_en: 'Engineering', provider: 'gemini', model: 'gemini-3.8-pro', color: '#3D5CC4', persona: 'veinte años de cicatrices', persona_en: 'twenty years of scars' },
-  { id: 'product', name: 'Product', name_en: 'Product', role: 'Producto', role_en: 'Product', provider: 'deepseek', model: 'deepseek-v4', color: '#AD7D1A', persona: 'historias claras, prioriza', persona_en: 'clear stories, prioritises' },
-  { id: 'design', name: 'Diseño', name_en: 'Design', role: 'Diseño', role_en: 'Design', provider: 'anthropic', model: 'claude-opus-5-5', color: '#9A57B8', persona: 'flujos simples, pantallas precisas', persona_en: 'simple flows, precise screens' },
-  { id: 'qa', name: 'QA', name_en: 'QA', role: 'Calidad', role_en: 'Quality', provider: 'openai', model: 'gpt-5.6', color: '#6E8226', persona: 'busca cómo se rompe todo', persona_en: 'finds how everything breaks' },
+  { id: 'ceo', name: 'CEO', name_en: 'CEO', role: 'Dirección', role_en: 'Leadership', provider: 'anthropic', model: 'claude-opus-5-5', color: '#C0603F', persona: 'visionario pero concreto', persona_en: 'visionary but concrete' , skills: ['pitch', 'alcance MVP'] },
+  { id: 'cto', name: 'CTO', name_en: 'CTO', role: 'Dirección', role_en: 'Leadership', provider: 'openai', model: 'gpt-5.6', color: '#17896A', persona: 'escéptico del hype', persona_en: 'hype sceptic' , skills: ['stack review', 'costos'] },
+  { id: 'eng', name: 'Head of Eng', name_en: 'Head of Eng', role: 'Ingeniería', role_en: 'Engineering', provider: 'gemini', model: 'gemini-3.8-pro', color: '#3D5CC4', persona: 'veinte años de cicatrices', persona_en: 'twenty years of scars' , skills: ['arquitectura', 'CI/CD'] },
+  { id: 'product', name: 'Product', name_en: 'Product', role: 'Producto', role_en: 'Product', provider: 'deepseek', model: 'deepseek-v4', color: '#AD7D1A', persona: 'historias claras, prioriza', persona_en: 'clear stories, prioritises' , skills: ['user stories', 'priorización'] },
+  { id: 'design', name: 'Diseño', name_en: 'Design', role: 'Diseño', role_en: 'Design', provider: 'anthropic', model: 'claude-opus-5-5', color: '#9A57B8', persona: 'flujos simples, pantallas precisas', persona_en: 'simple flows, precise screens' , skills: ['frontend-design', 'UX audit'] },
+  { id: 'qa', name: 'QA', name_en: 'QA', role: 'Calidad', role_en: 'Quality', provider: 'openai', model: 'gpt-5.6', color: '#6E8226', persona: 'busca cómo se rompe todo', persona_en: 'finds how everything breaks' , skills: ['test plan', 'e2e'] },
 ]
 const ARENA = TEAM.slice(0, 4)
 const MEMBER = Object.fromEntries(TEAM.map((m) => [m.id, m])) as Record<string, Member>
@@ -109,7 +110,7 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
       </header>
 
       {/* hero */}
-      <section className="max-w-6xl mx-auto px-6 pt-16 pb-10 grid lg:grid-cols-[1fr_1.15fr] gap-12 items-center">
+      <section className="max-w-[1400px] mx-auto px-6 pt-16 pb-10 grid lg:grid-cols-[0.75fr_1.45fr] gap-12 items-center">
         <div>
           <div data-hero-kicker className="text-xs uppercase tracking-[0.5em] text-accent">{T('tu equipo que diseña y construye', 'your team that designs and builds')}</div>
           <h1 data-hero-title className="mt-3 text-6xl md:text-7xl leading-[0.95] tracking-tight opacity-0">
@@ -220,7 +221,7 @@ function Demo({ clock }: { clock: ReturnType<typeof useClock> }) {
         </div>
         <button type="button" onClick={() => clock.jump(clock.scene + 1)} className={btn} aria-label={T('Paso siguiente', 'Next step')}><ChevronRight size={15} /></button>
       </div>
-      <div ref={stage} className="relative h-[400px] bg-surface">
+      <div ref={stage} className="relative h-[470px] bg-surface">
         <AnimatePresence mode="wait">
           {clock.key === 'idea' && <SceneIdea key="idea" t={clock.local} />}
           {clock.key === 'prompt' && <ScenePrompt key="prompt" t={clock.local} />}
@@ -322,6 +323,22 @@ function SceneIdea({ t: raw }: { t: number }) {
           </motion.div>
         )}
       </AnimatePresence>
+      <div data-r className="mt-5 grid grid-cols-[1fr_1fr] gap-5">
+        <div>
+          <Label>{T('Modo', 'Mode')}</Label>
+          <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+            {[T('Handoff libre', 'Free handoff'), T('Debate', 'Debate'), T('Mesa redonda', 'Round table')].map((m, i) => <span key={m} className={`rounded-lg border px-2 py-1.5 text-center text-[12px] ${i === 0 ? 'border-accent bg-accent-soft text-accent' : 'border-line bg-surface text-ink-2'}`}>{m}</span>)}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {[[T('Turnos máx.', 'Max turns'), '14', 0.35], [T('Tokens por turno', 'Tokens per turn'), '1800', 0.3]].map(([l, v, w]) => (
+            <div key={String(l)}>
+              <div className="flex justify-between text-[10px] uppercase tracking-widest text-ink-3"><span>{l}</span><span className="font-mono text-ink">{v}</span></div>
+              <div className="mt-2 h-1.5 rounded-full bg-black/5"><div className="relative h-full rounded-full bg-accent" style={{ width: `${Number(w) * 100}%` }}><span className="absolute -right-1.5 -top-[5px] h-4 w-4 rounded-full border-2 border-accent bg-surface" /></div></div>
+            </div>
+          ))}
+        </div>
+      </div>
       <Cursor x={cursor.x} y={cursor.y} click={clickDocs || clickFile || clickOpen} />
     </motion.div>
   )
@@ -347,7 +364,7 @@ function ScenePrompt({ t: raw }: { t: number }) {
         </motion.div>
         <span className="text-[12px] text-ink-3">{T('con', 'with')} Claude · claude-opus-5-5</span>
       </div>
-      <div className="mt-4 grid grid-cols-[1fr_1.1fr] gap-4">
+      <div className="mt-4 grid h-[calc(100%-60px)] grid-cols-[1fr_1.1fr] gap-4">
         <div className="space-y-2 text-[12.5px]">
           {reading && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 text-ink-2"><span className="text-accent">📄</span> {T('Leyendo brief-clima.pdf', 'Reading brief-clima.pdf')} <span className="text-ink-4">· 14 {T('páginas', 'pages')}</span></motion.div>}
           {thinking && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 text-ink-2"><span className="text-accent">💭</span> {T('Pensando qué falta para construir…', 'Thinking what is missing to build…')}</motion.div>}
@@ -378,25 +395,41 @@ function SceneTeam({ t: raw }: { t: number }) {
   const T = useT()
   const on = TEAM.filter((_, i) => t > 500 + i * 650)
   const i = Math.min(5, Math.floor((t - 200) / 650))
-  const cx = 60 + (Math.max(0, i) % 3) * 165 + 40
-  const cy = 80 + Math.floor(Math.max(0, i) / 3) * 112 + 24
+  const cx = 60 + (Math.max(0, i) % 3) * 180 + 60
+  const cy = 70 + Math.floor(Math.max(0, i) / 3) * 190 + 40
   return (
-    <motion.div {...sceneProps}>
-      <Label>{T('Agentes (6/8) · cada rol con su IA, su prompt y sus skills', 'Agents (6/8) · each role with its AI, prompt and skills')}</Label>
-      <div className="mt-3 grid grid-cols-3 gap-2.5">
+    <motion.div {...sceneProps} className="absolute inset-0 flex flex-col p-5">
+      <div className="flex items-center justify-between">
+        <Label>{T('Agentes (6/8) · cada rol con su IA, su prompt y sus skills', 'Agents (6/8) · each role with its AI, prompt and skills')}</Label>
+        <span data-r className="rounded-full border border-line bg-surface px-2.5 py-0.5 text-[11px] text-ink-2">{on.length}/6 {T('listos', 'ready')}</span>
+      </div>
+      <div className="mt-3 grid min-h-0 flex-1 grid-cols-3 grid-rows-2 gap-3">
         {TEAM.map((m) => {
           const picked = on.includes(m)
+          const theme = brandTheme(m.provider)
           return (
-            <motion.div data-r key={m.id} animate={{ scale: picked ? [1, 1.05, 1] : 1 }} className={`rounded-xl border px-3 py-2.5 transition-colors ${picked ? 'bg-surface' : 'border-line bg-surface-2/50'}`} style={{ borderColor: picked ? m.color : undefined }}>
-              <div className="flex items-center gap-2">
-                <ProviderLogo provider={m.provider} size={20} />
-                <span className="text-[13.5px] font-semibold" style={{ color: picked ? m.color : undefined }}>{T(m.name, m.name_en)}</span>
-                <span className={`ml-auto h-4 w-4 rounded-full border text-[10px] flex items-center justify-center ${picked ? 'border-accent bg-accent text-white' : 'border-line'}`}>{picked ? '✓' : ''}</span>
+            <motion.div
+              data-r
+              key={m.id}
+              animate={{ scale: picked ? [1, 1.04, 1] : 1, opacity: picked ? 1 : 0.55 }}
+              transition={{ duration: 0.45 }}
+              className="relative flex min-h-0 flex-col overflow-hidden rounded-2xl border p-3.5 shadow-[0_14px_30px_-18px_rgba(30,38,34,.45)]"
+              style={{ background: picked ? theme.bg : '#F6F7F6', borderColor: picked ? m.color : '#DCE2DE' }}
+            >
+              {picked && <LogoWatermark provider={m.provider} opacity={0.1} />}
+              <div className="relative flex items-center gap-2">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-surface shadow-sm" style={{ border: `1.5px solid ${picked ? m.color : '#DCE2DE'}` }}><ProviderLogo provider={m.provider} size={20} /></span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[14px] font-semibold leading-tight" style={{ color: picked ? m.color : undefined }}>{T(m.name, m.name_en)}</div>
+                  <div className="truncate text-[10px] uppercase tracking-widest text-ink-3">{T(m.role, m.role_en)}</div>
+                </div>
+                <span className={`flex h-6 w-6 items-center justify-center rounded-full border-[1.5px] text-[12px] font-bold transition-all ${picked ? 'border-accent bg-accent text-white shadow-[0_0_0_4px_rgba(47,107,93,.18)]' : 'border-line bg-surface text-transparent'}`}>✓</span>
               </div>
-              <div className="mt-1 font-mono text-[10px] text-ink-3">{m.model}</div>
-              <div className="mt-1 truncate text-[11.5px] text-ink-2">{picked ? T(m.persona, m.persona_en) : '—'}</div>
-              <div className="mt-1.5 flex gap-1 text-[9.5px]">
-                {picked && [T('skills', 'skills'), T('prompt', 'prompt')].map((s) => <span key={s} className="rounded bg-accent-soft px-1.5 py-[1px] text-accent">{s} ✓</span>)}
+              <div className="relative mt-2 inline-flex w-fit items-center gap-1 rounded-md bg-surface/80 px-1.5 py-0.5 font-mono text-[10px] text-ink-2 ring-1 ring-black/5">{m.model}</div>
+              <div className="relative mt-2 line-clamp-2 text-[12px] italic leading-snug text-ink-2">{picked ? `“${T(m.persona, m.persona_en)}”` : '—'}</div>
+              <div className="relative mt-auto flex flex-wrap gap-1 pt-2">
+                {picked && m.skills.map((sk) => <span key={sk} className="rounded-md border border-black/5 bg-surface/90 px-1.5 py-[2px] text-[10px] text-ink-2">🧩 {sk}</span>)}
+                {picked && <span className="rounded-md bg-accent-soft px-1.5 py-[2px] text-[10px] font-semibold text-accent">prompt ✓</span>}
               </div>
             </motion.div>
           )
@@ -415,34 +448,53 @@ function SceneRefs({ t: raw }: { t: number }) {
   const research = t > 2700
   const deep = t > 3600
   const launch = t > 4900
+  const notes: [string, string][][] = [
+    [[T('emular: pronóstico por horas arriba', 'emulate: hourly forecast on top'), T('evitar: 3 pantallas para una ciudad', 'avoid: 3 screens for one city')]],
+    [[T('emular: mapa como segunda vista', 'emulate: map as second view'), T('evitar: densidad de datos', 'avoid: data density')]],
+    [[T('emular: alertas con color y fuente', 'emulate: alerts with colour and source'), T('evitar: publicidad entre datos', 'avoid: ads between data')]],
+  ]
   return (
-    <motion.div {...sceneProps}>
+    <motion.div {...sceneProps} className="absolute inset-0 flex flex-col p-6">
       <Label>{T('Apps de referencia', 'Reference apps')}</Label>
       <div data-r className="mt-1.5 flex min-h-[44px] flex-wrap items-center gap-1.5 rounded-xl border border-accent bg-surface px-3 py-2">
         {chips.map((c) => <motion.span key={c} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="rounded-full bg-accent-soft px-2.5 py-0.5 text-[12.5px] text-accent">{c} ×</motion.span>)}
         {chips.length < REFS.length && <span className="text-[13px] text-ink-4">{t > 300 ? <span className="caret" /> : T('ej. apple.com/weather, windy.com', 'e.g. apple.com/weather, windy.com')}</span>}
       </div>
-      <div className="mt-4 space-y-2.5">
-        <Check on={research}>{T('Investigar apps de referencia', 'Research reference apps')} <span className="text-ink-3">{T('(el equipo entra, saca capturas y anota qué emular y qué evitar)', '(the team visits them, takes screenshots and notes what to emulate and avoid)')}</span></Check>
+      <div className="mt-3 grid grid-cols-[1.1fr_1fr] gap-x-6 gap-y-2">
+        <Check on={research}>{T('Investigar apps de referencia', 'Research reference apps')} <span className="text-ink-3">{T('(capturas y notas: qué emular, qué evitar)', '(screenshots and notes: what to emulate, what to avoid)')}</span></Check>
+        <Check on={t > 1000}>{T('Diseño UX/UI primero', 'UX/UI design first')} <span className="text-ink-3">{T('(aprobás el mockup)', '(you approve the mockup)')}</span></Check>
         <Check on={deep}>{T('Análisis profundo e ingeniería inversa', 'Deep analysis and reverse engineering')} <span className="rounded-full border border-gold/50 bg-gold/10 px-2 py-[1px] text-[10.5px] font-semibold text-gold">{T('pago por uso', 'pay per use')}</span></Check>
-        <Check on={t > 1000}>{T('Diseño UX/UI primero', 'UX/UI design first')} <span className="text-ink-3">{T('(aprobás el mockup antes de que exista código)', '(you approve the mockup before any code exists)')}</span></Check>
+        <Check on={t > 1400}>{T('Revisión pre-producción', 'Pre-production review')} <span className="text-ink-3">{T('(hasta 3 rondas)', '(up to 3 rounds)')}</span></Check>
       </div>
-      <AnimatePresence>
-        {research && (
-          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-4 flex gap-2">
-            {REFS.map((r, i) => (
-              <div key={r} className="w-[118px] overflow-hidden rounded-lg border border-line bg-surface-2">
-                <div className="h-[44px]" style={{ background: ['linear-gradient(135deg,#BFD9F2,#E8F1FA)', 'linear-gradient(135deg,#1E3A5F,#4C7FB5)', 'linear-gradient(135deg,#F4D6A3,#F9ECD6)'][i] }} />
-                <div className="truncate px-2 py-1 font-mono text-[9.5px] text-ink-3">{r} {deep ? '· REA ✓' : '· 📷'}</div>
+      {/* the benchmark: one card per reference, screenshot on top, what the team wrote underneath */}
+      <div className="mt-3 grid min-h-0 flex-1 grid-cols-3 gap-3">
+        {REFS.map((r, i) => {
+          const on = research && t > 2900 + i * 450
+          return (
+            <motion.div key={r} data-r animate={{ opacity: on ? 1 : 0.35, y: on ? 0 : 6 }} className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-[0_14px_30px_-18px_rgba(30,38,34,.4)]">
+              <div className="relative h-[72px] shrink-0" style={{ background: ['linear-gradient(135deg,#BFD9F2,#E8F1FA)', 'linear-gradient(135deg,#1E3A5F,#4C7FB5)', 'linear-gradient(135deg,#F4D6A3,#F9ECD6)'][i] }}>
+                <div className="absolute left-2 top-2 h-2 w-16 rounded bg-white/70" /><div className="absolute left-2 top-6 h-5 w-10 rounded bg-white/80" /><div className="absolute right-2 bottom-2 flex gap-1">{[0, 1, 2, 3].map((k) => <span key={k} className="h-6 w-3 rounded-sm bg-white/60" style={{ height: 10 + k * 5 }} />)}</div>
+                {on && <span className="absolute right-2 top-2 rounded bg-black/40 px-1.5 py-[1px] text-[9px] font-semibold text-white">📷 {deep ? 'REA ✓' : T('capturas', 'shots')}</span>}
               </div>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <motion.div animate={{ scale: launch ? 0.96 : 1 }} className="absolute right-6 bottom-6 flex items-center gap-2 rounded-2xl px-5 py-2.5 text-[14px] font-semibold text-white shadow-md" style={{ background: 'linear-gradient(90deg,#C0603F,#17896A,#3D5CC4,#AD7D1A)' }}>
-        ▶ {T('Iniciar experimento', 'Start experiment')}
-      </motion.div>
-      <Cursor x={launch ? 430 : deep ? 40 : research ? 40 : 200} y={launch ? 345 : deep ? 160 : research ? 128 : 60} click={launch || (t > 2500 && t < 2700) || (t > 3400 && t < 3600)} />
+              <div className="min-h-0 flex-1 p-2">
+                <div className="truncate font-mono text-[10px] text-ink-3">{r}</div>
+                {on && notes[i].map(([a, b]) => (
+                  <div key={a} className="mt-1 space-y-0.5 text-[10.5px] leading-snug">
+                    <div className="flex gap-1 text-ink-2"><span className="text-ok">✓</span><span className="truncate">{a}</span></div>
+                    <div className="flex gap-1 text-ink-2"><span className="text-danger">✕</span><span className="truncate">{b}</span></div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )
+        })}
+      </div>
+      <div className="mt-3 flex items-center justify-end">
+        <motion.div animate={{ scale: launch ? 0.96 : 1 }} className="flex items-center gap-2 rounded-2xl px-5 py-2.5 text-[14px] font-semibold text-white shadow-md" style={{ background: 'linear-gradient(90deg,#C0603F,#17896A,#3D5CC4,#AD7D1A)' }}>
+          ▶ {T('Iniciar experimento', 'Start experiment')}
+        </motion.div>
+      </div>
+      <Cursor x={launch ? 560 : deep ? 40 : research ? 40 : 200} y={launch ? 420 : deep ? 150 : research ? 122 : 60} click={launch || (t > 2500 && t < 2700) || (t > 3400 && t < 3600)} />
     </motion.div>
   )
 }
