@@ -274,18 +274,25 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
         </div>
       )}
       <div className="w-full px-8 py-10 2xl:px-12">
-        <div className="flex justify-end gap-2 -mb-4">
-          <LangSwitch />
-          <button onClick={onAudit} className="flex items-center gap-1.5 rounded-full bg-accent text-white px-3 py-1 text-sm hover:brightness-110 transition">
-            <Gavel size={15} /> {T('Auditar un proyecto', 'Audit a project')}
-          </button>
-          <button onClick={onSettings} className="flex items-center gap-1.5 rounded-full bg-surface border border-line px-3 py-1 text-sm text-ink-2 hover:text-accent hover:border-accent/50 transition">
-            <Settings2 size={15} /> {T('Modelos y API keys', 'Models & API keys')}
-          </button>
-          <div className="flex items-center gap-2 rounded-full bg-surface border border-line pl-1 pr-3 py-1 text-sm">
-            <span className="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center text-xs font-semibold uppercase">{user.name.slice(0, 1)}</span>
-            <span className="text-ink-2">{user.name}</span>
-            <button onClick={onLogout} className="ml-1 text-ink-3 hover:text-danger" title={T('Cerrar sesión', 'Log out')}><LogOut size={14} /></button>
+        {/* header: brand on the left, actions on the right, all the same height */}
+        <div className="-mb-2 flex items-center gap-3">
+          <span className="flex items-center gap-2.5">
+            <img src="/icon.svg" alt="" aria-hidden className="h-9 w-9 rounded-xl shadow-sm" draggable={false} />
+            <span className="serif text-xl">Tably <em className="text-accent">Team</em></span>
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <LangSwitch />
+            <button onClick={onAudit} title={T('Subí un proyecto existente y el equipo lo revisa desde cada rol', 'Upload an existing project and the team reviews it from every role')} className="flex h-10 items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-md transition hover:-translate-y-0.5 hover:brightness-110 hover:shadow-lg">
+              <Gavel size={16} /> {T('Auditar un proyecto', 'Audit a project')}
+            </button>
+            <button onClick={onSettings} title={T('Conectá tus IAs, elegí modelos por defecto, deploy y trazas', 'Connect your AIs, pick default models, deploy and tracing')} className="flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-medium text-ink-2 shadow-sm transition hover:-translate-y-0.5 hover:border-accent hover:text-accent hover:shadow-md">
+              <Settings2 size={16} /> {T('Modelos y API keys', 'Models & API keys')}
+            </button>
+            <div className="flex h-10 items-center gap-2 rounded-full border border-line bg-surface py-1 pl-1 pr-1.5 text-sm shadow-sm">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-[13px] font-semibold uppercase text-white">{user.name.slice(0, 1)}</span>
+              <span className="max-w-[140px] truncate font-medium text-ink">{user.name}</span>
+              <button onClick={onLogout} className="ml-1 flex h-8 w-8 items-center justify-center rounded-full text-ink-3 transition hover:bg-danger/10 hover:text-danger" title={T('Cerrar sesión', 'Log out')} aria-label={T('Cerrar sesión', 'Log out')}><LogOut size={15} /></button>
+            </div>
           </div>
         </div>
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
@@ -808,9 +815,9 @@ function ProviderConnect({ provider: p, onClose, onConnected }: { provider: Prov
 function LangSwitch() {
   const lang = useLang()
   return (
-    <div className="flex items-center rounded-full border border-line bg-surface p-0.5 text-[11px] font-semibold" title="Idioma / Language">
+    <div className="flex h-10 items-center rounded-full border border-line bg-surface p-1 text-[12px] font-semibold shadow-sm" title="Idioma / Language">
       {(['es', 'en'] as const).map((l) => (
-        <button key={l} onClick={() => setLang(l)} className={`rounded-full px-2 py-0.5 uppercase ${lang === l ? 'bg-accent text-white' : 'text-ink-3 hover:text-ink'}`}>{l}</button>
+        <button key={l} onClick={() => setLang(l)} className={`h-8 rounded-full px-3 uppercase transition ${lang === l ? 'bg-accent text-white shadow-sm' : 'text-ink-3 hover:bg-surface-2 hover:text-ink'}`}>{l}</button>
       ))}
     </div>
   )
