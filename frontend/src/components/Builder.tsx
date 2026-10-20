@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, CheckCircle2, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2 } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2 } from 'lucide-react'
 import { marked } from 'marked'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { reconnectBuild, useBuild, type Activity, type ChatItem, type Todo } from '../buildStore'
@@ -163,7 +163,15 @@ export default function Builder({ onBack }: { onBack: () => void }) {
     setWrapW(el.clientWidth)
     return () => ro.disconnect()
   }, [])
-  const paneW = wrapW ? Math.max(560, Math.min(wrapW - 56 - 400, Math.round((wrapW - 56) * 0.6))) : 760
+  // expanded: the pane takes the whole row (the chat folds away) so the editor can be worked in full width
+  const [paneFull, setPaneFull] = useState(false)
+  useEffect(() => {
+    if (!paneFull) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPaneFull(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [paneFull])
+  const paneW = wrapW ? (paneFull ? wrapW - 56 : Math.max(560, Math.min(wrapW - 56 - 400, Math.round((wrapW - 56) * 0.6)))) : 760
 
   return (
     <div className="h-full flex flex-col bg-paper">
@@ -249,7 +257,7 @@ export default function Builder({ onBack }: { onBack: () => void }) {
 
       <div ref={wrapRef} className="flex min-h-0 flex-1">
         {/* chat */}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col border-r border-line">
+        <div className={`flex min-h-0 min-w-0 flex-1 flex-col border-r border-line transition-opacity duration-300 ${paneFull && b.paneOpen ? 'pointer-events-none opacity-0' : ''}`}>
           <div ref={chatRef} className="flex-1 overflow-y-auto scroll-thin px-5 py-5 space-y-4">
             <AnimatePresence initial={false}>
               {b.chat.map((c, i) => (c.role === 'review' ? <ReviewRoundCard key={i} round={{ round: c.round!, approved: !!c.approved, results: c.results ?? [], mode: c.mode, ts: c.ts }} team={b.team} /> : <Bubble key={i} c={c} color={color} provider={b.provider} onOpen={(p) => useBuild.getState().set({ selected: p })} />))}
@@ -438,7 +446,8 @@ export default function Builder({ onBack }: { onBack: () => void }) {
                     <button onClick={openPreviewTab} className={PBTN}><ExternalLink size={12} /> {T('abrir en pestaña', 'open in tab')}</button>
                   </div>
                 )}
-                <button onClick={() => useBuild.getState().set({ paneOpen: false })} title={T('Cerrar el panel', 'Close the panel')} className={`ml-1 shrink-0 rounded-md p-1 transition ${b.pane === 'code' && codeDark ? 'text-[#B9C4BE] hover:bg-white/10 hover:text-white' : 'text-ink-3 hover:bg-surface-2 hover:text-ink'}`}><PanelRightClose size={14} /></button>
+                <button onClick={() => setPaneFull((v) => !v)} title={paneFull ? T('Volver al panel normal (Esc)', 'Back to the normal panel (Esc)') : T('Expandir a toda la pantalla', 'Expand to the full screen')} className={`ml-1 shrink-0 rounded-md p-1 transition ${paneFull ? 'bg-accent text-white hover:brightness-110' : b.pane === 'code' && codeDark ? 'text-[#B9C4BE] hover:bg-white/10 hover:text-white' : 'text-ink-3 hover:bg-surface-2 hover:text-ink'}`}>{paneFull ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button>
+                <button onClick={() => { setPaneFull(false); useBuild.getState().set({ paneOpen: false }) }} title={T('Cerrar el panel', 'Close the panel')} className={`shrink-0 rounded-md p-1 transition ${b.pane === 'code' && codeDark ? 'text-[#B9C4BE] hover:bg-white/10 hover:text-white' : 'text-ink-3 hover:bg-surface-2 hover:text-ink'}`}><PanelRightClose size={14} /></button>
               </div>
               <AnimatePresence mode="wait" initial={false}>
                 <motion.div key={b.pane} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -6 }} transition={{ duration: 0.18, ease: 'easeOut' }} className="flex min-h-0 flex-1 flex-col">
