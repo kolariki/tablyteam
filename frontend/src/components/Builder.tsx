@@ -19,6 +19,23 @@ import CouncilLaunch from './CouncilLaunch'
 import FdeModal from './FdeModal'
 import { useArena } from '../store'
 
+/** Header buttons share the home page's language: pills that lift on hover. */
+const HBTN = 'flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-sm text-ink-2 shadow-sm transition hover:-translate-y-0.5 hover:border-accent hover:text-accent disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:border-line disabled:hover:text-ink-2'
+const HBTN_PRIMARY = 'flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:brightness-110 disabled:opacity-40 disabled:hover:translate-y-0'
+const PBTN = 'flex items-center gap-1 rounded-md px-2 py-1 text-ink-3 transition hover:bg-surface-2 hover:text-ink disabled:opacity-40'
+
+type BuildState = ReturnType<typeof useBuild.getState>
+/** The panes the rail can open, in order, with when each one is still empty. */
+const PANES: { id: BuildState['pane']; icon: typeof FileCode2; es: string; en: string; off: (b: BuildState) => boolean }[] = [
+  { id: 'code', icon: FileCode2, es: 'Código', en: 'Code', off: () => false },
+  { id: 'design', icon: Palette, es: 'Diseño', en: 'Design', off: (b) => !b.designHtml },
+  { id: 'preview', icon: Eye, es: 'Vista previa', en: 'Preview', off: (b) => !b.previewHtml },
+  { id: 'app', icon: MonitorPlay, es: 'App real', en: 'Real app', off: (b) => Object.keys(b.files).length === 0 },
+  { id: 'versions', icon: GitBranch, es: 'Versiones', en: 'Versions', off: (b) => b.versions.length === 0 },
+  { id: 'deploy', icon: KeyRound, es: 'Servicios y deploy', en: 'Services & deploy', off: () => false },
+  { id: 'report', icon: FileText, es: 'Informe', en: 'Report', off: (b) => !b.auditReport },
+]
+
 const md = (s: string) => DOMPurify.sanitize(marked.parse(s, { async: false }) as string)
 
 /** Live-parse the streaming turn: the <say> text so far and which files are closed/open. */
@@ -132,22 +149,38 @@ export default function Builder({ onBack }: { onBack: () => void }) {
   const shownFile = b.liveFile && b.selected === b.liveFile.path ? b.liveFile.content : b.files[b.selected ?? '']?.content
   const tree = useMemo(() => buildTree(Object.keys(b.files).concat(b.liveFile ? [b.liveFile.path] : [])), [b.files, b.liveFile?.path])
   const stageCount = b.stages.length
+  // the side panel takes ~60% of the row (at least 640px), leaving the chat its minimum; measured so the spring can animate pixels
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [wrapW, setWrapW] = useState(0)
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setWrapW(el.clientWidth))
+    ro.observe(el)
+    setWrapW(el.clientWidth)
+    return () => ro.disconnect()
+  }, [])
+  const paneW = wrapW ? Math.max(560, Math.min(wrapW - 56 - 400, Math.round((wrapW - 56) * 0.6))) : 760
 
   return (
     <div className="h-full flex flex-col bg-paper">
       {/* top bar */}
-      <div className="flex items-center gap-3 px-4 h-14 border-b border-line bg-surface shrink-0">
-        <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-ink-3 hover:text-ink"><ArrowLeft size={15} /> Arena</button>
-        <span className="w-px h-6 bg-line" />
-        <span className="w-8 h-8 rounded-full bg-surface border flex items-center justify-center" style={{ borderColor: `${color}66` }}><ProviderLogo provider={b.provider} size={18} /></span>
+      <div className="flex h-16 shrink-0 items-center gap-3 border-b border-line bg-surface/90 px-4 backdrop-blur">
+        <button onClick={onBack} className="flex shrink-0 items-center gap-2.5 rounded-lg transition hover:opacity-80" title={T('Volver al inicio', 'Back to the home')}>
+          <img src="/icon.svg" alt="" aria-hidden className="h-8 w-8 rounded-lg shadow-sm" draggable={false} />
+          <span className="serif text-[17px] leading-none">Tably <em className="text-accent">Team</em></span>
+        </button>
+        <button onClick={onBack} className={`${HBTN} px-3`}><ArrowLeft size={14} /> {T('Volver', 'Back')}</button>
+        <span className="mx-1 h-7 w-px bg-line" />
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface shadow-sm" style={{ border: `1.5px solid ${color}` }}><ProviderLogo provider={b.provider} size={20} /></span>
         <div className="min-w-0">
-          <div className="serif text-lg leading-tight truncate">{b.title}</div>
-          <div className="font-mono text-[11px] text-ink-3 flex items-center gap-2">
+          <div className="serif truncate text-[17px] leading-tight">{b.title}</div>
+          <div className="flex items-center gap-2 font-mono text-[11px] text-ink-3">
             <span>{b.model}</span>
             {b.engineSession && b.workdir && (
               <button
                 onClick={() => { navigator.clipboard?.writeText(`cd "${b.workdir}" && claude --resume ${b.engineSession}`); toast.ok(tr('Comando copiado', 'Command copied'), tr('Pegalo en tu terminal para abrir esta misma sesión en tu Claude Code.', 'Paste it in your terminal to open this same session in your Claude Code.')) }}
-                className="flex items-center gap-1 rounded-md border border-line bg-surface-2 px-1.5 py-0.5 text-[10.5px] text-ink-2 hover:text-ink"
+                className="flex items-center gap-1 rounded-full border border-line bg-surface px-2 py-0.5 text-[10.5px] text-ink-2 shadow-sm transition hover:border-accent hover:text-accent"
                 title={`${T('Sesión de Claude Code', 'Claude Code session')} ${b.engineSession}\n${T('En tu terminal', 'In your terminal')}: cd "${b.workdir}" && claude --resume ${b.engineSession}`}
               >
                 <TerminalSquare size={11} /> {T('abrir en mi Claude Code', 'open in my Claude Code')} <Copy size={10} />
@@ -155,30 +188,30 @@ export default function Builder({ onBack }: { onBack: () => void }) {
             )}
           </div>
         </div>
-        <div className="ml-4 flex items-center gap-2">
+        <div className="ml-3 flex items-center gap-2">
           {reviewing ? (
-            <span className="flex items-center gap-1.5 rounded-full bg-gold/10 border border-gold/40 px-2.5 py-0.5 text-[11px] font-bold text-gold"><span className="w-2 h-2 rounded-full bg-gold animate-pulse" /> {b.reviewMode === 'audit' ? T('AUDITANDO', 'AUDITING') : `${T('CONSEJO · ronda', 'COUNCIL · round')} ${b.reviewRound ?? b.reviews.length + 1}`}</span>
+            <span className="flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-[11px] font-bold text-gold"><span className="h-2 w-2 rounded-full bg-gold animate-pulse" /> {b.reviewMode === 'audit' ? T('AUDITANDO', 'AUDITING') : `${T('CONSEJO · ronda', 'COUNCIL · round')} ${b.reviewRound ?? b.reviews.length + 1}`}</span>
           ) : b.status === 'audited' ? (
-            <span className="rounded-full bg-accent text-white px-2.5 py-0.5 text-[11px] font-bold">{T('AUDITADO · informe listo', 'AUDITED · report ready')}</span>
+            <span className="rounded-full bg-accent px-2.5 py-1 text-[11px] font-bold text-white">{T('AUDITADO · informe listo', 'AUDITED · report ready')}</span>
           ) : running ? (
-            <span className="flex items-center gap-1.5 rounded-full bg-accent-soft border border-accent/30 px-2.5 py-0.5 text-[11px] font-bold text-accent"><span className="w-2 h-2 rounded-full bg-accent animate-pulse" /> {b.reviews.length ? T('APLICANDO CAMBIOS', 'APPLYING CHANGES') : T('CONSTRUYENDO', 'BUILDING')}{b.liveTurn ? ` · ${T('turno', 'turn')} ${b.liveTurn}` : ''}</span>
+            <span className="flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent-soft px-2.5 py-1 text-[11px] font-bold text-accent"><span className="h-2 w-2 rounded-full bg-accent animate-pulse" /> {b.reviews.length ? T('APLICANDO CAMBIOS', 'APPLYING CHANGES') : T('CONSTRUYENDO', 'BUILDING')}{b.liveTurn ? ` · ${T('turno', 'turn')} ${b.liveTurn}` : ''}</span>
           ) : b.status === 'approved' ? (
-            <span className="rounded-full bg-ok text-white px-2.5 py-0.5 text-[11px] font-bold">{T('✓ APROBADO POR EL CONSEJO', '✓ APPROVED BY THE COUNCIL')}</span>
+            <span className="flex items-center gap-1.5 rounded-full bg-ok px-2.5 py-1 text-[11px] font-bold text-white"><CheckCircle2 size={12} /> {T('APROBADO POR EL CONSEJO', 'APPROVED BY THE COUNCIL')}</span>
           ) : (
-            <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${b.status === 'completed' ? 'bg-ok/10 border-ok/30 text-ok' : 'bg-surface-2 border-line text-ink-3'}`}>{b.status === 'completed' ? (b.reviews.length ? T('CAMBIOS LISTOS · pendiente de consejo', 'CHANGES READY · pending council') : T('✓ LISTO', '✓ DONE')) : b.status.toUpperCase()}</span>
+            <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${b.status === 'completed' ? 'border-ok/30 bg-ok/10 text-ok' : 'border-line bg-surface-2 text-ink-3'}`}>{b.status === 'completed' ? (b.reviews.length ? T('CAMBIOS LISTOS · pendiente de consejo', 'CHANGES READY · pending council') : <><span className="h-2 w-2 rounded-full bg-ok shadow-[0_0_0_3px_rgba(23,137,106,.18)]" /> {T('LISTO', 'DONE')}</>) : b.status.toUpperCase()}</span>
           )}
           {b.versions.length > 0 && <ReadinessBadge versions={b.versions} />}
           {b.reviews.length > 0 && !reviewing && <span className="text-[11px] text-ink-3">{b.reviews.length} {b.reviews.length === 1 ? T('ronda', 'round') : T('rondas', 'rounds')} {T('de revisión', 'of review')}</span>}
           {stageCount > 0 && <span className="text-[11px] text-ink-3">{stageCount} {stageCount === 1 ? T('etapa', 'stage') : T('etapas', 'stages')}</span>}
-          <span className="text-[11px] font-mono text-ink-3">{Object.keys(b.files).length} {T('archivos', 'files')} · ${b.cost.toFixed(3)}</span>
+          <span className="rounded-full border border-line bg-surface px-2.5 py-1 font-mono text-[11px] text-ink-3">{Object.keys(b.files).length} {T('archivos', 'files')} · ${b.cost.toFixed(3)}</span>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <button onClick={toggleRecording} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm ${b.recording ? 'border-danger/60 bg-danger/10 text-danger' : 'border-line bg-surface hover:bg-surface-2'}`} title={T('Graba esta pantalla (chat + código + vista previa) y descarga el video', 'Records this screen (chat + code + preview) and downloads the video')}>
+          <button onClick={toggleRecording} className={b.recording ? `${HBTN} border-danger/60 bg-danger/10 text-danger hover:border-danger hover:text-danger` : HBTN} title={T('Graba esta pantalla (chat + código + vista previa) y descarga el video', 'Records this screen (chat + code + preview) and downloads the video')}>
             <Circle size={12} className={b.recording ? 'fill-danger animate-pulse' : ''} /> {b.recording ? T('Guardar video', 'Save video') : T('Grabar', 'Record')}
           </button>
-          {running && b.id && <button onClick={() => api.buildStop(b.id!)} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface hover:bg-surface-2 px-3 py-1.5 text-sm"><Square size={14} /> {T('Detener', 'Stop')}</button>}
-          <button onClick={downloadZip} disabled={!Object.keys(b.files).length} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface hover:bg-surface-2 px-3 py-1.5 text-sm disabled:opacity-40"><Download size={14} /> {T('Descargar .zip', 'Download .zip')}</button>
-          <button onClick={() => setRunOpen(true)} disabled={!Object.keys(b.files).length || running} className="flex items-center gap-1.5 rounded-lg bg-accent text-white px-3.5 py-1.5 text-sm font-medium hover:brightness-110 disabled:opacity-40" title={T('Levanta la app en esta máquina y la muestra acá', 'Starts the app on this machine and shows it here')}><MonitorPlay size={14} /> {T('Correr la app', 'Run the app')}{b.appRun.status === 'running' ? <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> : null}</button>
+          {running && b.id && <button onClick={() => api.buildStop(b.id!)} className={HBTN}><Square size={14} /> {T('Detener', 'Stop')}</button>}
+          <button onClick={downloadZip} disabled={!Object.keys(b.files).length} className={HBTN}><Download size={14} /> {T('Descargar .zip', 'Download .zip')}</button>
+          <button onClick={() => setRunOpen(true)} disabled={!Object.keys(b.files).length || running} className={HBTN_PRIMARY} title={T('Levanta la app en esta máquina y la muestra acá', 'Starts the app on this machine and shows it here')}><MonitorPlay size={14} /> {T('Correr la app', 'Run the app')}{b.appRun.status === 'running' ? <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> : null}</button>
         </div>
       </div>
       {runOpen && <RunModal onClose={() => setRunOpen(false)} onDownload={downloadZip} />}
@@ -196,9 +229,9 @@ export default function Builder({ onBack }: { onBack: () => void }) {
         }} />
       )}
 
-      <div className={`flex-1 min-h-0 grid ${b.paneOpen ? 'grid-cols-[minmax(380px,1fr)_240px_minmax(420px,1.3fr)]' : 'grid-cols-[1fr_56px]'}`}>
+      <div ref={wrapRef} className="flex min-h-0 flex-1">
         {/* chat */}
-        <div className="flex flex-col min-h-0 border-r border-line">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col border-r border-line">
           <div ref={chatRef} className="flex-1 overflow-y-auto scroll-thin px-5 py-5 space-y-4">
             <AnimatePresence initial={false}>
               {b.chat.map((c, i) => (c.role === 'review' ? <ReviewRoundCard key={i} round={{ round: c.round!, approved: !!c.approved, results: c.results ?? [], mode: c.mode, ts: c.ts }} team={b.team} /> : <Bubble key={i} c={c} color={color} provider={b.provider} onOpen={(p) => useBuild.getState().set({ selected: p })} />))}
@@ -349,104 +382,110 @@ export default function Builder({ onBack }: { onBack: () => void }) {
           </div>
         </div>
 
-        {/* collapsed: a rail of tabs; click one to open the drawer */}
-        {!b.paneOpen && (
-          <div className="min-h-0 flex flex-col items-center gap-1 py-2 border-l border-line bg-surface">
-            {([
-              ['code', FileCode2, T('Código', 'Code'), false], ['design', Palette, T('Diseño', 'Design'), !b.designHtml], ['preview', Eye, T('Vista previa', 'Preview'), !b.previewHtml], ['app', MonitorPlay, T('App real', 'Real app'), Object.keys(b.files).length === 0],
-              ['versions', GitBranch, T('Versiones', 'Versions'), b.versions.length === 0], ['deploy', KeyRound, T('Servicios y deploy', 'Services & deploy'), false], ['report', FileText, T('Informe', 'Report'), !b.auditReport],
-            ] as const).map(([id, Icon, label, disabled]) => (
-              (id !== 'report' || b.auditReport || b.mode === 'audit') ? (
-                <button key={id} disabled={disabled} onClick={() => useBuild.getState().set({ paneOpen: true, pane: id })} title={label} className={`w-11 h-11 rounded-xl flex flex-col items-center justify-center gap-0.5 text-ink-3 hover:bg-surface-2 hover:text-ink disabled:opacity-30 ${b.pane === id ? 'text-accent' : ''}`}>
-                  <Icon size={17} />
-                  <span className="text-[8px] leading-none">{label.split(' ')[0]}</span>
-                </button>
-              ) : null
-            ))}
-            <button onClick={() => useBuild.getState().set({ paneOpen: true })} title={T('Abrir el panel', 'Open the panel')} className="mt-auto w-11 h-11 rounded-xl flex items-center justify-center text-ink-3 hover:bg-surface-2 hover:text-ink"><ChevronLeft size={16} /></button>
-          </div>
-        )}
-
-        {/* file tree */}
-        {b.paneOpen && (
-        <div className="min-h-0 overflow-y-auto scroll-thin border-r border-line bg-surface">
-          <div className="px-3 py-2 text-[11px] uppercase tracking-widest text-ink-3 border-b border-line sticky top-0 bg-surface">{T('Archivos', 'Files')}</div>
-          <div className="py-1 text-[13px] font-mono">
-            {tree.length === 0 && <div className="px-3 py-3 text-ink-4 text-xs font-sans">{T('Todavía no hay archivos.', 'No files yet.')}</div>}
-            {tree.map((n) => <TreeNode key={n.path} node={n} depth={0} selected={b.selected} live={b.liveFile?.path ?? null} onSelect={(p) => useBuild.getState().set({ selected: p })} />)}
-          </div>
-        </div>
-
-        )}
-
-        {/* code / preview drawer */}
-        {b.paneOpen && (
-        <div className={`min-h-0 flex flex-col ${b.pane !== 'code' ? 'bg-paper' : 'bg-[#1E2622]'}`}>
-          <div className={`flex items-center gap-1 px-2 h-9 text-[12px] border-b shrink-0 whitespace-nowrap overflow-x-auto ${b.pane !== 'code' ? 'border-line bg-surface' : 'border-white/10 text-[#B9C4BE]'}`}>
-            <button onClick={() => useBuild.getState().set({ paneOpen: true, pane: 'code' })} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 ${b.pane === 'code' ? 'bg-white/10 text-white' : b.pane === 'preview' ? 'text-ink-3 hover:text-ink' : 'text-[#B9C4BE] hover:text-white'}`}><FileCode2 size={13} /> {T('Código', 'Code')}</button>
-            <button onClick={() => useBuild.getState().set({ paneOpen: true, pane: 'design' })} disabled={!b.designHtml} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 disabled:opacity-40 ${b.pane === 'design' ? 'bg-accent-soft text-accent' : b.pane !== 'code' ? 'text-ink-3 hover:text-ink' : 'text-[#B9C4BE] hover:text-white'}`}><Palette size={13} /> {T('Diseño', 'Design')}</button>
-            <button onClick={() => useBuild.getState().set({ paneOpen: true, pane: 'preview' })} disabled={!b.previewHtml} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 disabled:opacity-40 ${b.pane === 'preview' ? 'bg-accent-soft text-accent' : b.pane === 'report' ? 'text-ink-3 hover:text-ink' : 'text-[#B9C4BE] hover:text-white'}`}><Eye size={13} /> {T('Vista previa', 'Preview')}{b.previewHtml ? '' : b.mode === 'audit' ? '' : T(' (al terminar)', ' (when done)')}</button>
-            <button onClick={() => useBuild.getState().set({ paneOpen: true, pane: 'app' })} disabled={Object.keys(b.files).length === 0} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 disabled:opacity-40 ${b.pane === 'app' ? 'bg-accent-soft text-accent' : b.pane !== 'code' ? 'text-ink-3 hover:text-ink' : 'text-[#B9C4BE] hover:text-white'}`}><MonitorPlay size={13} /> {T('App real', 'Real app')}{b.appRun.status === 'running' ? <span className="w-1.5 h-1.5 rounded-full bg-ok animate-pulse" /> : null}</button>
-            <button onClick={() => useBuild.getState().set({ paneOpen: true, pane: 'versions' })} disabled={b.versions.length === 0} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 disabled:opacity-40 ${b.pane === 'versions' ? 'bg-accent-soft text-accent' : b.pane !== 'code' ? 'text-ink-3 hover:text-ink' : 'text-[#B9C4BE] hover:text-white'}`}><GitBranch size={13} /> {T('Versiones', 'Versions')}{b.versions.length ? ` (${b.versions.length})` : ''}</button>
-            <button onClick={() => useBuild.getState().set({ paneOpen: true, pane: 'deploy' })} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 ${b.pane === 'deploy' ? 'bg-accent-soft text-accent' : b.pane !== 'code' ? 'text-ink-3 hover:text-ink' : 'text-[#B9C4BE] hover:text-white'}`}><KeyRound size={13} /> {T('Servicios y deploy', 'Services & deploy')}</button>
-            {(b.auditReport || b.mode === 'audit') && (
-              <button onClick={() => useBuild.getState().set({ paneOpen: true, pane: 'report' })} disabled={!b.auditReport} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 disabled:opacity-40 ${b.pane === 'report' ? 'bg-accent-soft text-accent' : b.pane === 'preview' ? 'text-ink-3 hover:text-ink' : 'text-[#B9C4BE] hover:text-white'}`}><FileText size={13} /> {T('Informe', 'Report')}</button>
-            )}
-            {b.pane === 'code' ? (
-              <>
-                <span className="ml-3 font-mono truncate">{b.selected ?? '—'}</span>
-                {b.liveFile && b.selected === b.liveFile.path && <span className="ml-2 text-[10px] font-bold text-[#8FD3B0] animate-pulse">{T('● escribiendo', '● writing')}</span>}
-                {b.selected && b.files[b.selected] && <span className="ml-auto font-mono text-ink-4">{b.files[b.selected].lines} {T('líneas', 'lines')}</span>}
-              </>
-            ) : b.pane === 'deploy' ? (
-              <span className="ml-auto text-[11px] text-ink-3">{T('keys, variables y hosting', 'keys, variables and hosting')}</span>
-            ) : b.pane === 'app' ? (
-              <span className="ml-auto text-[11px] text-ink-3">{T('corre en esta máquina, sin deploy', 'runs on this machine, no deploy')}</span>
-            ) : b.pane === 'versions' ? (
-              <span className="ml-auto text-[11px] text-ink-3">{T('qué cambió en cada iteración y qué tan lista está', 'what changed in each iteration and how ready it is')}</span>
-            ) : b.pane === 'design' ? (
-              <span className="ml-auto text-[11px] text-ink-3">design/mockup.html · {T('lo que la UI debe reproducir', 'what the UI must reproduce')}</span>
-            ) : b.pane === 'report' ? (
-              <div className="ml-auto flex items-center gap-1">
-                <button onClick={() => b.auditReport && downloadBlob(new Blob([b.auditReport], { type: 'text/markdown' }), `informe-auditoria-${b.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.md`)} className="flex items-center gap-1 rounded-md px-2 py-1 text-ink-3 hover:text-ink"><Download size={12} /> {T('descargar .md', 'download .md')}</button>
+        {/* the side: file tree + the open pane, sliding in and out on a spring */}
+        <motion.div initial={false} animate={{ width: b.paneOpen ? paneW : 0 }} transition={{ type: 'spring', stiffness: 230, damping: 30, mass: 0.9 }} className="relative min-h-0 shrink-0 overflow-hidden">
+          <div className="absolute inset-y-0 right-0 grid min-h-0 grid-cols-[232px_1fr]" style={{ width: paneW }}>
+            {/* file tree */}
+            <div className="min-h-0 overflow-y-auto scroll-thin border-r border-line bg-surface">
+              <div className="sticky top-0 border-b border-line bg-surface px-3 py-2 text-[11px] uppercase tracking-widest text-ink-3">{T('Archivos', 'Files')}</div>
+              <div className="py-1 font-mono text-[13px]">
+                {tree.length === 0 && <div className="px-3 py-3 font-sans text-xs text-ink-4">{T('Todavía no hay archivos.', 'No files yet.')}</div>}
+                {tree.map((n) => <TreeNode key={n.path} node={n} depth={0} selected={b.selected} live={b.liveFile?.path ?? null} onSelect={(p) => useBuild.getState().set({ selected: p })} />)}
               </div>
-            ) : (
-              <div className="ml-auto flex items-center gap-1">
-                <button onClick={regeneratePreview} disabled={running} className="flex items-center gap-1 rounded-md px-2 py-1 text-ink-3 hover:text-ink disabled:opacity-40" title={T('Vuelve a generar el prototipo con los últimos cambios', 'Regenerates the prototype with the latest changes')}><RefreshCw size={12} /> {T('regenerar', 'regenerate')}</button>
-                <button onClick={openPreviewTab} className="flex items-center gap-1 rounded-md px-2 py-1 text-ink-3 hover:text-ink"><ExternalLink size={12} /> {T('abrir en pestaña', 'open in tab')}</button>
+            </div>
+
+            {/* the pane */}
+            <div className={`flex min-h-0 min-w-0 flex-col ${b.pane !== 'code' ? 'bg-paper' : 'bg-[#1E2622]'}`}>
+              <div className={`flex h-10 shrink-0 items-center gap-2 overflow-x-auto whitespace-nowrap border-b px-3 text-[12px] ${b.pane !== 'code' ? 'border-line bg-surface' : 'border-white/10 text-[#B9C4BE]'}`}>
+                {(() => { const cur = PANES.find((x) => x.id === b.pane); const Icon = cur?.icon ?? FileCode2; return <span className={`flex items-center gap-1.5 font-semibold ${b.pane === 'code' ? 'text-white' : 'text-ink'}`}><Icon size={14} className={b.pane === 'code' ? 'text-[#8FD3B0]' : 'text-accent'} /> {cur ? T(cur.es, cur.en) : ''}</span> })()}
+                {b.pane === 'code' ? (
+                  <>
+                    <span className="ml-2 truncate font-mono">{b.selected ?? '—'}</span>
+                    {b.liveFile && b.selected === b.liveFile.path && <span className="ml-2 text-[10px] font-bold text-[#8FD3B0] animate-pulse">{T('● escribiendo', '● writing')}</span>}
+                    {b.selected && b.files[b.selected] && <span className="ml-auto font-mono text-ink-4">{b.files[b.selected].lines} {T('líneas', 'lines')}</span>}
+                  </>
+                ) : b.pane === 'deploy' ? (
+                  <span className="ml-auto text-[11px] text-ink-3">{T('keys, variables y hosting', 'keys, variables and hosting')}</span>
+                ) : b.pane === 'app' ? (
+                  <span className="ml-auto text-[11px] text-ink-3">{T('corre en esta máquina, sin deploy', 'runs on this machine, no deploy')}</span>
+                ) : b.pane === 'versions' ? (
+                  <span className="ml-auto text-[11px] text-ink-3">{T('qué cambió en cada iteración y qué tan lista está', 'what changed in each iteration and how ready it is')}</span>
+                ) : b.pane === 'design' ? (
+                  <span className="ml-auto text-[11px] text-ink-3">design/mockup.html · {T('lo que la UI debe reproducir', 'what the UI must reproduce')}</span>
+                ) : b.pane === 'report' ? (
+                  <div className="ml-auto flex items-center gap-1">
+                    <button onClick={() => b.auditReport && downloadBlob(new Blob([b.auditReport], { type: 'text/markdown' }), `informe-auditoria-${b.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.md`)} className={PBTN}><Download size={12} /> {T('descargar .md', 'download .md')}</button>
+                  </div>
+                ) : (
+                  <div className="ml-auto flex items-center gap-1">
+                    <button onClick={regeneratePreview} disabled={running} className={PBTN} title={T('Vuelve a generar el prototipo con los últimos cambios', 'Regenerates the prototype with the latest changes')}><RefreshCw size={12} /> {T('regenerar', 'regenerate')}</button>
+                    <button onClick={openPreviewTab} className={PBTN}><ExternalLink size={12} /> {T('abrir en pestaña', 'open in tab')}</button>
+                  </div>
+                )}
+                <button onClick={() => useBuild.getState().set({ paneOpen: false })} title={T('Cerrar el panel', 'Close the panel')} className={`ml-1 shrink-0 rounded-md p-1 transition ${b.pane === 'code' ? 'text-[#B9C4BE] hover:bg-white/10 hover:text-white' : 'text-ink-3 hover:bg-surface-2 hover:text-ink'}`}><PanelRightClose size={14} /></button>
               </div>
-            )}
-            <button onClick={() => useBuild.getState().set({ paneOpen: false })} title={T('Cerrar el panel', 'Close the panel')} className={`ml-1 shrink-0 rounded-md p-1 ${b.pane === 'code' ? 'text-[#B9C4BE] hover:text-white' : 'text-ink-3 hover:text-ink'}`}><PanelRightClose size={14} /></button>
-          </div>
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div key={b.pane} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -6 }} transition={{ duration: 0.18, ease: 'easeOut' }} className="flex min-h-0 flex-1 flex-col">
           {b.pane === 'design' && b.designHtml ? (
-            <div className="flex-1 min-h-0 p-3">
-              <div className="h-full rounded-xl border border-line bg-surface overflow-hidden shadow-sm">
-                <div className="flex items-center gap-1.5 px-3 h-7 border-b border-line bg-surface-2/70"><span className="w-2 h-2 rounded-full bg-[#E6A19A]" /><span className="w-2 h-2 rounded-full bg-[#E9C97A]" /><span className="w-2 h-2 rounded-full bg-[#9FCDA8]" /><span className="ml-2 text-[10px] font-mono text-ink-3">design/mockup.html · {T('maqueta hi-fi del Product Designer', 'hi-fi mockup by the Product Designer')}</span><button onClick={() => useBuild.getState().set({ selected: 'design/DESIGN.md', pane: 'code' })} className="ml-auto text-[11px] text-accent hover:underline">{T('ver DESIGN.md', 'view DESIGN.md')}</button></div>
-                <iframe title={T('Diseño', 'Design')} sandbox="allow-scripts allow-forms allow-modals allow-popups" srcDoc={b.designHtml} className="w-full h-[calc(100%-28px)] bg-white" />
-              </div>
+                <div className="flex-1 min-h-0 p-3">
+                  <div className="h-full rounded-xl border border-line bg-surface overflow-hidden shadow-sm">
+                    <div className="flex items-center gap-1.5 px-3 h-7 border-b border-line bg-surface-2/70"><span className="w-2 h-2 rounded-full bg-[#E6A19A]" /><span className="w-2 h-2 rounded-full bg-[#E9C97A]" /><span className="w-2 h-2 rounded-full bg-[#9FCDA8]" /><span className="ml-2 text-[10px] font-mono text-ink-3">design/mockup.html · {T('maqueta hi-fi del Product Designer', 'hi-fi mockup by the Product Designer')}</span><button onClick={() => useBuild.getState().set({ selected: 'design/DESIGN.md', pane: 'code' })} className="ml-auto text-[11px] text-accent hover:underline">{T('ver DESIGN.md', 'view DESIGN.md')}</button></div>
+                    <iframe title={T('Diseño', 'Design')} sandbox="allow-scripts allow-forms allow-modals allow-popups" srcDoc={b.designHtml} className="w-full h-[calc(100%-28px)] bg-white" />
+                  </div>
+                </div>
+              ) : b.pane === 'versions' ? (
+                <VersionsPanel />
+              ) : b.pane === 'app' ? (
+                <AppRunner />
+              ) : b.pane === 'deploy' ? (
+                <ServicesDeploy onOpenSettings={() => { useArena.getState().set({ view: 'settings' }) }} />
+              ) : b.pane === 'report' && b.auditReport ? (
+                <div className="flex-1 min-h-0 overflow-y-auto scroll-thin px-8 py-6 bg-surface"><article className="md" dangerouslySetInnerHTML={{ __html: md(b.auditReport) }} /></div>
+              ) : b.pane === 'preview' && b.previewHtml ? (
+                <div className="flex-1 min-h-0 p-3">
+                  <div className="h-full rounded-xl border border-line bg-surface overflow-hidden shadow-sm">
+                    <div className="flex items-center gap-1.5 px-3 h-7 border-b border-line bg-surface-2/70"><span className="w-2 h-2 rounded-full bg-[#E6A19A]" /><span className="w-2 h-2 rounded-full bg-[#E9C97A]" /><span className="w-2 h-2 rounded-full bg-[#9FCDA8]" /><span className="ml-2 text-[10px] font-mono text-ink-3">preview/index.html · {T('prototipo navegable del producto', 'clickable prototype of the product')}</span></div>
+                    <iframe title={T('Vista previa del producto', 'Product preview')} sandbox="allow-scripts allow-forms allow-modals allow-popups" srcDoc={b.previewHtml} className="w-full h-[calc(100%-28px)] bg-white" />
+                  </div>
+                </div>
+              ) : (
+                <pre ref={codeRef} className="flex-1 min-h-0 overflow-auto scroll-thin p-4 text-[12.5px] leading-[1.55] text-[#E6ECE8] font-mono">
+                  {shownFile !== undefined ? <Code text={shownFile} /> : <span className="text-[#7F8C86]">{b.selected ? T('cargando…', 'loading…') : T('Elegí un archivo del árbol o esperá a que el constructor empiece a escribir.', 'Pick a file from the tree or wait for the builder to start writing.')}</span>}
+                </pre>
+              )}
+                    </motion.div>
+              </AnimatePresence>
             </div>
-          ) : b.pane === 'versions' ? (
-            <VersionsPanel />
-          ) : b.pane === 'app' ? (
-            <AppRunner />
-          ) : b.pane === 'deploy' ? (
-            <ServicesDeploy onOpenSettings={() => { useArena.getState().set({ view: 'settings' }) }} />
-          ) : b.pane === 'report' && b.auditReport ? (
-            <div className="flex-1 min-h-0 overflow-y-auto scroll-thin px-8 py-6 bg-surface"><article className="md" dangerouslySetInnerHTML={{ __html: md(b.auditReport) }} /></div>
-          ) : b.pane === 'preview' && b.previewHtml ? (
-            <div className="flex-1 min-h-0 p-3">
-              <div className="h-full rounded-xl border border-line bg-surface overflow-hidden shadow-sm">
-                <div className="flex items-center gap-1.5 px-3 h-7 border-b border-line bg-surface-2/70"><span className="w-2 h-2 rounded-full bg-[#E6A19A]" /><span className="w-2 h-2 rounded-full bg-[#E9C97A]" /><span className="w-2 h-2 rounded-full bg-[#9FCDA8]" /><span className="ml-2 text-[10px] font-mono text-ink-3">preview/index.html · {T('prototipo navegable del producto', 'clickable prototype of the product')}</span></div>
-                <iframe title={T('Vista previa del producto', 'Product preview')} sandbox="allow-scripts allow-forms allow-modals allow-popups" srcDoc={b.previewHtml} className="w-full h-[calc(100%-28px)] bg-white" />
-              </div>
-            </div>
-          ) : (
-            <pre ref={codeRef} className="flex-1 min-h-0 overflow-auto scroll-thin p-4 text-[12.5px] leading-[1.55] text-[#E6ECE8] font-mono">
-              {shownFile !== undefined ? <Code text={shownFile} /> : <span className="text-[#7F8C86]">{b.selected ? T('cargando…', 'loading…') : T('Elegí un archivo del árbol o esperá a que el constructor empiece a escribir.', 'Pick a file from the tree or wait for the builder to start writing.')}</span>}
-            </pre>
-          )}
+          </div>
+        </motion.div>
+
+        {/* the rail: one tab per pane, always visible; the active one closes the panel again */}
+        <div className="flex min-h-0 w-14 shrink-0 flex-col items-center gap-1 border-l border-line bg-surface py-2">
+          {PANES.filter((x) => x.id !== 'report' || b.auditReport || b.mode === 'audit').map((x) => {
+            const Icon = x.icon
+            const disabled = x.off(b)
+            const active = b.paneOpen && b.pane === x.id
+            return (
+              <motion.button
+                key={x.id}
+                disabled={disabled}
+                whileHover={disabled ? undefined : { y: -2 }}
+                whileTap={disabled ? undefined : { scale: 0.94 }}
+                onClick={() => useBuild.getState().set(active ? { paneOpen: false } : { paneOpen: true, pane: x.id })}
+                className={`group relative flex h-11 w-11 flex-col items-center justify-center gap-0.5 rounded-xl transition-colors disabled:opacity-30 ${active ? 'bg-accent-soft text-accent shadow-[inset_0_0_0_1px_rgba(47,107,93,.25)]' : 'text-ink-3 hover:bg-surface-2 hover:text-ink'}`}
+              >
+                <Icon size={17} />
+                <span className="text-[8px] leading-none">{T(x.es, x.en).split(' ')[0]}</span>
+                {x.id === 'app' && b.appRun.status === 'running' && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-ok animate-pulse" />}
+                {x.id === 'versions' && b.versions.length > 0 && <span className="absolute -right-0.5 -top-0.5 rounded-full border border-surface bg-accent px-1 text-[8px] font-bold leading-[13px] text-white">{b.versions.length}</span>}
+                <span className="pointer-events-none absolute right-full top-1/2 mr-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-ink px-2 py-1 text-[11px] font-medium normal-case text-paper opacity-0 shadow-lg transition group-hover:opacity-100">{T(x.es, x.en)}{disabled ? ` · ${T('todavía no', 'not yet')}` : ''}</span>
+              </motion.button>
+            )
+          })}
+          <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.94 }} onClick={() => useBuild.getState().set({ paneOpen: !b.paneOpen })} title={b.paneOpen ? T('Cerrar el panel', 'Close the panel') : T('Abrir el panel', 'Open the panel')} className="mt-auto flex h-11 w-11 items-center justify-center rounded-xl text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink">
+            <motion.span animate={{ rotate: b.paneOpen ? 180 : 0 }} transition={{ type: 'spring', stiffness: 300, damping: 24 }} className="flex"><ChevronLeft size={16} /></motion.span>
+          </motion.button>
         </div>
-        )}
       </div>
     </div>
   )
