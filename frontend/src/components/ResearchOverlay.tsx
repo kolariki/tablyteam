@@ -100,7 +100,7 @@ export default function ResearchOverlay({ demo = false, onClose }: { demo?: bool
 
         {/* what is going on */}
         <div className="min-w-0">
-          <div className="text-[11px] uppercase tracking-[0.35em] text-accent">{T('Antes del consejo', 'Before the council')}</div>
+          <div className="text-[11px] uppercase tracking-[0.35em] text-accent">{T('Reverse engineering · antes del consejo', 'Reverse engineering · before the council')}</div>
           <h2 className="mt-1 text-[30px] leading-tight">{r?.finished ? T('Listo: abriendo el consejo…', 'Done: opening the council…') : T('El equipo está investigando las referencias', 'The team is researching the references')}</h2>
           <p className="mt-2 max-w-xl text-[14px] leading-relaxed text-ink-2">{T('Entra a cada app, saca capturas y anota qué emular y qué evitar. Con eso en la mano, el consejo revisa tu proyecto. Quedate acá: se abre solo al terminar.', 'It visits each app, takes screenshots and notes what to emulate and avoid. With that in hand the council reviews your project. Stay here: it opens by itself when done.')}</p>
 
