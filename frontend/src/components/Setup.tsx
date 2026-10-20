@@ -275,7 +275,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
           {error && <div className="rounded-lg border border-danger/40 bg-danger/5 px-3 py-1.5 text-[12.5px] text-danger">{error}</div>}
         </div>
       )}
-      <div className="max-w-6xl mx-auto px-6 py-10">
+      <div className="w-full px-8 py-10 2xl:px-12">
         <div className="flex justify-end gap-2 -mb-4">
           <LangSwitch />
           <button onClick={onAudit} className="flex items-center gap-1.5 rounded-full bg-accent text-white px-3 py-1 text-sm hover:brightness-110 transition">
@@ -327,11 +327,11 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
         {presets.some((p) => p.custom) && (
           <>
             <h2 className="mt-10 flex items-center gap-2 font-sans text-xs uppercase tracking-widest text-ink-3"><Bookmark size={13} /> {T('Tus experimentos', 'Your experiments')} <span className="text-ink-4">({presets.filter((p) => p.custom).length})</span></h2>
-            <div className="mt-3 grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">{presets.filter((p) => p.custom).map(presetCard)}</div>
+            <div className="mt-3 grid gap-3 grid-cols-[repeat(auto-fill,minmax(220px,1fr))]">{presets.filter((p) => p.custom).map(presetCard)}</div>
           </>
         )}
         <h2 className="mt-10 font-sans text-xs uppercase tracking-widest text-ink-3">{T('Experimentos', 'Experiments')}</h2>
-        <div className="mt-3 grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+        <div className="mt-3 grid gap-3 grid-cols-[repeat(auto-fill,minmax(220px,1fr))]">
           {presets.filter((p) => !p.custom).map(presetCard)}
         </div>
 
