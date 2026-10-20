@@ -243,12 +243,17 @@ async def _claude_loop(proc, result: dict, cwd: Path, on_event: Emit) -> None:
                     if name in ("Write", "Edit", "MultiEdit") and inp.get("file_path"):
                         await _call(on_event, "file_hint", path=str(inp["file_path"]))
         elif t == "result":
-            result.update(text=ev.get("result") or "", cost=float(ev.get("total_cost_usd") or 0), turns=int(ev.get("num_turns") or 0), is_error=bool(ev.get("is_error")))
+            result.update(text=ev.get("result") or "", cost=float(ev.get("total_cost_usd") or 0), turns=int(ev.get("num_turns") or 0), is_error=bool(ev.get("is_error")), subtype=ev.get("subtype"))
             if ev.get("is_error"):
-                result["error"] = (ev.get("result") or "error")[:400]
+                # the step cap is not a failure of the work: the caller continues the same session
+                result["error"] = "límite de pasos del turno alcanzado" if ev.get("subtype") == "error_max_turns" else (ev.get("result") or "error")[:400]
 
 
-async def run_claude_code(prompt: str, cwd: Path, *, system: str | None = None, continue_: bool = False, resume_session: str | None = None, read_only: bool = False, max_turns: int = 80, model: str | None = None, mcp: dict | None = None, on_event: Emit) -> dict:
+# steps (tool calls) a single headless turn may take before Claude Code stops; a big design pass needs hundreds
+MAX_TURNS = int(os.environ.get("ARENA_ENGINE_MAX_TURNS", "400"))
+
+
+async def run_claude_code(prompt: str, cwd: Path, *, system: str | None = None, continue_: bool = False, resume_session: str | None = None, read_only: bool = False, max_turns: int = MAX_TURNS, model: str | None = None, mcp: dict | None = None, on_event: Emit) -> dict:
     """Streams a headless Claude Code run. on_event(kind, **data): text | tool | file_hint | result | error.
     `mcp`: {"mcpServers": {...}, "path_dir": ...} → the run gets those MCP servers (e.g. REA for deep analysis) and their tools allowed."""
     spec = ENGINES["claude-code"]

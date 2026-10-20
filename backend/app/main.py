@@ -45,7 +45,7 @@ from .local_engine import ENGINES, engine_status, is_engine, snapshot_dir
 from . import deploy as deploymod
 from . import service_guide
 from . import billing
-from . import providers
+from . import providers as provmod
 from . import runner as runmod
 from . import skills as skillmod
 from . import skills_catalog as catalog
@@ -1321,12 +1321,12 @@ async def build_design_summary(session_id: str, build_id: str, lang: str = "es",
     text_html = re.sub(r"<[^>]+>", " ", text_html)
     text_html = " ".join(text_html.split())[:3000]
     prompt = f"PROYECTO: {b.title}\n\nDESIGN.md (lo que escribió el diseñador):\n{md[:9000]}\n\nTEXTO VISIBLE DE LA MAQUETA:\n{text_html}"
-    result = providers.CallResult()
+    result = provmod.CallResult()
     buf: list[str] = []
-    async for kind, delta in providers.stream(provider, model, DESIGN_SUMMARY_SYSTEM["en" if lang == "en" else "es"], prompt, temperature=0.3, max_tokens=1200, result=result, cred=cred):
+    async for kind, delta in provmod.stream(provider, model, DESIGN_SUMMARY_SYSTEM["en" if lang == "en" else "es"], prompt, temperature=0.3, max_tokens=1200, result=result, cred=cred):
         if kind == "text":
             buf.append(delta)
-    out = {"key": key, "text": "".join(buf).strip(), "model": f"{providers.PROVIDERS[provider].label} · {model}", "lang": lang, "ts": time.time()}
+    out = {"key": key, "text": "".join(buf).strip(), "model": f"{provmod.PROVIDERS[provider].label} · {model}", "lang": lang, "ts": time.time()}
     try:
         cache.write_text(json.dumps(out, ensure_ascii=False))
     except Exception:  # noqa: BLE001

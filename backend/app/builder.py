@@ -638,6 +638,16 @@ class Build:
                 res = await run_engine(self.engine, prompt, self.workdir, continue_=not first, resume_session=self.engine_session, model=self.req.model if self.req.model not in ("default", "") else None, mcp=self._engine_mcp(), on_event=on_event)
                 if res.get("session_id"):
                     self.engine_session = res["session_id"]
+                # the step cap of one headless run is not the end of the job: pick the same session up where it stopped
+                for _ in range(3):
+                    if res.get("subtype") != "error_max_turns" or self._stop.is_set():
+                        break
+                    self.cost += float(res.get("cost") or 0)
+                    self._note("El constructor llegó al límite de pasos del turno; sigue desde donde quedó.")
+                    res = await run_engine(self.engine, "Seguí EXACTAMENTE desde donde quedaste con el pedido anterior: completá lo que falte, dejá todo compilando y con los tests en verde, y resumí qué cambió y cómo verificarlo.",
+                                           self.workdir, continue_=True, resume_session=self.engine_session, model=self.req.model if self.req.model not in ("default", "") else None, mcp=self._engine_mcp(), on_event=on_event)
+                    if res.get("session_id"):
+                        self.engine_session = res["session_id"]
                 obs.safe_update(span, output=res.get("text", "")[:8000], metadata={"turns": str(res.get("turns")), "cost": str(res.get("cost"))})
         except asyncio.CancelledError:
             res = {"text": "", "is_error": False, "error": None, "cost": 0.0}
