@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Check, ExternalLink, KeyRound, Loader2, ShieldCheck, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api, type ProviderSetting } from '../lib/api'
@@ -6,6 +6,8 @@ import { tr, useT } from '../lib/i18n'
 import ModelSelect, { invalidateModels } from './ModelSelect'
 import ProviderLogo, { LogoWatermark } from './ProviderLogo'
 import PageHeader from './PageHeader'
+import HomeLoader from './HomeLoader'
+import { readCache, writeCache } from '../lib/cache'
 import { brandTheme } from '../lib/brand'
 import SubscriptionPanel from './SubscriptionPanel'
 
@@ -24,20 +26,25 @@ const KEY_URL: Record<string, string> = {
 
 export default function Settings({ onBack }: { onBack: () => void }) {
   const T = useT()
-  const [items, setItems] = useState<ProviderSetting[]>([])
+  const [items, setItems] = useState<ProviderSetting[]>(() => readCache<ProviderSetting[]>('settings.providers') ?? [])
+  const [booting, setBooting] = useState(() => !readCache('settings.providers'))
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     api.settings().then((r) => {
-      setItems(r.providers.filter((p) => p.kind !== 'mock'))
-    }).catch((e) => setError(e.message))
+      const list = r.providers.filter((p) => p.kind !== 'mock')
+      if (writeCache('settings.providers', list)) setItems(list)
+    }).catch((e) => setError(e.message)).finally(() => setBooting(false))
+    const t = setTimeout(() => setBooting(false), 8000)
+    return () => clearTimeout(t)
   }, [])
 
-  const replace = (p: ProviderSetting) => setItems((xs) => xs.map((x) => (x.id === p.id ? p : x)))
+  const replace = (p: ProviderSetting) => setItems((xs) => { const next = xs.map((x) => (x.id === p.id ? p : x)); writeCache('settings.providers', next); return next })
   const ready = items.filter((p) => p.configured).length
 
   return (
     <div className="h-full overflow-y-auto scroll-thin arena-bg">
+      <AnimatePresence>{booting && <HomeLoader key="loader" caption={T('Buscando tus proveedores…', 'Looking up your providers…')} />}</AnimatePresence>
       <div className="w-full px-8 py-8 2xl:px-12">
         <PageHeader
           onBack={onBack}

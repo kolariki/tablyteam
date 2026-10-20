@@ -46,13 +46,23 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   // a saved experiment opens a chooser: see the project (its build), edit the team, or see the council's last run
   const [chooser, setChooser] = useState<{ preset: Preset; run: SessionSummary | null | undefined } | null>(null)
   const teamRef = useRef<HTMLDivElement>(null)
+  // while a project or council opens (the view switches when its data is in): the loader, so the click is never "nothing"
+  const [opening, setOpening] = useState<string | null>(null)
+  useEffect(() => {
+    if (!opening) return
+    const t = setTimeout(() => setOpening(null), 15000)
+    return () => clearTimeout(t)
+  }, [opening])
+  const lastRunOf = (list: SessionSummary[], p: Preset) =>
+    // the newest run of this experiment: same title (what the card saves) or same topic; council review rounds are not runs
+    list.filter((x) => x.mode !== 'review' && x.mode !== 'audit' && ((x.title && x.title === p.title) || x.topic === p.topic)).sort((a, b) => b.created - a.created)[0] ?? null
   const openChooser = (p: Preset) => {
-    setChooser({ preset: p, run: undefined })
+    const cached = readCache<SessionSummary[]>('sessions')
+    setChooser({ preset: p, run: cached ? lastRunOf(cached, p) : undefined })  // remembered list: the options are ready at once
     api.sessions().then((list) => {
-      // the newest run of this experiment: same title (what the card saves) or same topic; council review rounds are not runs
-      const runs = list.filter((x) => x.mode !== 'review' && x.mode !== 'audit' && ((x.title && x.title === p.title) || x.topic === p.topic)).sort((a, b) => b.created - a.created)
-      setChooser((c) => (c && c.preset.id === p.id ? { ...c, run: runs[0] ?? null } : c))
-    }).catch(() => setChooser((c) => (c && c.preset.id === p.id ? { ...c, run: null } : c)))
+      writeCache('sessions', list)
+      setChooser((c) => (c && c.preset.id === p.id ? { ...c, run: lastRunOf(list, p) } : c))
+    }).catch(() => setChooser((c) => (c && c.preset.id === p.id && c.run === undefined ? { ...c, run: null } : c)))
   }
   useEffect(() => {
     if (!chooser) return
@@ -216,7 +226,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
 
   return (
     <div className="h-full overflow-y-auto scroll-thin arena-bg">
-      <AnimatePresence>{booting && <HomeLoader key="loader" />}</AnimatePresence>
+      <AnimatePresence>{booting ? <HomeLoader key="loader" /> : opening ? <HomeLoader key="opening" caption={opening} /> : null}</AnimatePresence>
       {nameDialog}
       {deleteDialog}
       {chooser && (() => {
@@ -251,9 +261,9 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                 </div>
                 <div className="mt-1 text-[12px] text-ink-3">{runHint}</div>
                 <div className="mt-4 space-y-2">
-                  {option(<FolderOpen size={17} />, T('Ver el proyecto', 'See the project'), T('Abre lo construido en la última corrida: código, vista previa y versiones.', 'Opens what the last run built: code, preview and versions.'), () => { setChooser(null); if (run) onOpen(run.id) }, loading || noRun)}
+                  {option(<FolderOpen size={17} />, T('Ver el proyecto', 'See the project'), T('Abre lo construido en la última corrida: código, vista previa y versiones.', 'Opens what the last run built: code, preview and versions.'), () => { setChooser(null); if (run) { setOpening(T('Abriendo el proyecto…', 'Opening the project…')); onOpen(run.id) } }, loading || noRun)}
                   {option(<Users size={17} />, T('Cambiar la configuración de los agentes', 'Change the agents’ setup'), T('Carga el experimento acá abajo para editar roles, modelos, prompts y skills antes de volver a correrlo.', 'Loads the experiment below to edit roles, models, prompts and skills before running it again.'), () => { setChooser(null); applyPreset(p); setTimeout(() => teamRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80) })}
-                  {option(<Eye size={17} />, T('Ver el consejo', 'See the council'), T('Muestra el último debate tal como quedó, sin correr nada ni gastar tokens.', 'Shows the last debate as it ended, without running anything or spending tokens.'), () => { setChooser(null); if (run) useArena.getState().set({ pendingLive: run.id }) }, loading || noRun)}
+                  {option(<Eye size={17} />, T('Ver el consejo', 'See the council'), T('Muestra el último debate tal como quedó, sin correr nada ni gastar tokens.', 'Shows the last debate as it ended, without running anything or spending tokens.'), () => { setChooser(null); if (run) { setOpening(T('Abriendo el consejo…', 'Opening the council…')); useArena.getState().set({ pendingLive: run.id }) } }, loading || noRun)}
                 </div>
               </div>
             </div>
@@ -611,7 +621,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
             })()}
         </div>
 
-        <Dashboard onOpen={onOpen} onCouncil={(id) => useArena.getState().set({ pendingLive: id })} onReplay={onReplay} onSettings={onSettings} onAudit={onAudit} onLoaded={() => mark('dashboard')} />
+        <Dashboard onOpen={(id) => { setOpening(T('Abriendo el proyecto…', 'Opening the project…')); onOpen(id) }} onCouncil={(id) => { setOpening(T('Abriendo el consejo…', 'Opening the council…')); useArena.getState().set({ pendingLive: id }) }} onReplay={onReplay} onSettings={onSettings} onAudit={onAudit} onLoaded={() => mark('dashboard')} />
       </div>
     </div>
   )

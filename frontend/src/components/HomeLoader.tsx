@@ -5,7 +5,7 @@ import ProviderLogo from './ProviderLogo'
 const RING = ['anthropic', 'openai', 'deepseek', 'gemini', 'xai', 'groq', 'kimi', 'mistral', 'openrouter', 'ollama']
 
 /** The home is loading (providers, experiments, projects): the Tably mark with the companies orbiting around it. */
-export default function HomeLoader() {
+export default function HomeLoader({ caption }: { caption?: string } = {}) {
   const T = useT()
   const R = 92
   return (
@@ -34,7 +34,7 @@ export default function HomeLoader() {
         <span className="pointer-events-none absolute inset-6 rounded-full border border-dashed border-line/80" aria-hidden />
       </div>
       <div className="serif mt-8 text-2xl">Tably <em className="text-accent">Team</em></div>
-      <div className="mt-1.5 text-[13px] text-ink-3">{T('Reuniendo a tu equipo…', 'Gathering your team…')}</div>
+      <div className="mt-1.5 text-[13px] text-ink-3">{caption ?? T('Reuniendo a tu equipo…', 'Gathering your team…')}</div>
     </motion.div>
   )
 }

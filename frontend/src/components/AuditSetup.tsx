@@ -1,4 +1,6 @@
 import PageHeader from './PageHeader'
+import HomeLoader from './HomeLoader'
+import { AnimatePresence } from 'framer-motion'
 import { FileArchive, Gavel, Loader2, Plus, Puzzle, Trash2, UploadCloud } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { api, type EngineStatus } from '../lib/api'
@@ -48,13 +50,20 @@ export default function AuditSetup({ onBack, onStart }: Props) {
   const rolesRef = useRef(roles)
   rolesRef.current = roles
   const personaOf = (roleId: string) => { const role = rolesRef.current.roles.find((x) => x.id === roleId); return role ? pickLang(role, 'persona') : '' }
+  const [loaded, setLoaded] = useState({ roles: false, engines: false, providers: false, timeout: false })
+  const mark = (k: keyof typeof loaded) => setLoaded((l) => (l[k] ? l : { ...l, [k]: true }))
+  const booting = !loaded.timeout && !(loaded.roles && loaded.engines && loaded.providers)
+  useEffect(() => {
+    const t = setTimeout(() => mark('timeout'), 8000)
+    return () => clearTimeout(t)
+  }, [])
   useEffect(() => {
     api.roles().then((r) => {
       setRoles(r)
       // every auditor starts with its role's default prompt (the user can rewrite it)
       setTeam((t) => t.map((a) => { const role = r.roles.find((x) => x.id === a.role); return a.persona?.trim() || !role ? a : { ...a, persona: pickLang(role, 'persona') } }))
-    }).catch(() => {})
-    api.engines().then(setEngines).catch(() => {})
+    }).catch(() => {}).finally(() => mark('roles'))
+    api.engines().then(setEngines).catch(() => {}).finally(() => mark('engines'))
     api.providers().then((ps) => {
       setProviders(ps)
       const p = ps.find((x) => x.configured && x.id !== 'mock') ?? ps.find((x) => x.id === 'mock')
@@ -63,7 +72,7 @@ export default function AuditSetup({ onBack, onStart }: Props) {
         setModel(p.default_model)
         setTeam(DEFAULT_TEAM.map((t, i) => ({ id: t.role, name: t.name, role: t.role, provider: p.id, model: p.default_model, persona: personaOf(t.role), color: p.id === 'mock' ? PALETTE[i % PALETTE.length] : null })))
       }
-    }).catch((e) => setError(e.message))
+    }).catch((e) => setError(e.message)).finally(() => mark('providers'))
   }, [])
 
   useEffect(() => {
@@ -110,6 +119,7 @@ export default function AuditSetup({ onBack, onStart }: Props) {
 
   return (
     <div className="h-full overflow-y-auto scroll-thin arena-bg">
+      <AnimatePresence>{booting && <HomeLoader key="loader" caption={T('Armando el equipo auditor…', 'Assembling the audit team…')} />}</AnimatePresence>
       <div className="w-full px-8 py-8 2xl:px-12">
         <PageHeader onBack={onBack} kicker={T('Auditoría de proyecto', 'Project audit')} title={T('Que el equipo evalúe tu proyecto', 'Let the team evaluate your project')} subtitle={T('Subí tu código y cada rol lo revisa desde su área: qué está bien, qué hay que mejorar y propuestas concretas con prioridad. Después podés aplicar las mejoras con el constructor y que el consejo las apruebe.', 'Upload your code and each role reviews it from its own area: what is right, what needs improving and concrete, prioritised proposals. Then you can apply the improvements with the builder and have the council approve them.')} />
 
