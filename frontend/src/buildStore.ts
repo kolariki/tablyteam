@@ -109,7 +109,7 @@ interface BuildState {
   chat: ChatItem[]
   stages: BuildStage[]
   liveTurn: number | null
-  livePhase: 'build' | 'preview' | 'report' | 'design' | null
+  livePhase: 'build' | 'preview' | 'report' | 'design' | 'research' | null
   previewHtml: string | null
   designHtml: string | null
   designRounds: number
@@ -127,6 +127,8 @@ interface BuildState {
   deploying: boolean
   deployLogs: string[]
   councilSession: string | null
+  researching: { refs: string[]; started: number; visited: { name?: string; url?: string | null; ok?: boolean }[]; finished: boolean } | null  // references being benchmarked before a council round
+  councilSessionsKnown: number  // how many council rounds the build had when the research started (the poll detects the new one)
   pendingCouncil: string | null
   versions: BuildVersion[]
   appRun: { status: string; service: string | null; label?: string; url: string | null; embedUrl?: string | null; port: number | null; error: string | null; logs: string[] }
@@ -177,6 +179,8 @@ const empty = {
   deploying: false,
   deployLogs: [] as string[],
   councilSession: null as string | null,
+  researching: null as { refs: string[]; started: number; visited: { name?: string; url?: string | null; ok?: boolean }[]; finished: boolean } | null,
+  councilSessionsKnown: 0,
   pendingCouncil: null as string | null,
   versions: [] as BuildVersion[],
   appRun: { status: 'idle', service: null as string | null, url: null as string | null, port: null as number | null, error: null as string | null, logs: [] as string[] },
@@ -241,7 +245,7 @@ export const useBuild = create<BuildState>((set, get) => ({
           activity: b.activity ?? s.activity, todos: b.todos ?? s.todos, versions: b.versions ?? s.versions, pendingCouncil: b.pending_council ?? null, designRounds: b.design_rounds ?? s.designRounds, designHtml: b.design_html ?? s.designHtml,
           appRun: b.app_run ? { status: b.app_run.status, service: b.app_run.service, label: b.app_run.label, url: b.app_run.url, embedUrl: b.app_run.embed_url ?? null, port: b.app_run.port, error: b.app_run.error, logs: b.app_run.logs ?? [] } : s.appRun,
           status: b.status === 'running' ? 'running' : b.status, files: { ...s.files, ...b.files }, chat: b.chat, stages: b.stages,
-          cost: b.cost_usd, fees: (b as { fees_usd?: number }).fees_usd ?? 0, feesDue: (b as { fees_due_usd?: number }).fees_due_usd ?? 0, tokens: b.tokens, done: b.done, selected: s.selected ?? Object.keys(b.files)[0] ?? null,
+          councilSessionsKnown: (b.council_sessions ?? []).length, cost: b.cost_usd, fees: (b as { fees_usd?: number }).fees_usd ?? 0, feesDue: (b as { fees_due_usd?: number }).fees_due_usd ?? 0, tokens: b.tokens, done: b.done, selected: s.selected ?? Object.keys(b.files)[0] ?? null,
           ...(b.live ? { liveTurn: b.live.turn, livePhase: b.live.phase, liveRaw: b.live.raw, liveFile: liveFileFrom(b.live.raw) } : {}),
           team: b.team ?? s.team, reviews: b.reviews ?? s.reviews, reviewPlan: b.review_plan ?? null,
           liveReviews: b.live_reviews ?? {}, reviewRound: b.status === 'reviewing' ? (b.reviews?.length ?? 0) + 1 : null,
@@ -297,11 +301,17 @@ export const useBuild = create<BuildState>((set, get) => ({
       case 'build.team':
         set({ team: ev.team ?? s.team })
         break
+      case 'research.reference':
+        if (s.researching) set({ researching: { ...s.researching, visited: [...s.researching.visited, { name: ev.name, url: ev.url, ok: ev.ok }] } })
+        break
+      case 'research.done':
+        if (s.researching) set({ researching: { ...s.researching, finished: true } })
+        break
       case 'build.status':
         set({ status: ev.status, liveTurn: null, livePhase: null, liveRaw: '', liveFile: null })
         break
       case 'build.council':
-        set({ councilSession: ev.session_id, status: 'completed', liveTurn: null, livePhase: null })
+        set({ councilSession: ev.session_id, status: 'completed', liveTurn: null, livePhase: null, researching: null })
         break
       case 'app.status':
         set({ appRun: { ...s.appRun, status: ev.status, service: ev.service, label: ev.label, url: ev.url ?? null, embedUrl: ev.embed_url ?? null, port: ev.port ?? null, error: ev.error ?? null, logs: ev.status === 'installing' ? [] : s.appRun.logs } })
