@@ -197,7 +197,15 @@ Mirás capturas (desktop y móvil) y un resumen del DOM. NO copiás nada: observ
 3. Patrones de interfaz que funcionan (navegación, jerarquía, cards, estados vacíos, onboarding, microcopy, densidad, color, tipografía).
 4. Decisiones de producto notables (qué resuelven muy bien, qué dejan afuera).
 5. Qué EMULAR en nuestro producto y qué EVITAR (y por qué).
-Sé concreto y visual (nombrá componentes, posiciones, textos reales). Máximo 500 palabras. Markdown con esos 5 títulos."""
+6. PLANO VISUAL para reproducir la estructura con fidelidad (lo más importante; sé exhaustivo y medible):
+   - Layout: regiones de la pantalla con posición y tamaño aproximados en % (header, barras, panel lateral, mapa/contenido principal, línea de tiempo, footer), grilla y márgenes.
+   - Componentes: cada uno con forma, radio, borde, sombra, estado hover/activo y qué contiene (textos de ejemplo, íconos, controles).
+   - Paleta: colores principales, de fondo, de texto y de acento con hex aproximado; gradientes y escalas (por ejemplo, de viento/temperatura).
+   - Tipografía: familia (sans/serif/mono), pesos, tamaños relativos (título / cuerpo / etiquetas), mayúsculas, tracking.
+   - Densidad y espaciado: aire entre elementos, alturas de barras, tamaños de controles.
+   - Interacciones y motion: qué pasa al pasar el mouse, al tocar, al arrastrar; animaciones y transiciones visibles.
+   - Móvil: qué cambia respecto del desktop (qué se oculta, qué se apila, navegación).
+Sé concreto y visual (nombrá componentes, posiciones, textos reales). Máximo 900 palabras. Markdown con esos 6 títulos."""
 
 SYNTH_SYSTEM = """Sos el Product Designer del equipo. Con las notas de benchmark de varias apps de referencia, escribí research/REFERENCES.md:
 un brief de referentes para el diseñador y el constructor. Secciones (Markdown):
@@ -208,7 +216,12 @@ Tabla: app · qué hace mejor · qué le falta.
 # Flujo recomendado para nuestro producto (paso a paso, pantalla por pantalla, inspirado en lo observado pero ajustado a NUESTRO brief)
 # Copy y tono
 # Checklist de calidad "nivel referente" (10 ítems verificables)
-Concreto, accionable, sin relleno. Máximo 900 palabras."""
+# Plano visual objetivo
+La estructura que NUESTRAS pantallas tienen que reproducir con la mayor fidelidad posible, tomada del PLANO VISUAL de los referentes
+(el primero de la lista manda): pantalla por pantalla, regiones con posición y tamaño en %, componentes con su estilo, paleta con hex,
+tipografía, espaciado, interacciones y comportamiento móvil. Indicá qué captura mirar para cada pantalla (research/shots/NN-desktop.png
+y NN-mobile.png). Se reproduce la estructura y el comportamiento con elementos propios: nunca assets, marcas, textos ni código ajenos.
+Concreto, accionable, sin relleno. Máximo 1600 palabras."""
 
 
 def build_user_prompt_for_analysis(cap: Capture, brief_head: str) -> str:

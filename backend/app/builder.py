@@ -125,6 +125,11 @@ aprendiste en research/DEEP_ANALYSIS.md con evidencia. Está prohibido copiar c�
 mecanismo y se implementa una versión propia para nuestro producto."""
 
 
+FIDELITY_NOTE = (f"\n\nFIDELIDAD AL REFERENTE: en {RESEARCH_PATH} está el «Plano visual objetivo» y en research/shots/ las capturas reales (abrí las imágenes y miralas). "
+                 "Reproducí la estructura visual lo más fielmente posible: distribución y proporciones de las regiones, componentes y su estilo, paleta (hex), tipografía equivalente, "
+                 "espaciado, interacciones y comportamiento móvil. Con elementos propios: nunca assets, logos, marcas, textos ni código de terceros.")
+
+
 def research_context(md: str) -> str:
     return f"\n\n===== {RESEARCH_PATH} (benchmark de apps de referencia: emulá los patrones marcados, evitá los señalados) =====\n{md[:12000]}\n" if md else ""
 
@@ -566,7 +571,7 @@ class Build:
                       f"Cuando termines, resumí en 5-10 líneas qué quedó construido, cómo correrlo y qué verificar.\n\n"
                       f"ESTÁNDAR DE CALIDAD (el equipo que diseñó el producto lo va a revisar con esta vara; construí para aprobarla a la primera):\n{bar}"
                       + (BUILDER_DESIGN_RULE if (self.workdir / "design" / "mockup.html").exists() else "")
-                      + (f"\n\nREFERENTES: leé {RESEARCH_PATH} (benchmark de apps de referencia) y construí al nivel de esos productos: flujo recomendado, patrones a emular, checklist 'nivel referente'." if (self.workdir / RESEARCH_PATH).exists() else "")
+                      + (f"\n\nREFERENTES: leé {RESEARCH_PATH} (benchmark de apps de referencia) y construí al nivel de esos productos: flujo recomendado, patrones a emular, checklist 'nivel referente'." + FIDELITY_NOTE if (self.workdir / RESEARCH_PATH).exists() else "")
                       + (REA_PROMPT if self.req.deep_analysis else ""))
         elif resume_with == CONTINUE:
             prompt = ("La construcción se interrumpió. Revisá el estado actual de este directorio frente a BRIEF.md, completá lo que falte del plan "
@@ -574,7 +579,7 @@ class Build:
         else:
             prompt = (f"Pedido de cambios sobre el proyecto de este directorio (ver BRIEF.md):\n{resume_with}\n\nAplicá TODOS los cambios con archivos completos, "
                       f"actualizá README/NOTES si corresponde, regenerá `{PREVIEW_PATH}` para reflejarlos, y resumí qué cambió y cómo verificarlo."
-                      + (f"\n\nREFERENTES: leé {RESEARCH_PATH} (benchmark de apps de referencia que eligió el usuario) y llevá las pantallas y flujos tocados al nivel de esos productos: emulá los patrones marcados, evitá los señalados." if (self.workdir / RESEARCH_PATH).exists() else "")
+                      + (f"\n\nREFERENTES: leé {RESEARCH_PATH} (benchmark de apps de referencia que eligió el usuario) y llevá las pantallas y flujos tocados al nivel de esos productos: emulá los patrones marcados, evitá los señalados." + FIDELITY_NOTE if (self.workdir / RESEARCH_PATH).exists() else "")
                       + (REA_PROMPT if self.req.deep_analysis else ""))
         self.turns += 1
         self.emit("turn.started", turn=self.turns, phase="build")
@@ -832,14 +837,14 @@ class Build:
                 continue
             self._activity("read", f"Analizando {ref['name'] or cap.title or ref['url']}", ref["url"])
             images = [im for im in (cap.desktop, cap.mobile) if im] if not mock else None
-            analysis = await self._ask(rsch.ANALYZE_SYSTEM, rsch.build_user_prompt_for_analysis(cap, self.brief), provider, model, cred, images=images, max_tokens=1800,
+            analysis = await self._ask(rsch.ANALYZE_SYSTEM, rsch.build_user_prompt_for_analysis(cap, self.brief), provider, model, cred, images=images, max_tokens=3000,
                                        mock_text=f"## 1. Qué es\n{cap.title or ref['url']} (simulado).\n## 2. Pantallas\nHome con buscador y pronóstico.\n## 3. Patrones\nCards, jerarquía clara.\n## 4. Decisiones\nSin cuentas.\n## 5. Emular / evitar\nEmular: buscador arriba. Evitar: densidad excesiva.")
             notes.append(f"## {ref['name'] or cap.title or ref['url']}\nURL: {ref['url']}\n\n{analysis.strip()}")
             self._note(f"{ref['name'] or cap.title or ref['url']}: notas tomadas ({len(analysis.split())} palabras).")
         md = ""
         if notes and not self._stop.is_set():
             self._activity("plan", "Armando el brief de referentes", RESEARCH_PATH)
-            synth = await self._ask(rsch.SYNTH_SYSTEM, f"NUESTRO BRIEF:\n{self.brief[:8000]}\n\nNOTAS DE BENCHMARK:\n\n" + "\n\n---\n\n".join(notes), provider, model, cred, max_tokens=3500,
+            synth = await self._ask(rsch.SYNTH_SYSTEM, f"NUESTRO BRIEF:\n{self.brief[:8000]}\n\nREFERENTES (en orden de prioridad): {', '.join(r['name'] or r['url'] for r in refs)}\n\nNOTAS DE BENCHMARK:\n\n" + "\n\n---\n\n".join(notes), provider, model, cred, max_tokens=6000,
                                     mock_text="# Referentes\n| app | mejor | falta |\n|---|---|---|\n| Open-Meteo | API clara | UI |\n# Patrones a emular\n- Buscador arriba\n# Patrones a evitar\n- Densidad\n# Flujo recomendado\n1. Buscar ciudad 2. Ver pronóstico\n# Copy y tono\nDirecto.\n# Checklist\n1. Carga < 2 s")
             md = f"<!-- Benchmark generado por Tably Team el {rsch.stamp()}. Observación de productos públicos; nada copiado. -->\n\n{synth.strip()}\n\n---\n\n# Notas por referente\n\n" + "\n\n".join(notes) + "\n"
             self._write(RESEARCH_PATH, md)
@@ -875,7 +880,7 @@ class Build:
             return
         designer = next((a for a in self.team if a.get("role") == "product-designer"), None)
         system = design_system_prompt("español") + ("\n\n" + skillmod.prompt_block(self.user.id, designer.get("skills")) if designer and designer.get("skills") else "")
-        user_msg = DESIGN_USER.format(brief=self.brief[:30000]) + research_context(self.research_md)
+        user_msg = DESIGN_USER.format(brief=self.brief[:30000]) + research_context(self.research_md) + (FIDELITY_NOTE if self.research_md else "")
         if feedback:
             prev = self.files.get("design/DESIGN.md", "")[:12000]
             user_msg += f"\n\n---\nYA HAY UNA VERSIÓN DEL DISEÑO (abajo). El usuario la vio y pide ESTOS CAMBIOS, que son prioridad absoluta:\n{feedback}\n\nRediseñá entregando los tres archivos completos otra vez, aplicando los cambios y mejorando el resto.\n\nDISEÑO ANTERIOR (DESIGN.md):\n{prev}"
@@ -914,7 +919,7 @@ class Build:
         try:
             designer = next((a for a in self.team if a.get("role") == "product-designer"), None)
             fb = getattr(self, "_design_feedback_now", None)
-            dprompt = ENGINE_DESIGN_PROMPT + frontend_design_guide() + (f"\n\nANTES de diseñar leé {RESEARCH_PATH} (benchmark de apps de referencia): emulá los patrones marcados y evitá los señalados." if self.research_md else "") + (REA_PROMPT if self.req.deep_analysis else "") + (f"\n\nYA EXISTE design/ y el usuario lo revisó. Pide ESTOS CAMBIOS (prioridad absoluta): {fb}\nRediseñá los tres archivos aplicándolos y mejorando el resto." if fb else "") + ("\n\n" + skillmod.prompt_block(self.user.id, designer.get("skills")) if designer and designer.get("skills") else "")
+            dprompt = ENGINE_DESIGN_PROMPT + frontend_design_guide() + (f"\n\nANTES de diseñar leé {RESEARCH_PATH} (benchmark de apps de referencia): emulá los patrones marcados y evitá los señalados." + FIDELITY_NOTE if self.research_md else "") + (REA_PROMPT if self.req.deep_analysis else "") + (f"\n\nYA EXISTE design/ y el usuario lo revisó. Pide ESTOS CAMBIOS (prioridad absoluta): {fb}\nRediseñá los tres archivos aplicándolos y mejorando el resto." if fb else "") + ("\n\n" + skillmod.prompt_block(self.user.id, designer.get("skills")) if designer and designer.get("skills") else "")
             res = await run_engine(self.engine, dprompt, self.workdir, resume_session=self.engine_session, model=self.req.model if self.req.model not in ("default", "") else None, mcp=self._engine_mcp(), on_event=on_event)
             if res.get("session_id"):
                 self.engine_session = res["session_id"]
@@ -1076,7 +1081,8 @@ class Build:
         if self.req.references and self.research_md:
             prior += ("\n\nREFERENTES ELEGIDOS POR EL USUARIO: " + ", ".join(self.req.references[:8]) + f". Sus notas están en {RESEARCH_PATH} (arriba). "
                       "Cada rol compara el proyecto contra esos referentes desde su área (Diseño y Product: layout, jerarquía, interacciones, estados; Head of Eng y CTO: arquitectura y datos) "
-                      "y pide como cambios CONCRETOS, con pantalla y archivo, lo que haya que emular para estar a ese nivel. No basta con decir que está bien: la vara son los referentes.")
+                      "y pide como cambios CONCRETOS, con pantalla y archivo, lo que haya que emular para estar a ese nivel. No basta con decir que está bien: la vara son los referentes. "
+                      "Diseño y Product: comparen cada pantalla nuestra con el «Plano visual objetivo» de REFERENCES.md y pidan, región por región, lo que falta para que quede igual de estructurada (layout, componentes, paleta, tipografía, interacciones).")
         if prio:
             prior += f"\n\nPRIORIDADES DEL USUARIO PARA ESTA RONDA (tratarlas primero):\n{prio}"
         cfg = SessionConfig(
@@ -1103,7 +1109,7 @@ class Build:
             f"- [{c.get('severity', 'mejora')}]{(' [' + c['role'] + ']') if c.get('role') else ''} {c['text']}" for c in changes if c.get("text"))
         text += "\n\nAplicá TODOS los cambios con archivos completos (respetando el estilo y la estructura existentes), primero los bloqueantes, actualizá README/NOTES si corresponde y, al terminar, emití <done>."
         if self.req.references and self.research_md:
-            text += f"\n\nREFERENTES del usuario: {', '.join(self.req.references[:8])} (notas en {RESEARCH_PATH}). Los cambios de UI y flujo tienen que dejar el producto al nivel de esos referentes."
+            text += f"\n\nREFERENTES del usuario: {', '.join(self.req.references[:8])} (notas en {RESEARCH_PATH}). Los cambios de UI y flujo tienen que dejar el producto al nivel de esos referentes." + FIDELITY_NOTE
         self.status = "running"
         self._stop = asyncio.Event()
         self.chat.append({"role": "user", "text": text, "ts": time.time()})
