@@ -103,10 +103,15 @@ export default function Login({ onAuthed, onBack, initialMode = 'login' }: { onA
   return (
     <div className="relative h-full arena-bg flex flex-col overflow-hidden">
       <TeamBackdrop blur={9} opacity={0.5} />
+      <header className="relative z-20 flex h-14 shrink-0 items-center gap-3 border-b border-line bg-paper/80 px-6 backdrop-blur">
+        <button type="button" onClick={onBack} className="flex items-center gap-3 rounded-lg transition hover:opacity-80" title={T('Volver a la presentación', 'Back to the intro')}>
+          <img src="/icon.svg" alt="" aria-hidden className="h-7 w-7 rounded-lg shadow-sm" draggable={false} />
+          <span className="serif text-lg">Tably <em className="text-accent">Team</em></span>
+        </button>
+      </header>
       <div className="relative z-10 flex-1 min-h-0 flex items-center justify-center p-6">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-6xl grid md:grid-cols-[1fr_1.15fr] gap-12 items-center">
         <div>
-          <button onClick={onBack} className="mb-6 text-sm text-ink-3 hover:text-ink">{T('← Volver a la presentación', '← Back to the intro')}</button>
           <div className="text-xs uppercase tracking-[0.5em] text-accent">{T('tu equipo que diseña y construye', 'your team that designs and builds')}</div>
           <h1 className="mt-2 text-6xl md:text-7xl tracking-tight">
             Tably <em className="text-accent">Team</em>
@@ -154,8 +159,8 @@ export default function Login({ onAuthed, onBack, initialMode = 'login' }: { onA
               <button type="button" onClick={() => setMode('register')} className={`flex-1 rounded-lg py-2 transition ${mode === 'register' ? 'bg-surface shadow-sm font-medium' : 'text-ink-3'}`}>{T('Crear cuenta', 'Create account')}</button>
             )}
           </div>
-          <h2 className="mt-6 text-3xl">{mode === 'login' ? T('Bienvenido de vuelta', 'Welcome back') : T('Tu arena personal', 'Your personal arena')}</h2>
-          <p className="mt-1 text-sm text-ink-3">{mode === 'login' ? T('Tus experimentos y grabaciones te esperan.', 'Your experiments and recordings are waiting.') : T('Cada cuenta tiene sus propios experimentos, replays y videos.', 'Each account has its own experiments, replays and videos.')}</p>
+          <h2 className="mt-6 text-3xl">{mode === 'login' ? T('Bienvenido de vuelta', 'Welcome back') : T('Armá tu equipo', 'Build your team')}</h2>
+          <p className="mt-1 text-sm text-ink-3">{mode === 'login' ? T('Tus proyectos y tu equipo te esperan.', 'Your projects and your team are waiting.') : T('Tu cuenta guarda tus proyectos, tu equipo de IAs y tus API keys, cifradas y solo tuyas.', 'Your account keeps your projects, your AI team and your API keys, encrypted and yours alone.')}</p>
           <div className="mt-5 space-y-3">
             {mode === 'register' && <input className={input} placeholder={T('Nombre', 'Name')} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />}
             <input className={input} type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
