@@ -66,12 +66,13 @@ export function heroIntro(root: HTMLElement) {
     tl.to(logos, { scale: 1, opacity: 1, rotate: 0, duration: 0.55, ease: 'back.out(2.2)', stagger: 0.07 }, 0.15)
       .to(logos, { y: '+=6', duration: 0.5, ease: 'sine.inOut', yoyo: true, repeat: 1, stagger: { each: 0.05 } }, 0.7)
       .to(logos, { x: cx, y: cy, scale: 0.3, opacity: 0.95, rotate: 360, duration: 0.85, ease: 'power3.in', stagger: 0.04, overwrite: 'auto' }, 1.35)
-      .to(orb, { scale: 1, opacity: 1, duration: 0.45, ease: 'back.out(3)' }, 1.95)
-      .to(logos, { opacity: 0, scale: 0, duration: 0.2 }, 2.15)
-      .to(orb, { scale: 1.25, duration: 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 2.2)
-      .to(orb, { scale: 3.2, opacity: 0, duration: 0.7, ease: 'power2.out' }, 2.75)
-      .to(wordChars, { opacity: 1, scale: 1, duration: 0.75, ease: 'back.out(2.4)', stagger: 0.07 }, 2.78)
-      .fromTo(wordChars, { textShadow: '0 0 34px rgba(47,107,93,0.95)' }, { textShadow: '0 0 0px rgba(47,107,93,0)', duration: 1.3, ease: 'power2.out' }, 3.0)
+      .to(orb, { scale: 1, opacity: 1, duration: 0.45, ease: 'back.out(3)' }, 2.05)
+      // the last logo lands at 1.35 + 6 × 0.04 + 0.85 ≈ 2.45: only then do they all vanish, or the last one lingers
+      .to(logos, { opacity: 0, scale: 0, duration: 0.2, overwrite: true }, 2.47)
+      .to(orb, { scale: 1.25, duration: 0.35, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 2.5)
+      .to(orb, { scale: 3.2, opacity: 0, duration: 0.7, ease: 'power2.out' }, 3.05)
+      .to(wordChars, { opacity: 1, scale: 1, duration: 0.75, ease: 'back.out(2.4)', stagger: 0.07 }, 3.08)
+      .fromTo(wordChars, { textShadow: '0 0 34px rgba(47,107,93,0.95)' }, { textShadow: '0 0 0px rgba(47,107,93,0)', duration: 1.3, ease: 'power2.out' }, 3.3)
     const icon = root.querySelector<HTMLElement>('[data-brand-icon]')
     const brandText = root.querySelectorAll('[data-brand-text]')
     if (icon && spark) {
@@ -79,12 +80,12 @@ export function heroIntro(root: HTMLElement) {
       const ix = I.left - L.left + I.width / 2
       const iy = I.top - L.top + I.height / 2
       gsap.set(spark, { x: cx, y: cy, xPercent: -50, yPercent: -50, opacity: 0, scale: 0.6 })
-      tl.to(spark, { opacity: 1, duration: 0.15 }, 3.05)
-        .to(spark, { x: ix, y: iy, scale: 1, duration: 0.75, ease: 'power2.inOut' }, 3.1)
-        .to(spark, { opacity: 0, scale: 0.2, duration: 0.2 }, 3.8)
-        .fromTo(icon, { scale: 0.5, rotate: -25 }, { scale: 1, rotate: 0, duration: 0.7, ease: 'back.out(3)' }, 3.8)
-        .fromTo(icon, { boxShadow: '0 0 0px 0px rgba(47,107,93,0)' }, { boxShadow: '0 0 24px 6px rgba(47,107,93,0.55)', duration: 0.25, yoyo: true, repeat: 1 }, 3.85)
-        .from(brandText, { opacity: 0, x: -10, duration: 0.45, stagger: 0.08 }, 3.95)
+      tl.to(spark, { opacity: 1, duration: 0.15 }, 3.35)
+        .to(spark, { x: ix, y: iy, scale: 1, duration: 0.75, ease: 'power2.inOut' }, 3.4)
+        .to(spark, { opacity: 0, scale: 0.2, duration: 0.2 }, 4.1)
+        .fromTo(icon, { scale: 0.5, rotate: -25 }, { scale: 1, rotate: 0, duration: 0.7, ease: 'back.out(3)' }, 4.1)
+        .fromTo(icon, { boxShadow: '0 0 0px 0px rgba(47,107,93,0)' }, { boxShadow: '0 0 24px 6px rgba(47,107,93,0.55)', duration: 0.25, yoyo: true, repeat: 1 }, 4.15)
+        .from(brandText, { opacity: 0, x: -10, duration: 0.45, stagger: 0.08 }, 4.25)
     }
   }
   return tl
