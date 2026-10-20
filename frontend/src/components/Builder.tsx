@@ -151,6 +151,8 @@ export default function Builder({ onBack }: { onBack: () => void }) {
   const isEngineBuild = b.provider === 'claude-code' || b.provider === 'codex'
   const codeTheme = useEditorTheme((s) => s.theme)
   const [payingFees, setPayingFees] = useState(false)
+  const [stopping, setStopping] = useState(false)
+  useEffect(() => { if (!running) setStopping(false) }, [running])  // the stop landed: the button goes back to normal (or away)
   const codeDark = codeTheme.dark
   // the side panel takes ~60% of the row (at least 640px), leaving the chat its minimum; measured so the spring can animate pixels
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -238,7 +240,16 @@ export default function Builder({ onBack }: { onBack: () => void }) {
           <button onClick={toggleRecording} className={`${b.recording ? `${HBTN} border-danger/60 bg-danger/10 text-danger hover:border-danger hover:text-danger` : HBTN} px-3 2xl:px-3.5`} title={b.recording ? T('Guardar el video', 'Save the video') : T('Graba esta pantalla (chat + código + vista previa) y descarga el video', 'Records this screen (chat + code + preview) and downloads the video')}>
             <Circle size={13} className={b.recording ? 'fill-danger animate-pulse' : ''} /> <span className="hidden 2xl:inline">{b.recording ? T('Guardar video', 'Save video') : T('Grabar', 'Record')}</span>
           </button>
-          {running && b.id && <button onClick={() => api.buildStop(b.id!)} className={`${HBTN} border-danger/40 px-3 text-danger hover:border-danger hover:text-danger 2xl:px-3.5`} title={T('Detener la construcción', 'Stop the build')}><Square size={14} /> <span className="hidden 2xl:inline">{T('Detener', 'Stop')}</span></button>}
+          {running && b.id && (
+            <button
+              disabled={stopping}
+              onClick={async () => { setStopping(true); try { await api.buildStop(b.id!) } catch (e) { toast.error(tr('No se pudo detener', 'Could not stop'), (e as Error).message); setStopping(false) } }}
+              className={`${HBTN} border-danger/40 px-3 text-danger hover:border-danger hover:text-danger disabled:opacity-80 2xl:px-3.5`}
+              title={stopping ? T('Deteniendo la construcción…', 'Stopping the build…') : T('Detener la construcción', 'Stop the build')}
+            >
+              {stopping ? <Loader2 size={14} className="animate-spin" /> : <Square size={14} />} <span className={stopping ? 'inline' : 'hidden 2xl:inline'}>{stopping ? T('Deteniendo…', 'Stopping…') : T('Detener', 'Stop')}</span>
+            </button>
+          )}
           <button onClick={downloadZip} disabled={!Object.keys(b.files).length} className={`${HBTN} px-3 2xl:px-3.5`} title={T('Descargar el proyecto como .zip', 'Download the project as .zip')}><Download size={14} /> <span className="hidden 2xl:inline">{T('Descargar .zip', 'Download .zip')}</span></button>
           <button onClick={() => setRunOpen(true)} disabled={!Object.keys(b.files).length || running} className={HBTN_PRIMARY} title={T('Levanta la app en esta máquina y la muestra acá', 'Starts the app on this machine and shows it here')}><MonitorPlay size={14} /> {T('Correr la app', 'Run the app')}{b.appRun.status === 'running' ? <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> : null}</button>
         </div>
