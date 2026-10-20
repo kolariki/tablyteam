@@ -224,6 +224,29 @@ y NN-mobile.png). Se reproduce la estructura y el comportamiento con elementos p
 Concreto, accionable, sin relleno. Máximo 1600 palabras."""
 
 
+CLONE_ANALYZE_EXTRA = """
+
+MODO CLON: el equipo va a construir una RÉPLICA de este producto (todo igual salvo nombre, logo y textos literales). Además de lo anterior, escribí
+7. PLANO DE CLONACIÓN, exhaustivo y medible, para que un desarrollador lo reproduzca 1:1 sin ver el original:
+   - Inventario de pantallas y rutas visibles, y cómo se navega entre ellas.
+   - Por pantalla: cada región con posición y tamaño en px sobre la captura de 1440 px (y en móvil), orden de apilado, fondos.
+   - Cada componente: dimensiones, radio, borde, sombra, íconos (describilos), estados (default/hover/activo/deshabilitado/cargando/vacío/error).
+   - Paleta completa con hex exactos (muestreá la captura), escalas de color (leyendas, gradientes) con sus valores.
+   - Tipografía: familia (o la libre más parecida), tamaños en px, pesos, interlineado, mayúsculas, tracking, por tipo de texto.
+   - Funcionalidades visibles: qué hace cada control, qué datos muestra (unidades, formatos, rangos), filtros, búsquedas, capas, selectores de tiempo, etc.
+   - Interacciones y motion: hover, arrastre, scroll, transiciones, duraciones aproximadas.
+   - Textos: para cada rótulo o mensaje, su función y un texto propio equivalente (no copies el literal).
+Sin límite de palabras para esta sección: cuanto más completa, mejor."""
+
+CLONE_SYNTH_EXTRA = """
+
+MODO CLON: agregá al final una sección
+# Plano de clonación
+que consolide, para el referente principal, TODO el plano de clonación de sus notas (pantallas, rutas, regiones con px, componentes con estados,
+paleta con hex, tipografía con px, funcionalidades, interacciones, textos propios equivalentes), ordenado pantalla por pantalla y listo para
+implementar 1:1. Esta sección puede ser tan larga como haga falta. Lo único que cambia respecto del original: nombre, logo y textos literales."""
+
+
 def build_user_prompt_for_analysis(cap: Capture, brief_head: str) -> str:
     parts = [f"REFERENTE: {cap.url}", f"Título de la página: {cap.title or '(sin título)'}"]
     if cap.headings:
