@@ -27,7 +27,8 @@ from .config import DATA_DIR, env
 log = logging.getLogger("arena.engine")
 
 ENGINES: dict[str, dict] = {
-    "claude-code": {"label": "Claude Code · tu suscripción", "logo": "anthropic", "bin": env("ARENA_CLAUDE_BIN", "claude"), "color": "#C0603F"},
+    # "default" from the UI resolves to the engine's strongest model, not to whatever the CLI happens to have configured
+    "claude-code": {"label": "Claude Code · tu suscripción", "logo": "anthropic", "bin": env("ARENA_CLAUDE_BIN", "claude"), "color": "#C0603F", "default_model": env("ARENA_CLAUDE_MODEL", "claude-opus-5-5")},
     "codex": {"label": "Codex CLI · ChatGPT", "logo": "openai", "bin": env("ARENA_CODEX_BIN", "codex"), "color": "#17896A"},
 }
 BUILD_ROOT = Path(env("ARENA_BUILD_DIR", str(DATA_DIR.parent / "builds")))

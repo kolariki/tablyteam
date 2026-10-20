@@ -643,7 +643,7 @@ class Build:
 
         try:
             with obs.observation(as_type="agent", name=f"engine · {self.engine}", input=prompt[:3000]) as span:
-                res = await run_engine(self.engine, prompt, self.workdir, continue_=not first, resume_session=self.engine_session, model=self.req.model if self.req.model not in ("default", "") else None, mcp=self._engine_mcp(), on_event=on_event)
+                res = await run_engine(self.engine, prompt, self.workdir, continue_=not first, resume_session=self.engine_session, model=self._engine_model(), mcp=self._engine_mcp(), on_event=on_event)
                 if res.get("session_id"):
                     self.engine_session = res["session_id"]
                 # the step cap of one headless run is not the end of the job: pick the same session up where it stopped
@@ -653,7 +653,7 @@ class Build:
                     self.cost += float(res.get("cost") or 0)
                     self._note("El constructor llegó al límite de pasos del turno; sigue desde donde quedó.")
                     res = await run_engine(self.engine, "Seguí EXACTAMENTE desde donde quedaste con el pedido anterior: completá lo que falte, dejá todo compilando y con los tests en verde, y resumí qué cambió y cómo verificarlo.",
-                                           self.workdir, continue_=True, resume_session=self.engine_session, model=self.req.model if self.req.model not in ("default", "") else None, mcp=self._engine_mcp(), on_event=on_event)
+                                           self.workdir, continue_=True, resume_session=self.engine_session, model=self._engine_model(), mcp=self._engine_mcp(), on_event=on_event)
                     if res.get("session_id"):
                         self.engine_session = res["session_id"]
                 obs.safe_update(span, output=res.get("text", "")[:8000], metadata={"turns": str(res.get("turns")), "cost": str(res.get("cost"))})
@@ -742,6 +742,12 @@ class Build:
         self._design_ok.set()
 
     # ------------------------------------------------------------- reference research (level 1) + deep analysis fee (level 2)
+    def _engine_model(self) -> str | None:
+        """The model the local agent runs with: the user's choice, or the engine's strongest (Opus 5.5 for Claude Code)."""
+        if self.req.model not in ("default", ""):
+            return self.req.model
+        return (ENGINES.get(self.req.provider) or {}).get("default_model")
+
     def _ref_note(self) -> str:
         """How close to the reference the work must be: a replica when the user turned on reverse engineering, close otherwise."""
         return CLONE_NOTE if self.req.deep_analysis else FIDELITY_NOTE
@@ -942,7 +948,7 @@ class Build:
             designer = next((a for a in self.team if a.get("role") == "product-designer"), None)
             fb = getattr(self, "_design_feedback_now", None)
             dprompt = ENGINE_DESIGN_PROMPT + frontend_design_guide() + (f"\n\nANTES de diseñar leé {RESEARCH_PATH} (benchmark de apps de referencia): emulá los patrones marcados y evitá los señalados." + self._ref_note() if self.research_md else "") + (REA_PROMPT if self.req.deep_analysis else "") + (f"\n\nYA EXISTE design/ y el usuario lo revisó. Pide ESTOS CAMBIOS (prioridad absoluta): {fb}\nRediseñá los tres archivos aplicándolos y mejorando el resto." if fb else "") + ("\n\n" + skillmod.prompt_block(self.user.id, designer.get("skills")) if designer and designer.get("skills") else "")
-            res = await run_engine(self.engine, dprompt, self.workdir, resume_session=self.engine_session, model=self.req.model if self.req.model not in ("default", "") else None, mcp=self._engine_mcp(), on_event=on_event)
+            res = await run_engine(self.engine, dprompt, self.workdir, resume_session=self.engine_session, model=self._engine_model(), mcp=self._engine_mcp(), on_event=on_event)
             if res.get("session_id"):
                 self.engine_session = res["session_id"]
         except asyncio.CancelledError:
