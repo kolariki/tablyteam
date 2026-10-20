@@ -81,5 +81,9 @@ export const BRAND_THEME: Record<string, { tint: string; bg: string; border: str
   mock: { tint: '#E9EDEB', bg: 'linear-gradient(135deg, #F6F7F6 0%, #ECEFED 100%)', border: '#DCE2DE', accent: '#8A9299', ink: '#3A4440' },
   'claude-code': { tint: '#F2E4D6', bg: 'linear-gradient(135deg, #F8F2EA 0%, #F1E4D6 100%)', border: '#E6CDB8', accent: '#C0603F', ink: '#3B2A22' },
   codex: { tint: '#E7ECEA', bg: 'linear-gradient(135deg, #F6F7F7 0%, #E9ECEB 100%)', border: '#D3D9D6', accent: '#0F0F0F', ink: '#1B1F1E' },
+  // deploy targets (same card language as the model companies)
+  vercel: { tint: '#E8E8E8', bg: 'linear-gradient(135deg, #FAFAFA 0%, #EAEAEA 100%)', border: '#D4D4D4', accent: '#000000', ink: '#111111' },
+  railway: { tint: '#E6E3F3', bg: 'linear-gradient(135deg, #F4F2FB 0%, #E8E4F6 100%)', border: '#D3CCEC', accent: '#7B3FE4', ink: '#2A1F4E' },
+  langfuse: { tint: '#E3EAF6', bg: 'linear-gradient(135deg, #F3F6FC 0%, #E6ECF8 100%)', border: '#CFDAF0', accent: '#0A60B5', ink: '#1C2E4A' },
 }
 export const brandTheme = (provider?: string | null) => BRAND_THEME[provider ?? ''] ?? BRAND_THEME.mock

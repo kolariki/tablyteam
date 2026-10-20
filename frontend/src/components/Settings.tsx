@@ -94,18 +94,29 @@ function LangfuseSettings() {
     <div className="mt-8">
       <h2 className="text-2xl">{T('Trazas · Langfuse', 'Tracing · Langfuse')}</h2>
       <p className="mt-1 text-[13px] text-ink-2">{T('Cada llamada a un modelo (debates, briefs, construcciones, revisiones) queda registrada con latencia, tokens y costo.', 'Every model call (debates, briefs, builds, reviews) is recorded with latency, tokens and cost.')}</p>
-      <div className="panel mt-3 flex items-center gap-4 rounded-2xl p-5">
-        <span className={`flex h-10 w-10 items-center justify-center rounded-full text-[18px] ${h?.langfuse ? 'bg-ok/15 text-ok' : 'bg-surface-2 text-ink-3'}`}>📈</span>
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold">{h === null ? '…' : h.langfuse ? T('Conectado', 'Connected') : T('Desactivado', 'Off')}</div>
-          <div className="truncate font-mono text-[12px] text-ink-3">{h?.langfuse_host || T('sin servidor configurado', 'no server configured')}</div>
+      <div className="relative mt-3 overflow-hidden rounded-2xl border p-5 shadow-[0_14px_30px_-18px_rgba(30,38,34,.45)]" style={{ background: brandTheme('langfuse').bg, borderColor: h?.langfuse ? brandTheme('langfuse').accent : brandTheme('langfuse').border }}>
+        <LogoWatermark provider="langfuse" opacity={0.1} />
+        <div className="relative flex items-center gap-4">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface shadow-sm" style={{ border: `1.5px solid ${brandTheme('langfuse').accent}` }}>
+            <ProviderLogo provider="langfuse" size={28} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[15px] font-semibold">Langfuse</div>
+            <div className="truncate font-mono text-[12px] text-ink-3">{h?.langfuse_host || T('sin servidor configurado', 'no server configured')}</div>
+          </div>
+          <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11.5px] font-medium ${h?.langfuse ? 'bg-ok/10 text-ok border-ok/30' : 'bg-surface-2 text-ink-3 border-line'}`}>
+            {h?.langfuse && <span className="h-2 w-2 rounded-full bg-ok shadow-[0_0_0_3px_rgba(23,137,106,.18)]" />}
+            {h === null ? '…' : h.langfuse ? T('Conectado', 'Connected') : T('Desactivado', 'Off')}
+          </span>
+          {h?.langfuse && h.langfuse_host && <a href={h.langfuse_host} target="_blank" rel="noreferrer" className="flex h-8 items-center gap-1 rounded-lg border border-line bg-surface px-3 text-sm shadow-sm hover:bg-surface-2"><ExternalLink size={14} /> {T('Abrir', 'Open')}</a>}
         </div>
-        {h?.langfuse && h.langfuse_host && <a href={h.langfuse_host} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm hover:bg-surface-2"><ExternalLink size={14} /> {T('Abrir', 'Open')}</a>}
       </div>
       <p className="mt-2 text-[12px] text-ink-4">{T('Se configura en el .env del backend con LANGFUSE_HOST, LANGFUSE_PUBLIC_KEY y LANGFUSE_SECRET_KEY; también podés levantarlo local con docker-compose.langfuse.yml.', 'Configured in the backend .env with LANGFUSE_HOST, LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY; you can also run it locally with docker-compose.langfuse.yml.')}</p>
     </div>
   )
 }
+
+const input = 'w-full rounded-lg bg-surface border border-line px-3 py-2 text-sm font-mono outline-none focus:border-accent transition shadow-sm'
 
 function DeploySettings() {
   const T = useT()
@@ -125,20 +136,41 @@ function DeploySettings() {
         {st.status.map((t) => {
           const k = st[t.id as 'vercel' | 'railway']
           return (
-            <div key={t.id} className="panel rounded-2xl p-5">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold">{t.label}</span>
-                <span className={`ml-auto rounded-full border px-2.5 py-0.5 text-[11.5px] font-medium ${t.installed && (t.token || t.logged_in) ? 'bg-ok/10 text-ok border-ok/30' : 'bg-surface-2 text-ink-3 border-line'}`}>
-                  {!t.installed ? T('CLI no instalado', 'CLI not installed') : k.set ? `token ··${k.last4}` : t.logged_in ? T('CLI logueado', 'CLI logged in') : T('sin acceso', 'no access')}
+            <div key={t.id} className="relative overflow-hidden rounded-2xl border p-5 shadow-[0_14px_30px_-18px_rgba(30,38,34,.45)] transition hover:shadow-[0_18px_40px_-18px_rgba(30,38,34,.5)]" style={{ background: brandTheme(t.id).bg, borderColor: t.installed && (t.token || t.logged_in) ? brandTheme(t.id).accent : brandTheme(t.id).border }}>
+              <LogoWatermark provider={t.id} opacity={0.1} />
+              <div className="relative">
+              <div className="flex items-center gap-3">
+                {t.id === 'vercel' ? (
+                  // Vercel's mark is a wordmark: show it whole, small, in a pill instead of a round medallion
+                  <span className="flex h-12 items-center justify-center rounded-full bg-surface px-4 shadow-sm" style={{ border: `1.5px solid ${brandTheme(t.id).accent}` }}>
+                    <img src="/logos/vercel.png" alt="Vercel" draggable={false} className="h-[18px] w-auto select-none" />
+                  </span>
+                ) : (
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface shadow-sm" style={{ border: `1.5px solid ${brandTheme(t.id).accent}` }}>
+                    <ProviderLogo provider={t.id} size={26} />
+                  </span>
+                )}
+                <div>
+                  <div className="text-[15px] font-semibold">{t.label}</div>
+                  <a href={t.token_help} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[12px] text-ink-3 hover:text-accent">{T('crear token', 'create token')} <ExternalLink size={11} /></a>
+                </div>
+                <span className={`ml-auto inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11.5px] font-medium ${t.installed && (t.token || t.logged_in) ? 'bg-ok/10 text-ok border-ok/30' : 'bg-surface-2 text-ink-3 border-line'}`}>
+                  {t.installed && (t.token || t.logged_in) && <span className="h-2 w-2 rounded-full bg-ok shadow-[0_0_0_3px_rgba(23,137,106,.18)]" />}
+                  {!t.installed ? T('CLI no instalado', 'CLI not installed') : k.set || t.logged_in ? T('Conectado', 'Connected') : T('Sin acceso', 'No access')}
                 </span>
               </div>
-              <a href={t.token_help} target="_blank" rel="noreferrer" className="text-[12px] text-ink-3 hover:text-accent inline-flex items-center gap-1 mt-1">{T('crear token', 'create token')} <ExternalLink size={11} /></a>
-              <div className="mt-3 flex gap-2">
-                <input type="password" autoComplete="off" placeholder={`${t.label} token`} value={tok[t.id] ?? ''} onChange={(e) => setTok({ ...tok, [t.id]: e.target.value })} className="w-full rounded-lg bg-surface/80 border border-line px-3 py-2 text-sm font-mono outline-none focus:border-accent" />
-                <button disabled={!tok[t.id]?.trim()} onClick={async () => { await api.saveDeployToken(t.id, tok[t.id].trim()); setTok({ ...tok, [t.id]: '' }); setMsg(`${t.label}: ${tr('token guardado', 'token saved')}`); load() }} className="rounded-lg bg-accent text-white px-3 text-sm font-medium disabled:opacity-40">{T('Guardar', 'Save')}</button>
+              <div className="mt-4 text-[10.5px] uppercase tracking-widest text-ink-3">{k.set ? T('Reemplazar token', 'Replace token') : 'Token'}</div>
+              <div className="mt-1 flex gap-2">
+                <input type="password" autoComplete="off" placeholder={k.set ? `token ··${k.last4}` : `${t.label} token`} value={tok[t.id] ?? ''} onChange={(e) => setTok({ ...tok, [t.id]: e.target.value })} className={input} />
+                <button disabled={!tok[t.id]?.trim()} onClick={async () => { await api.saveDeployToken(t.id, tok[t.id].trim()); setTok({ ...tok, [t.id]: '' }); setMsg(`${t.label}: ${tr('token guardado', 'token saved')}`); load() }} className="rounded-lg bg-accent px-3.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40">{T('Guardar', 'Save')}</button>
               </div>
-              {k.set && <button onClick={async () => { await api.saveDeployToken(t.id, null, true); setMsg(`${t.label}: ${tr('token borrado', 'token deleted')}`); load() }} className="mt-2 text-[12px] text-ink-3 hover:text-danger">{T('Borrar token', 'Delete token')}</button>}
+              <div className="mt-2 flex items-center gap-3 text-[12px] text-ink-3">
+                {k.set && <span>{T('Token guardado', 'Token saved')} ··{k.last4}</span>}
+                {!k.set && t.logged_in && <span>{T('Logueado desde la terminal', 'Logged in from the terminal')}</span>}
+                {k.set && <button onClick={async () => { await api.saveDeployToken(t.id, null, true); setMsg(`${t.label}: ${tr('token borrado', 'token deleted')}`); load() }} className="ml-auto hover:text-danger">{T('Borrar token', 'Delete token')}</button>}
+              </div>
               {!t.installed && <div className="mt-2 text-[12px] text-gold">{t.hint}</div>}
+              </div>
             </div>
           )
         })}
