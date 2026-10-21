@@ -1,6 +1,7 @@
 import { AnimatePresence } from 'framer-motion'
 import { BookOpen, CheckCircle2, Download, ExternalLink, Loader2, Rocket, Save, XCircle } from 'lucide-react'
 import ServiceGuide from './ServiceGuide'
+import { BuilderBusyNotice } from './BlockedNotice'
 import ProviderLogo, { logoUrl } from './ProviderLogo'
 import { useEffect, useRef, useState } from 'react'
 import { useBuild } from '../buildStore'
@@ -167,6 +168,7 @@ export default function ServicesDeploy({ onOpenSettings }: { onOpenSettings: () 
           </div>
         )}
         {missing.length > 0 && <div className="mt-2 text-[12px] text-gold">{T('Faltan', 'Missing')} {missing.length} {missing.length === 1 ? T('variable requerida', 'required variable') : T('variables requeridas', 'required variables')}{T(': el deploy puede fallar o la app no va a funcionar completa.', ': the deploy may fail or the app will not work fully.')}</div>}
+        <BuilderBusyNotice what={T('El deploy sube los archivos tal como queden.', 'The deploy uploads the files as they end up.')} className="mt-3" />
         <button
           disabled={!tgt?.ok || b.deploying}
           onClick={async () => {

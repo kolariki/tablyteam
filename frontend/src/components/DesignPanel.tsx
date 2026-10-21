@@ -3,10 +3,11 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ExternalLink, FileText, Loader2, Palette, RefreshCw, Send, Sparkles, Wand2 } from 'lucide-react'
 import { marked } from 'marked'
 import { useEffect, useState } from 'react'
-import { useBuild } from '../buildStore'
+import { reconnectBuild, useBuild } from '../buildStore'
 import { api } from '../lib/api'
 import { tr, useLang, useT } from '../lib/i18n'
 import { toast } from './Toast'
+import { BuilderBusyNotice } from './BlockedNotice'
 
 const md = (s: string) => DOMPurify.sanitize(marked.parse(s, { async: false }) as string)
 
@@ -47,6 +48,11 @@ export default function DesignPanel() {
     try {
       const r = await api.designRequest(b.id, text.trim(), b.sessionId)
       setAsk('')
+      if (r.mode !== 'redo') {
+        // the change runs on the builder: a finished build has no open socket, so attach to see it work
+        useBuild.getState().set({ status: 'connecting', error: null, pane: 'code', paneOpen: false })
+        reconnectBuild(b.id)
+      }
       toast.ok(
         tr('Pedido de diseño enviado', 'Design request sent'),
         r.mode === 'redo' ? tr('El diseñador hace otra ronda con tu pedido.', 'The designer does another round with your request.') : r.mode === 'queued' ? tr('Lo toma en el próximo turno.', 'It picks it up on the next turn.') : tr('La construcción se reanudó para aplicarlo.', 'The build resumed to apply it.'),
@@ -72,6 +78,7 @@ export default function DesignPanel() {
       {/* left: the design in plain words + the request box */}
       <div className="flex w-[420px] shrink-0 flex-col border-r border-line">
         <div className="min-h-0 flex-1 overflow-y-auto scroll-thin p-5">
+          <BuilderBusyNotice what={T('Tu pedido de diseño se está aplicando.', 'Your design request is being applied.')} className="mb-4" />
           <div className="text-[10.5px] uppercase tracking-[0.3em] text-accent">{T('El diseño actual', 'The current design')}</div>
           <h3 className="mt-1 text-[22px] leading-tight">{T('Qué tiene el diseño, en palabras simples', 'What the design has, in plain words')}</h3>
           {!hasDesign ? (

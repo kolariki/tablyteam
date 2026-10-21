@@ -7,6 +7,7 @@ import { tr, useT } from '../lib/i18n'
 import { useArena } from '../store'
 import ProviderLogo from './ProviderLogo'
 import { toast } from './Toast'
+import BlockedNotice, { BuilderBusyNotice } from './BlockedNotice'
 
 const LABEL = 'text-[11px] uppercase tracking-[0.25em] text-ink-3'
 const PILL = 'flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-[13px] text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent disabled:opacity-40 disabled:hover:border-line disabled:hover:bg-surface disabled:hover:text-ink-2'
@@ -146,7 +147,8 @@ export default function CloudPanel() {
           )}
         </div>
 
-        {error && <div className="rounded-xl border border-danger/40 bg-danger/5 px-3 py-2 text-[12.5px] text-danger">{error}</div>}
+        <BuilderBusyNotice what={T('Publicar toma los archivos tal como queden.', 'Publishing takes the files as they end up.')} />
+        {error && <BlockedNotice kind="blocked" title={error} action={{ label: T('Cerrar', 'Close'), onClick: () => setError(null) }} />}
 
         {/* -------- hosting */}
         <Section

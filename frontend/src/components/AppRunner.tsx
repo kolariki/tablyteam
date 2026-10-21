@@ -5,6 +5,7 @@ import { reconnectBuild, useBuild } from '../buildStore'
 import { api, type RunService } from '../lib/api'
 import { tr, useT } from '../lib/i18n'
 import { toast } from './Toast'
+import BlockedNotice, { BuilderBusyNotice } from './BlockedNotice'
 
 const STEP = (): Record<string, string> => ({
   installing: tr('Instalando dependencias…', 'Installing dependencies…'),
@@ -24,6 +25,7 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
   const [service, setService] = useState<string>('')
   const [logsOpen, setLogsOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
   const [frameKey, setFrameKey] = useState(0)
   const [full, setFull] = useState(false)
   useEffect(() => {
@@ -40,6 +42,13 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
     api.appRun(b.sessionId, b.id).then((d) => {
       setServices(d.services)
       setService((s) => s || d.run?.service || d.services.find((x) => x.web)?.id || d.services[0]?.id || '')
+      // a run started earlier (or from another tab) is shown as it is, not as "ready to run"
+      const r = d.run
+      const cur = useBuild.getState().appRun
+      if (r && (cur.status === 'idle' || cur.status === 'stopped' || cur.service !== r.service || cur.url !== r.url)) {
+        useBuild.getState().set({ appRun: { status: r.status, service: r.service, label: r.label, url: r.url ?? null, embedUrl: r.embed_url ?? null, port: r.port ?? null, error: r.error ?? null, logs: r.logs ?? cur.logs } })
+        if (r.status === 'installing' || r.status === 'starting' || r.status === 'running') reconnectBuild(b.id!)
+      }
     }).catch((e) => toast.error(tr('No pude analizar el proyecto', 'Could not analyze the project'), (e as Error).message))
   }
   useEffect(load, [b.sessionId, b.id, Object.keys(b.files).length]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -55,18 +64,25 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
     if (!autoStart || autoDone || !services || !service || !b.sessionId || !b.id) return
     if (run.status === 'idle' || run.status === 'stopped') {
       setAutoDone(true)
-      api.appStart(b.sessionId, b.id, service).then(() => reconnectBuild(b.id!)).catch((e) => toast.error(tr('No se pudo correr la app', 'Could not run the app'), (e as Error).message))
+      api.appStart(b.sessionId, b.id, service).then(() => reconnectBuild(b.id!)).catch((e) => { const msg = (e as Error).message; if (/ya está corriendo|already running/i.test(msg)) { load(); reconnectBuild(b.id!) } else setNotice(msg) })
     } else setAutoDone(true)
   }, [autoStart, autoDone, services, service, run.status, b.sessionId, b.id])
 
   const start = async () => {
     if (!b.sessionId || !b.id || !service) return
     setBusy(true)
+    setNotice(null)
     try {
       await api.appStart(b.sessionId, b.id, service)
       reconnectBuild(b.id) // the build's websocket carries app.status / app.log
     } catch (e) {
-      toast.error(tr('No se pudo correr la app', 'Could not run the app'), (e as Error).message)
+      const msg = (e as Error).message
+      if (/ya está corriendo|already running/i.test(msg)) {
+        // not an error: show the run that is already there
+        setNotice(tr('La app ya estaba corriendo: te la muestro tal como está.', 'The app was already running: showing it as it is.'))
+        load()
+        reconnectBuild(b.id)
+      } else setNotice(msg)
     } finally {
       setBusy(false)
     }
@@ -126,6 +142,12 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
         <div className="px-3 py-1.5 text-[11.5px] text-ink-3 border-b border-line font-mono">{sel.dir === '.' ? '' : `${sel.dir}/ · `}{sel.needs_install ? `${sel.install} → ` : ''}{sel.run.replace('{port}', T('<puerto libre>', '<free port>'))}</div>
       )}
 
+      {(notice || b.status === 'running' || b.status === 'reviewing' || b.status === 'connecting') && (
+        <div className="space-y-2 border-b border-line px-3 py-2">
+          {notice && <BlockedNotice kind={/ya estaba|already/.test(notice) ? 'info' : 'blocked'} title={notice} action={{ label: T('Cerrar', 'Close'), onClick: () => setNotice(null) }} />}
+          <BuilderBusyNotice what={T('La app puede cambiar mientras corre: los archivos se están escribiendo.', 'The app may change while it runs: files are being written.')} />
+        </div>
+      )}
       {/* body */}
       <div className="flex-1 min-h-0 flex flex-col">
         {run.status === 'running' && run.url && sel?.web !== false ? (
