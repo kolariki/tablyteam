@@ -205,10 +205,16 @@ function AppInner() {
 
   /** Uploads a project and opens the builder in audit mode. */
   const startAudit = async (form: FormData) => {
-    const { id, session_id } = await api.createAudit(form)
+    const { id, session_id, council } = await api.createAudit(form)
     const name = String(form.get('name') ?? tr('proyecto', 'project'))
     const provider = String(form.get('provider') ?? 'mock')
     const model = String(form.get('model') ?? '')
+    if (council) {
+      // the audit is a council round: watch the debate live; its verdict leads to «construir con estos cambios»
+      useBuild.getState().reset({ id, sessionId: session_id, provider, model, title: name, status: 'completed', mode: 'build' })
+      watchLive(council)
+      return
+    }
     useArena.getState().reset({ view: 'builder', sessionId: session_id, config: null })
     useBuild.getState().reset({ id, sessionId: session_id, provider, model, title: name, status: 'connecting', mode: 'audit' })
     setIntro({ provider, model, title: name })

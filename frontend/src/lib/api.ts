@@ -136,7 +136,7 @@ export const api = {
   buildMessage: (id: string, text: string, session_id?: string | null) => j(post(`/api/builds/${id}/message`, { text, session_id })),
   buildStop: (id: string) => j(post(`/api/builds/${id}/stop`, {})),
   buildResume: (id: string, session_id: string | null) => j(post(`/api/builds/${id}/resume`, { session_id })),
-  createAudit: (form: FormData) => j<{ id: string; session_id: string; files: number }>(authed('/api/audits', { method: 'POST', body: form })),
+  createAudit: (form: FormData) => j<{ id: string; session_id: string; files: number ; council?: string | null}>(authed('/api/audits', { method: 'POST', body: form })),
   buildApply: (id: string, session_id: string | null, requests: { role_label: string; name: string; text: string }[], max_rounds: number) =>
     j(post(`/api/builds/${id}/apply`, { session_id, requests, max_rounds })),
   services: (sessionId: string, id: string) => j<ServicesInfo>(authed(`/api/sessions/${sessionId}/builds/${id}/services`)),

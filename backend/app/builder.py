@@ -1151,7 +1151,7 @@ class Build:
             self._save()
         self.start_council(priorities=priorities, focus=focus)
 
-    def start_council(self, priorities: str | None = None, focus: str = "production") -> str | None:
+    def start_council(self, priorities: str | None = None, focus: str = "production", audit: bool = False) -> str | None:
         """Launches the pre-production review as an arena session (same UI as the debate). Returns the session id."""
         if priorities is not None:
             self.council_priorities = priorities
@@ -1183,12 +1183,17 @@ class Build:
             if self.req.deep_analysis:
                 prior += ("\n\nMODO CLON: el usuario quiere una RÉPLICA del referente principal (todo igual salvo nombre, logo y textos literales). Cada rol compara lado a lado contra las capturas de research/shots/ y "
                           "pide TODO lo que difiera: pantallas que faltan, funcionalidades visibles no implementadas, regiones con otra proporción, colores o tipografías distintas, interacciones ausentes. La vara es la igualdad.")
+        if audit:
+            prior += ("\n\nAUDITORÍA DE UN PROYECTO EXISTENTE: este proyecto lo subió el usuario, no lo construyó este equipo. No hay brief previo: el «brief» de arriba es solo el árbol "
+                      "de archivos y la descripción del usuario. Cada rol revisa el estado real del código desde su área (producto, arquitectura, calidad, diseño, seguridad, datos) y pide "
+                      "cambios CONCRETOS con archivo y pantalla, en orden de impacto: primero lo que bloquea una salida a producción, después mejoras. Al final el consejo entrega la lista "
+                      "de cambios que el constructor va a aplicar sobre este mismo código.")
         if prio:
             prior += f"\n\nPRIORIDADES DEL USUARIO PARA ESTA RONDA (tratarlas primero):\n{prio}"
         ref_names = ", ".join(r.replace("https://", "").replace("http://", "").strip("/") for r in self.req.references[:3]) if self.req.references else ""
         cfg = SessionConfig(
-            topic=(f"Revisión de diseño · ronda {rnd}: ¿las pantallas de {self.title} están al nivel de {ref_names or 'los referentes'}?" if design_focus else f"Revisión pre-producción · ronda {rnd}: ¿{self.title} está listo para salir?"),
-            title=f"Consejo · {self.title} · ronda {rnd}" + (" · diseño" if design_focus else ""),
+            topic=(f"Auditoría · ronda {rnd}: ¿qué hay que cambiar en {self.title} antes de salir a producción?" if audit else f"Revisión de diseño · ronda {rnd}: ¿las pantallas de {self.title} están al nivel de {ref_names or 'los referentes'}?" if design_focus else f"Revisión pre-producción · ronda {rnd}: ¿{self.title} está listo para salir?"),
+            title=(f"Auditoría · {self.title} · ronda {rnd}" if audit else f"Consejo · {self.title} · ronda {rnd}") + (" · diseño" if design_focus else ""),
             mode="review", agents=[{k: v for k, v in a.items() if k in ("id", "role", "name", "provider", "model", "persona", "wanted_provider", "skills")} for a in agents],
             max_turns=min(60, max(4, 2 * len(agents))), min_turns=min(len(agents), 4), final_vote=False, closing_round=True, pace_ms=500, max_tokens=1600,
             auto_skills=True,  # the council picks catalog skills the review needs (per role, on top of the user's)

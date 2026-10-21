@@ -1012,8 +1012,15 @@ async def create_audit(
     b.status = "completed"
     b.chat.append({"role": "system", "text": f"Proyecto «{title}» cargado: {len(files)} archivos. El equipo empieza la auditoría.", "ts": _t.time()})
     BUILDS[b.id] = b
-    b.start_audit()
-    return {"id": b.id, "session_id": sid, "files": len(files)}
+    # the audit is a council round in the arena (live debate → verdict → change list → «construir con estos cambios»);
+    # the silent parallel review stays as fallback when no role can speak via API
+    b.review_plan = {"max_rounds": 6}
+    council = b.start_council(priorities=description.strip()[:2000], focus="production", audit=True)
+    if not council:
+        b.start_audit()
+    else:
+        b._save()
+    return {"id": b.id, "session_id": sid, "files": len(files), "council": council}
 
 
 @app.post("/api/builds/{build_id}/apply")
