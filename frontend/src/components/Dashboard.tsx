@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion'
-import { ChevronDown, Gavel, HardHat, Loader2, MonitorPlay, Pencil, Play, Search, Trash2, Users, Video } from 'lucide-react'
+import { ChevronDown, Download, Gavel, HardHat, Loader2, MonitorPlay, Pencil, Play, Search, Trash2, Users, Video } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, getToken, type DashboardData } from '../lib/api'
 import { fmtDur } from '../lib/duration'
+import { downloadBlob, slug } from '../lib/recorder'
 import { readCache, writeCache } from '../lib/cache'
 import { fmtUsd } from '../lib/parse'
 import { BrandLogoRow, BrandStripes } from './ProviderLogo'
@@ -231,6 +232,23 @@ export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refres
                         <button onClick={() => go(s.id, 'run')} disabled={!latest?.files || !!busyAct} className={builds.length ? ACT_PRIMARY : ACT} title={latest?.files ? T('Levanta la app en esta máquina y la muestra', 'Starts the app on this machine and shows it') : T('Todavía no hay archivos para correr', 'No files to run yet')}>{actLabel(s.id, 'run', <MonitorPlay size={13} />, T('Correr app', 'Run app'))}</button>
                       </>
                     )}
+                    {latest?.files ? (
+                      <button
+                        disabled={busyAct === `${s.id}:zip`}
+                        onClick={async () => {
+                          setBusyAct(`${s.id}:zip`)
+                          try {
+                            downloadBlob(await api.buildZip(s.id, latest.id), `${slug(s.title || s.topic) || 'proyecto'}.zip`)
+                          } finally {
+                            setBusyAct(null)
+                          }
+                        }}
+                        className="rounded-lg border border-line bg-surface/70 px-2 py-1.5 text-ink-3 hover:text-ink disabled:opacity-50"
+                        title={T('Descargar el proyecto (.zip con el código, el BRIEF y el README)', 'Download the project (.zip with the code, the BRIEF and the README)')}
+                      >
+                        {busyAct === `${s.id}:zip` ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                      </button>
+                    ) : null}
                     {!isAudit && <button onClick={() => onReplay(s.id)} className="rounded-lg border border-line bg-surface/70 px-2 py-1.5 text-ink-3 hover:text-ink" title={T('Reproducir como video', 'Play as video')}><Video size={13} /></button>}
                     <button onClick={() => { setEditing(s.id); setTitle(s.title || s.topic) }} className="rounded-lg border border-line bg-surface/70 px-2 py-1.5 text-ink-3 hover:text-ink" title={T('Renombrar', 'Rename')}><Pencil size={13} /></button>
                     <button
