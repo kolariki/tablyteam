@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, CheckCircle2, FlaskConical, Gauge, Home, ListChecks, Search, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, FlaskConical, Gauge, Home, ListChecks, Search, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2, CloudUpload } from 'lucide-react'
 import { marked } from 'marked'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { reconnectBuild, useBuild, type Activity, type ChatItem, type Todo } from '../buildStore'
@@ -12,6 +12,7 @@ import { toast } from './Toast'
 import ProviderLogo from './ProviderLogo'
 import { LiveReview, ReviewLauncher, ReviewRoundCard } from './ReviewPanel'
 import ServicesDeploy from './ServicesDeploy'
+import CloudPanel from './CloudPanel'
 import AppRunner from './AppRunner'
 import RunModal from './RunModal'
 import VersionsPanel, { ReadinessBadge } from './VersionsPanel'
@@ -35,6 +36,7 @@ const PANES: { id: BuildState['pane']; icon: typeof FileCode2; es: string; en: s
   { id: 'preview', icon: Eye, es: 'Vista previa', en: 'Preview', off: (b) => !b.previewHtml },
   { id: 'app', icon: MonitorPlay, es: 'App real', en: 'Real app', off: (b) => Object.keys(b.files).length === 0 },
   { id: 'versions', icon: GitBranch, es: 'Versiones', en: 'Versions', off: (b) => b.versions.length === 0 },
+  { id: 'cloud', icon: CloudUpload, es: 'Publicar', en: 'Publish', off: () => false },
   { id: 'deploy', icon: KeyRound, es: 'Servicios y deploy', en: 'Services & deploy', off: () => false },
   { id: 'report', icon: FileText, es: 'Informe', en: 'Report', off: (b) => !b.auditReport },
 ]
@@ -518,6 +520,8 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
                 {(() => { const cur = PANES.find((x) => x.id === b.pane); const Icon = cur?.icon ?? FileCode2; return <span className={`flex items-center gap-1.5 font-semibold ${b.pane === 'code' ? (codeDark ? 'text-white' : 'text-ink') : 'text-ink'}`}><Icon size={14} className={b.pane === 'code' && codeDark ? 'text-[#8FD3B0]' : 'text-accent'} /> {cur ? T(cur.es, cur.en) : ''}</span> })()}
                 {b.pane === 'code' ? (
                   <span className="ml-auto text-[11px] opacity-70">{running ? T('solo lectura mientras el constructor escribe', 'read-only while the builder writes') : T('editá y guardá con ⌘S: el constructor sigue desde tu versión', 'edit and save with ⌘S: the builder continues from your version')}</span>
+                ) : b.pane === 'cloud' ? (
+                  <span className="ml-auto text-[11px] text-ink-3">{T('hosting, base de datos, git y migración', 'hosting, database, git and migration')}</span>
                 ) : b.pane === 'deploy' ? (
                   <span className="ml-auto text-[11px] text-ink-3">{T('keys, variables y hosting', 'keys, variables and hosting')}</span>
                 ) : b.pane === 'app' ? (
@@ -547,6 +551,8 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
                 <VersionsPanel />
               ) : b.pane === 'app' ? (
                 <AppRunner />
+              ) : b.pane === 'cloud' ? (
+                <CloudPanel />
               ) : b.pane === 'deploy' ? (
                 <ServicesDeploy onOpenSettings={() => { useArena.getState().set({ view: 'settings' }) }} />
               ) : b.pane === 'report' && b.auditReport ? (

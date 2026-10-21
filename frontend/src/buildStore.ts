@@ -1,3 +1,4 @@
+import type { CloudApp } from './lib/api'
 import { create } from 'zustand'
 
 export interface BuildFile {
@@ -121,11 +122,15 @@ interface BuildState {
   reviewMode: 'review' | 'audit'
   mode: 'build' | 'audit'
   auditReport: string | null
-  pane: 'code' | 'preview' | 'report' | 'deploy' | 'app' | 'versions' | 'design'
+  pane: 'code' | 'preview' | 'report' | 'deploy' | 'app' | 'versions' | 'design' | 'cloud'
   fdePrefill: string | null  // open "Pedir un developer" with this text once the builder is shown
   paneOpen: boolean  // right drawer (code/preview/…) closed by default: the agent's work is the show
   deploying: boolean
   deployLogs: string[]
+  publishing: boolean
+  cloudLogs: string[]
+  cloudApp: CloudApp | null
+  cloudGithub: string | null
   councilSession: string | null
   researching: { refs: string[]; started: number; visited: { name?: string; url?: string | null; ok?: boolean }[]; finished: boolean; opening?: boolean } | null  // references being benchmarked before a council round; opening = the council is up, play the fusion and leave
   councilSessionsKnown: number  // how many council rounds the build had when the research started (the poll detects the new one)
@@ -178,6 +183,10 @@ const empty = {
   reviewRound: null,
   deploying: false,
   deployLogs: [] as string[],
+  publishing: false,
+  cloudLogs: [] as string[],
+  cloudApp: null as CloudApp | null,
+  cloudGithub: null as string | null,
   councilSession: null as string | null,
   researching: null as { refs: string[]; started: number; visited: { name?: string; url?: string | null; ok?: boolean }[]; finished: boolean; opening?: boolean } | null,
   councilSessionsKnown: 0,
@@ -318,6 +327,18 @@ export const useBuild = create<BuildState>((set, get) => ({
         break
       case 'app.log':
         set({ appRun: { ...s.appRun, logs: [...s.appRun.logs.slice(-600), ev.line] } })
+        break
+      case 'cloud.started':
+        set({ publishing: true, cloudLogs: [], pane: 'cloud', paneOpen: true })
+        break
+      case 'cloud.log':
+        set({ cloudLogs: [...s.cloudLogs.slice(-400), ev.line] })
+        break
+      case 'cloud.status':
+        set({ publishing: false, cloudApp: ev.app?.slug ? ev.app : s.cloudApp })
+        break
+      case 'cloud.github':
+        set({ cloudGithub: ev.url })
         break
       case 'deploy.started':
         set({ deploying: true, deployLogs: [] })

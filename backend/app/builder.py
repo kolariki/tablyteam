@@ -73,6 +73,7 @@ ESTÁNDAR DE CALIDAD (el equipo que diseñó el producto lo va a revisar con est
 REGLAS:
 - Código real, completo, que compila y corre. Nada de pseudocódigo, TODOs vacíos ni placeholders.
 - Primera etapa: estructura del proyecto, README.md (setup), .env.example con TODAS las variables del brief, dependencias y config base.
+- Publicable con un clic (Tably Cloud): si es frontend, `npm run build` tiene que dejar un `dist/` (o `build/`/`out/`) estático que funcione servido desde cualquier ruta (assets relativos o `base` configurable por `--base`); si tiene servidor, tiene que arrancar con la variable `PORT` y escuchar en `0.0.0.0`, con un `Dockerfile` si no es Node o Python estándar. Postgres solo por `DATABASE_URL`; auth y storage por Supabase (`SUPABASE_URL`, `SUPABASE_ANON_KEY`).
 - Respetá el stack, el modelo de datos, los contratos y las pantallas del brief. Si algo falta, decidilo y anotalo en NOTES.md.
 - Cada archivo se entrega una sola vez por turno. Un archivo por <file>. Rutas sin "./" inicial.
 - MÁXIMO 4 archivos por turno (o menos si son largos): tu salida tiene un límite y un archivo cortado no sirve. Si una etapa

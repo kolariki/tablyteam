@@ -161,6 +161,15 @@ export const api = {
   appStart: (sessionId: string, id: string, service: string) => j(post(`/api/sessions/${sessionId}/builds/${id}/run`, { service })),
   appStop: (sessionId: string, id: string) => j(authed(`/api/sessions/${sessionId}/builds/${id}/run`, { method: 'DELETE' })),
   deploy: (sessionId: string, id: string, target: string) => j(post(`/api/sessions/${sessionId}/builds/${id}/deploy`, { target })),
+  cloudStatus: () => j<CloudStatus & { github: { set: boolean; last4: string | null }; apps: CloudApp[] }>(authed('/api/cloud/status')),
+  saveGithubToken: (token: string | null, clear = false) =>
+    j<{ set: boolean; last4: string | null }>(authed('/api/settings/github', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, clear }) })),
+  cloud: (sessionId: string, id: string) => j<CloudInfo>(authed(`/api/sessions/${sessionId}/builds/${id}/cloud`)),
+  cloudPublish: (sessionId: string, id: string) => j(post(`/api/sessions/${sessionId}/builds/${id}/cloud/publish`, {})),
+  cloudUnpublish: (sessionId: string, id: string) => j<{ ok: boolean; app: CloudApp | null }>(authed(`/api/sessions/${sessionId}/builds/${id}/cloud/publish`, { method: 'DELETE' })),
+  cloudDb: (sessionId: string, id: string, provider: 'neon' | 'supabase') => j<{ ok: boolean; provider: string; host: string; vars: string[] }>(post(`/api/sessions/${sessionId}/builds/${id}/cloud/db`, { provider })),
+  gitSync: (sessionId: string, id: string) => j<{ ok: boolean; head: string; committed: boolean; git: GitInfo }>(post(`/api/sessions/${sessionId}/builds/${id}/cloud/git/sync`, {})),
+  gitGithub: (sessionId: string, id: string, name: string, priv: boolean) => j<{ ok: boolean; url: string }>(post(`/api/sessions/${sessionId}/builds/${id}/cloud/git/github`, { name, private: priv })),
   deploySettings: () => j<{ vercel: { set: boolean; last4: string | null }; railway: { set: boolean; last4: string | null }; status: DeployTarget[] }>(authed('/api/settings/deploy')),
   saveDeployToken: (target: string, token: string | null, clear = false) =>
     j<{ set: boolean; last4: string | null }>(authed(`/api/settings/deploy/${target}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, clear }) })),
@@ -232,6 +241,45 @@ export interface ServiceVar {
   configured: boolean
 }
 
+export interface CloudStatus {
+  static: 'local' | 'cloudflare'
+  server: 'fly' | null
+  database: 'neon' | null
+  auth: 'supabase' | null
+  missing: Record<'cloudflare' | 'fly' | 'neon' | 'supabase', string | null>
+  public_url: string
+}
+export interface CloudDb { provider: string; ok: boolean; vars: string[]; host: string | null; ts: number }
+export interface CloudApp {
+  build_id: string
+  slug: string
+  provider: 'local' | 'cloudflare' | 'fly' | string
+  kind: 'static' | 'server' | 'unknown' | string
+  status: 'building' | 'live' | 'error' | 'down' | string
+  url: string | null
+  version: number | null
+  error: string | null
+  log: string[]
+  db: Partial<Record<'database' | 'auth', CloudDb>>
+  created: number
+  updated: number
+}
+export interface GitInfo {
+  exists: boolean
+  clone_url: string
+  head: string | null
+  commits: { hash: string; ts: number; message: string; refs: string[] }[]
+  tags: string[]
+}
+export interface CloudInfo {
+  app: CloudApp | null
+  git: GitInfo
+  migration: { has_database: boolean; database_url_masked: string | null; pg_dump: string | null; pg_restore: string | null; env_vars: string[] }
+  status: CloudStatus
+  github: { set: boolean; last4: string | null }
+  publishing: boolean
+  version: number
+}
 export interface DeployTarget {
   id: string
   label: string

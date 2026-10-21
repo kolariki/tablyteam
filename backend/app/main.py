@@ -49,6 +49,8 @@ from . import research_jobs
 from . import providers as provmod
 from . import runner as runmod
 from . import skills as skillmod
+from . import cloud as cloudmod
+from . import gitserver
 from . import skills_catalog as catalog
 from .i18n_data import GROUPS_EN, preset_en, role_en, template_en
 from . import fde as fdemod
@@ -1826,6 +1828,156 @@ async def _startup():
     from .tasks import start_runner
 
     start_runner()
+
+
+# ================================================================================================ Tably Cloud · git propio, publicar, base de datos, migrar
+
+
+@app.get("/api/cloud/status")
+def cloud_status(user: User = CurrentUser):
+    return {**cloudmod.status(), "github": keystore.key_status(user.id, "github"), "apps": [cloudmod.public(a) for a in cloudmod.list_apps(user.id)]}
+
+
+@app.put("/api/settings/github")
+def settings_github(body: dict, user: User = CurrentUser):
+    keystore.save(user.id, "github", api_key=body.get("token"), clear_key=bool(body.get("clear")))
+    return keystore.key_status(user.id, "github")
+
+
+def _cloud_root(user: User, b) -> Path:
+    """The project folder to build/publish/commit: the engine's workdir when it really holds the project; otherwise
+    (API builds, or a workdir that is empty because the build was restored elsewhere) a folder written from the saved files."""
+    def has_project(d: Path) -> bool:
+        for p in d.iterdir():
+            if p.name in (".git", ".gitignore"):
+                continue
+            if p.is_dir() or p.stat().st_size > 0:
+                return True
+        return False
+
+    wd = b.workdir if b.workdir and b.workdir.exists() and has_project(b.workdir) else None
+    return deploymod.materialize(user.id, b.id, b.files, wd)
+
+
+@app.get("/api/sessions/{session_id}/builds/{build_id}/cloud")
+def build_cloud(session_id: str, build_id: str, user: User = CurrentUser):
+    b = _build_any(user, session_id, build_id)
+    return {
+        "app": cloudmod.public(cloudmod.get_app(user.id, build_id)),
+        "git": gitserver.info(user.id, build_id, cloudmod.public_url()),
+        "migration": cloudmod.migration_kit(user.id, build_id),
+        "status": cloudmod.status(),
+        "github": keystore.key_status(user.id, "github"),
+        "publishing": bool(getattr(b, "publishing", False)),
+        "version": len(b.versions),
+    }
+
+
+@app.post("/api/sessions/{session_id}/builds/{build_id}/cloud/publish")
+async def build_cloud_publish(session_id: str, build_id: str, user: User = CurrentUser):
+    b = _build_any(user, session_id, build_id)
+    if getattr(b, "publishing", False):
+        raise HTTPException(409, "Ya hay una publicación en curso")
+    if b.status in ("running", "reviewing"):
+        raise HTTPException(409, "Esperá a que el constructor termine")
+    _check_capacity(user.id)
+    root = _cloud_root(user, b)
+    b.publishing = True
+    b.emit("cloud.started", build=build_id)
+
+    async def run():
+        def logf(line: str):
+            b.emit("cloud.log", line=line[-500:])
+
+        try:
+            app_ = await cloudmod.publish(user.id, build_id, b.title, root, b.files, len(b.versions), logf)
+            gitserver.sync(user.id, build_id, root, f"publicación v{len(b.versions)}")
+        except Exception as e:  # noqa: BLE001
+            log.exception("cloud publish")
+            app_ = {"status": "error", "error": str(e)[:300], "url": None, "slug": None, "provider": None}
+        b.publishing = False
+        b.emit("cloud.status", app=cloudmod.public(app_) if app_.get("slug") else app_)
+
+    spawn(run())
+    return {"ok": True}
+
+
+@app.delete("/api/sessions/{session_id}/builds/{build_id}/cloud/publish")
+async def build_cloud_unpublish(session_id: str, build_id: str, user: User = CurrentUser):
+    b = _build_any(user, session_id, build_id)
+    app_ = await cloudmod.unpublish(user.id, build_id)
+    b.emit("cloud.status", app=cloudmod.public(app_))
+    return {"ok": True, "app": cloudmod.public(app_)}
+
+
+@app.post("/api/sessions/{session_id}/builds/{build_id}/cloud/db")
+async def build_cloud_db(session_id: str, build_id: str, body: dict, user: User = CurrentUser):
+    b = _build_any(user, session_id, build_id)
+    provider = body.get("provider")
+
+    def logf(line: str):
+        b.emit("cloud.log", line=line[-500:])
+
+    if provider == "neon":
+        res = await cloudmod.provision_neon(user.id, build_id, b.title, logf)
+    elif provider == "supabase":
+        res = await cloudmod.provision_supabase(user.id, build_id, b.title, logf)
+    else:
+        raise HTTPException(400, "proveedor inválido")
+    if not res.get("ok"):
+        raise HTTPException(400, res.get("error") or "no se pudo provisionar")
+    b.emit("cloud.status", app=cloudmod.public(cloudmod.get_app(user.id, build_id)))
+    return res
+
+
+@app.post("/api/sessions/{session_id}/builds/{build_id}/cloud/git/sync")
+def build_git_sync(session_id: str, build_id: str, user: User = CurrentUser):
+    b = _build_any(user, session_id, build_id)
+    res = gitserver.sync(user.id, build_id, _cloud_root(user, b), f"sync manual · v{len(b.versions)}")
+    if not res.get("ok"):
+        raise HTTPException(400, res.get("error") or "no se pudo sincronizar")
+    return {**res, "git": gitserver.info(user.id, build_id, cloudmod.public_url())}
+
+
+@app.post("/api/sessions/{session_id}/builds/{build_id}/cloud/git/github")
+def build_git_github(session_id: str, build_id: str, body: dict, user: User = CurrentUser):
+    b = _build_any(user, session_id, build_id)
+    token = keystore.get_key(user.id, "github")
+    if not token:
+        raise HTTPException(400, "Cargá un token de GitHub (permiso «repo») en Configuración → Tably Cloud.")
+    res = gitserver.push_github(user.id, build_id, token, body.get("name") or b.title or build_id, private=body.get("private", True), root=_cloud_root(user, b))
+    if not res.get("ok"):
+        raise HTTPException(400, res.get("error") or "no se pudo mover a GitHub")
+    b.emit("cloud.github", url=res["url"])
+    return res
+
+
+@app.api_route("/git/{user_id}/{repo}/{path:path}", methods=["GET", "POST"])
+async def git_http(user_id: str, repo: str, path: str, request: Request):
+    """Smart HTTP for `git clone/fetch/push`: the account token goes as the Basic password (any username)."""
+    tok = gitserver.parse_basic_auth(request.headers.get("authorization"))
+    u = auth.user_from_token(tok) if tok else None
+    if not u or u.id != user_id:
+        return Response(status_code=401, headers={"WWW-Authenticate": 'Basic realm="Tably Git"'}, content="token requerido")
+    body = await request.body()
+    status, headers, payload = gitserver.http_backend(user_id, repo, path, request.method, request.url.query, request.headers.get("content-type"), body)
+    return Response(status_code=status, headers={k: v for k, v in headers}, content=payload)
+
+
+@app.get("/apps/{slug}/{path:path}")
+def cloud_app_file(slug: str, path: str = ""):
+    p = cloudmod.local_file(slug, path)
+    if not p:
+        raise HTTPException(404)
+    return FileResponse(p)
+
+
+@app.get("/apps/{slug}")
+def cloud_app_root(slug: str):
+    p = cloudmod.local_file(slug, "")
+    if not p:
+        raise HTTPException(404)
+    return FileResponse(p)
 
 
 @app.on_event("shutdown")

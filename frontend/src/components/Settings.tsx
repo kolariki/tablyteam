@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check, ExternalLink, KeyRound, Loader2, ShieldCheck, Trash2 } from 'lucide-react'
+import { Check, CloudUpload, Database, ExternalLink, Globe, KeyRound, Loader2, Server, ShieldCheck, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api, type ProviderSetting } from '../lib/api'
 import { tr, useT } from '../lib/i18n'
@@ -85,9 +85,81 @@ export default function Settings({ onBack }: { onBack: () => void }) {
             </motion.div>
           ))}
         </div>
+        <TablyCloudSettings />
         <DeploySettings />
         <LangfuseSettings />
       </div>
+    </div>
+  )
+}
+
+/** Tably Cloud: what this installation can publish/provision (operator .env) and the user's GitHub token for «Mover a GitHub». */
+function TablyCloudSettings() {
+  const T = useT()
+  const [st, setSt] = useState<Awaited<ReturnType<typeof api.cloudStatus>> | null>(null)
+  const [tok, setTok] = useState('')
+  const [msg, setMsg] = useState<string | null>(null)
+  const load = () => { api.cloudStatus().then(setSt).catch(() => {}) }
+  useEffect(load, [])
+  if (!st) return null
+  const rows = [
+    { icon: <Globe size={15} />, title: T('Hosting estático', 'Static hosting'), ok: true, value: st.static === 'cloudflare' ? 'Cloudflare Pages' : T('Servidor de Tably (local)', 'Tably server (local)'), hint: st.static === 'cloudflare' ? null : st.missing.cloudflare },
+    { icon: <Server size={15} />, title: T('Apps con servidor', 'Server apps'), ok: !!st.server, value: st.server ? 'Fly Machines' : T('No disponible', 'Not available'), hint: st.missing.fly },
+    { icon: <Database size={15} />, title: 'Postgres', ok: !!st.database, value: st.database ? 'Neon' : T('No disponible', 'Not available'), hint: st.missing.neon },
+    { icon: <ShieldCheck size={15} />, title: T('Auth y storage', 'Auth and storage'), ok: !!st.auth, value: st.auth ? 'Supabase' : T('No disponible', 'Not available'), hint: st.missing.supabase },
+  ]
+  return (
+    <div className="mt-8">
+      <div className="flex items-center gap-2">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-white"><CloudUpload size={15} /></span>
+        <h2 className="text-2xl">Tably Cloud</h2>
+      </div>
+      <p className="mt-1 text-[13px] text-ink-2">{T('Publicación con un clic desde el constructor: hosting, base de datos y auth salen de las cuentas de Tably y la app se lleva a otro lado cuando quieras. Lo que falte se configura en el .env del backend.', 'One-click publishing from the builder: hosting, database and auth come from Tably\'s accounts and the app can be moved elsewhere whenever you want. Anything missing is configured in the backend .env.')}</p>
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        {rows.map((r) => (
+          <div key={r.title} className={`flex items-start gap-3 rounded-2xl border px-4 py-3.5 ${r.ok ? 'border-ok/30 bg-ok/5' : 'border-line bg-surface'}`}>
+            <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${r.ok ? 'bg-ok/15 text-ok' : 'bg-surface-2 text-ink-3'}`}>{r.icon}</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 text-[14px] font-semibold">{r.title}
+                <span className={`ml-auto inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${r.ok ? 'border-ok/30 bg-ok/10 text-ok' : 'border-line bg-surface text-ink-3'}`}>{r.ok && <span className="h-2 w-2 rounded-full bg-ok" />}{r.value}</span>
+              </div>
+              {r.hint && <div className="mt-1 text-[11.5px] leading-snug text-ink-4">{T('Para activarlo:', 'To enable it:')} {r.hint}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 rounded-2xl border border-line bg-surface p-5">
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-sm ring-1 ring-black/10"><ProviderLogo provider="github" size={22} /></span>
+          <div>
+            <div className="text-[15px] font-semibold">GitHub</div>
+            <a href="https://github.com/settings/tokens/new?scopes=repo&description=Tably%20Team" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[12px] text-ink-3 hover:text-accent">{T('crear token con permiso «repo»', 'create a token with the "repo" scope')} <ExternalLink size={11} /></a>
+          </div>
+          <span className={`ml-auto inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11.5px] font-medium ${st.github.set ? 'border-ok/30 bg-ok/10 text-ok' : 'border-line bg-surface text-ink-3'}`}>{st.github.set && <span className="h-2 w-2 rounded-full bg-ok" />}{st.github.set ? T('Conectado', 'Connected') : T('Sin token', 'No token')}</span>
+        </div>
+        <p className="mt-2 text-[12.5px] text-ink-2">{T('Con este token, «Mover a GitHub» crea el repositorio en tu cuenta y sube el historial completo de la construcción.', 'With this token, "Move to GitHub" creates the repository in your account and pushes the build\'s full history.')}</p>
+        <div className="mt-3 flex gap-2">
+          <input type="password" autoComplete="off" placeholder={st.github.set ? `token ··${st.github.last4}` : 'ghp_…'} value={tok} onChange={(e) => setTok(e.target.value)} className="h-10 flex-1 rounded-xl border border-line bg-paper px-3 font-mono text-[13px] outline-none focus:border-accent" />
+          <button disabled={!tok.trim()} onClick={async () => { await api.saveGithubToken(tok.trim()); setTok(''); setMsg(tr('Token de GitHub guardado', 'GitHub token saved')); load() }} className="flex h-10 items-center gap-1.5 rounded-full bg-accent px-4 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40"><Check size={14} /> {T('Guardar', 'Save')}</button>
+          {st.github.set && <button onClick={async () => { await api.saveGithubToken(null, true); setMsg(tr('Token borrado', 'Token deleted')); load() }} className="flex h-10 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-[13px] text-ink-2 transition hover:border-danger hover:text-danger"><Trash2 size={14} /> {T('Borrar', 'Delete')}</button>}
+        </div>
+        {msg && <div className="mt-2 text-[12px] text-ok">{msg}</div>}
+      </div>
+      {st.apps.length > 0 && (
+        <div className="mt-3 rounded-2xl border border-line bg-surface p-5">
+          <div className="text-[11px] uppercase tracking-[0.25em] text-ink-3">{T('Apps publicadas', 'Published apps')}</div>
+          <ul className="mt-2 divide-y divide-line">
+            {st.apps.map((a) => (
+              <li key={a.slug} className="flex items-center gap-3 py-2 text-[13px]">
+                <span className={`h-2 w-2 rounded-full ${a.status === 'live' ? 'bg-ok' : a.status === 'error' ? 'bg-danger' : 'bg-ink-4'}`} />
+                <span className="font-mono text-[12px]">{a.slug}</span>
+                <span className="text-[11.5px] text-ink-3">{a.provider} · v{a.version ?? '?'}</span>
+                {a.url && <a href={a.url} target="_blank" rel="noreferrer" className="ml-auto inline-flex items-center gap-1 text-[12px] text-accent hover:underline">{a.url.replace(/^https?:\/\//, '')} <ExternalLink size={11} /></a>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

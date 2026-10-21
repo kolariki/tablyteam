@@ -6,9 +6,11 @@ const HAS_LOGO = new Set(['anthropic', 'openai', 'deepseek', 'gemini', 'xai', 'g
 
 const ALIAS: Record<string, string> = { 'claude-code': 'anthropic', codex: 'openai' }
 
+const HAS_SVG = new Set(['github', 'cloudflare'])
+
 export const logoUrl = (provider?: string | null) => {
   const p = provider ? ALIAS[provider] ?? provider : null
-  return p && HAS_LOGO.has(p) ? `/logos/${p}.png` : null
+  return p && HAS_LOGO.has(p) ? `/logos/${p}.png` : p && HAS_SVG.has(p) ? `/logos/${p}.svg` : null
 }
 
 export default function ProviderLogo({ provider, size = 20, className = '' }: { provider?: string | null; size?: number; className?: string }) {
