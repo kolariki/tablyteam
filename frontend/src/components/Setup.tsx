@@ -178,17 +178,25 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
     setCfg((c) => ({ ...c, agents: [...c.agents, { id: `agente-${n}`, name: `Agente ${n}`, provider: p.id, model: p.default_model, persona: '', color: p.id === 'mock' ? PALETTE[(n - 1) % PALETTE.length] : null }] }))
   }
 
-  const start = async () => {
+  const validate = () => {
     setError(null)
     const ids = cfg.agents.map((a) => a.id)
-    if (new Set(ids).size !== ids.length) return setError(tr('Los ids de agentes deben ser únicos', 'Agent ids must be unique'))
-    if (!cfg.topic.trim()) return setError(tr('Falta el tema', 'The topic is missing'))
-    setBusy(true)
-    try {
-      let context = cfg.context ?? null
-      const refs = (cfg.references ?? []).map((r) => r.trim()).filter(Boolean)
-      if (refs.length) {
-        // benchmark the references first (the reverse-engineering screen shows it); the team then debates with the notes
+    if (new Set(ids).size !== ids.length) { setError(tr('Los ids de agentes deben ser únicos', 'Agent ids must be unique')); return false }
+    if (!cfg.topic.trim()) { setError(tr('Falta el tema', 'The topic is missing')); return false }
+    return true
+  }
+
+  // context the debate opens with: the user's own notes plus the benchmark of the references (researched first)
+  const launchContext = useRef<string | null>(null)
+
+  /** Benchmark the references first, with the reverse-engineering screen; then the team intro; then the council. */
+  const research = async () => {
+    if (!validate()) return
+    let context = cfg.context ?? null
+    const refs = (cfg.references ?? []).map((r) => r.trim()).filter(Boolean)
+    if (refs.length) {
+      setBusy(true)
+      try {
         const job = await api.researchJobStart(refs, `${cfg.title ?? ''}\n\n${cfg.topic}`, !!cfg.deep_analysis)
         useBuild.getState().set({ researching: { refs, started: Date.now(), visited: [], finished: false }, activity: [] })
         const md = await new Promise<string>((resolve) => {
@@ -205,12 +213,24 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
           tick()
         })
         if (md) context = (context ? `${context}\n\n` : '') + md
-        const st = useBuild.getState()
-        st.set({ researching: st.researching ? { ...st.researching, finished: true, opening: true } : null })
+      } catch (e) {
+        useBuild.getState().set({ researching: null })
+        setError((e as Error).message)
+        setBusy(false)
+        return
       }
-      await onStart({ ...cfg, context, min_turns: Math.min(cfg.min_turns, cfg.max_turns) })
+      useBuild.getState().set({ researching: null, activity: [] })
+      setBusy(false)
+    }
+    launchContext.current = context
+    setLaunching(true)
+  }
+
+  const start = async () => {
+    setBusy(true)
+    try {
+      await onStart({ ...cfg, context: launchContext.current ?? cfg.context ?? null, min_turns: Math.min(cfg.min_turns, cfg.max_turns) })
     } catch (e) {
-      useBuild.getState().set({ researching: null })
       setError((e as Error).message)
     } finally {
       setBusy(false)
@@ -623,7 +643,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
               const stops = order.map((p, i) => `${brandTheme(p).tint} ${(((i + 0.5) / order.length) * 100).toFixed(2)}%`).join(', ')
               const background = order.length === 1 ? brandTheme(order[0]).tint : `linear-gradient(90deg, ${stops})`
               return (
-                <button onClick={() => { setError(null); if (!cfg.topic.trim()) return setError(tr('Falta el tema', 'The topic is missing')); const ids = cfg.agents.map((a) => a.id); if (new Set(ids).size !== ids.length) return setError(tr('Los ids de agentes deben ser únicos', 'Agent ids must be unique')); setLaunching(true) }} disabled={busy || launching || cfg.agents.length < 2} style={{ background }} className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-black/10 text-ink px-6 py-3.5 font-bold text-lg shadow-sm hover:scale-[1.02] transition disabled:opacity-50" title={order.join(' · ')}>
+                <button onClick={research} disabled={busy || launching || cfg.agents.length < 2} style={{ background }} className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-black/10 text-ink px-6 py-3.5 font-bold text-lg shadow-sm hover:scale-[1.02] transition disabled:opacity-50" title={order.join(' · ')}>
                   {/* launch: the play icon slides out to the right, then the logos follow one by one (each one shows up big on stage as it leaves) */}
                   <span className="flex items-center -space-x-1">
                     {order.map((p, i) => (
@@ -640,7 +660,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                   <motion.span animate={launching ? { x: 220, opacity: 0 } : { x: 0, opacity: 1 }} transition={{ duration: PLAY_OUT, ease: 'easeIn' }} className="inline-flex">
                     <Play size={20} className="group-hover:translate-x-0.5 transition" />
                   </motion.span>
-                  {launching ? tr('Entrando a la arena…', 'Entering the arena…') : busy ? tr('Iniciando…', 'Starting…') : tr('Iniciar experimento', 'Start experiment')}
+                  {launching ? tr('Entrando a la arena…', 'Entering the arena…') : busy ? tr('Investigando referencias…', 'Researching references…') : tr('Iniciar experimento', 'Start experiment')}
                 </button>
               )
             })()}
