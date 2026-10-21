@@ -35,6 +35,7 @@ export interface SessionConfig {
   final_vote: boolean
   closing_round?: boolean
   auto_skills?: boolean
+  platform?: 'web' | 'mobile' | 'both'  // what gets built: web app, mobile app (iOS + Android) or both
   references?: string[]  // reference apps / URLs the team studies before designing
   deep_analysis?: boolean  // paid per use: REA reverse engineering of those apps during the build
   starter?: string | null

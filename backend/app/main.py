@@ -894,6 +894,8 @@ async def create_build(req: BuildRequest, user: User = CurrentUser):
         req.references = [r for r in (data["config"].get("references") or []) if isinstance(r, str) and r.strip()]
     brief = _brief_for(user, req.session_id, req.target)
     title = data["config"].get("title") or data["config"]["topic"][:60]
+    if req.platform == "web":  # the request rarely says it: the session config decides (web / mobile / both)
+        req.platform = data["config"].get("platform") or "web"
     b = start_build(user, req, cred, brief, title, data["config"].get("agents", []), keystore.creds(user.id))
     return {"id": b.id}
 
@@ -1962,6 +1964,33 @@ async def git_http(user_id: str, repo: str, path: str, request: Request):
     body = await request.body()
     status, headers, payload = gitserver.http_backend(user_id, repo, path, request.method, request.url.query, request.headers.get("content-type"), body)
     return Response(status_code=status, headers={k: v for k, v in headers}, content=payload)
+
+
+@app.get("/api/devices")
+def devices_status(user: User = CurrentUser):
+    """What this machine can run for mobile apps (iOS Simulator, Android emulator)."""
+    return runmod.devices()
+
+
+@app.get("/api/sessions/{session_id}/builds/{build_id}/run/screen")
+def app_run_screen(session_id: str, build_id: str, request: Request, target: str = "ios", token: str | None = None):
+    """The device screen as PNG. Auth by bearer or by `token` query, because the panel loads it in an <img>."""
+    bearer = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
+    user = auth.user_from_token(token or bearer or None)
+    if not user:
+        raise HTTPException(401)
+    _build_any(user, session_id, build_id)
+    png = runmod.screenshot(target if target in ("ios", "android") else "ios")
+    if not png:
+        raise HTTPException(404, "No hay un dispositivo encendido para capturar")
+    return Response(content=png, media_type="image/png", headers={"cache-control": "no-store"})
+
+
+@app.post("/api/sessions/{session_id}/builds/{build_id}/run/tap")
+def app_run_tap(session_id: str, build_id: str, body: dict, user: User = CurrentUser):
+    _build_any(user, session_id, build_id)
+    ok = runmod.tap(str(body.get("target") or "android"), int(body.get("x") or 0), int(body.get("y") or 0))
+    return {"ok": ok}
 
 
 @app.get("/apps/{slug}/{path:path}")

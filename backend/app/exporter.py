@@ -281,6 +281,13 @@ async def stream_brief(user: User, session_id: str, req: BriefRequest) -> AsyncI
     cfg = data["config"]
     system = BRIEF_SYSTEM.format(language=cfg.get("language", "español"), howto=TARGETS[req.target]["howto"])
     user_msg = f"DEBATE A CONVERTIR EN BRIEF:\n\n{transcript}"
+    plat = cfg.get("platform") or "web"
+    if plat == "mobile":
+        user_msg += ("\n\nPLATAFORMA ELEGIDA POR EL USUARIO: APP MÓVIL (iOS y Android). El brief es para una app móvil: stack por defecto Expo (React Native) + TypeScript + expo-router, "
+                     "pantallas de teléfono con navegación nativa, publicación en App Store y Google Play (EAS Build) como etapa final, backend aparte solo si hace falta. No propongas una web app.")
+    elif plat == "both":
+        user_msg += ("\n\nPLATAFORMA ELEGIDA POR EL USUARIO: WEB + MÓVIL (iOS y Android). El brief cubre las dos: stack por defecto Expo (React Native) + TypeScript + expo-router con react-native-web "
+                     "(un solo código), web responsive publicable como estático y app móvil para las tiendas; backend aparte solo si hace falta. Marcá qué pantallas difieren entre web y móvil.")
     if cfg.get("context") and "Referentes" in str(cfg.get("context")):
         clone = bool(cfg.get("deep_analysis")) or "Plano de clonación" in str(cfg.get("context"))
         if clone:

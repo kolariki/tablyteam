@@ -113,6 +113,7 @@ class BuildRequest(BaseModel):
     research: bool = False  # level 1: look at reference apps (user's list, or proposed from the brief) before designing
     references: list[str] = []  # reference apps / URLs the team studies first
     deep_analysis: bool = False  # level 2 (paid per use): REA reverse-engineering tools for the builder engine on those targets
+    platform: str = "web"  # web | mobile | both (from the session config): decides the default stack and how the app runs
 
 
 RESEARCH_PATH = "research/REFERENCES.md"
@@ -124,6 +125,33 @@ Usalas SOLO sobre los referentes listados en research/REFERENCES.md: analizá su
 de pantallas y flujos para ENTENDER cómo están construidos (arquitectura, estados, datos que manejan, patrones de UI). Documentá lo que
 aprendiste en research/DEEP_ANALYSIS.md con evidencia. Está prohibido copiar código, assets, textos o marcas de terceros: se aprende el
 mecanismo y se implementa una versión propia para nuestro producto."""
+
+
+def design_platform_note(platform: str) -> str:
+    if platform == "mobile":
+        return ("\n\nPLATAFORMA MÓVIL: diseñá pantallas de teléfono (marco 390×844 con safe areas, barra de estado, tabs o stack nativos, gestos). "
+                "El mockup muestra cada pantalla dentro de un marco de teléfono, con las convenciones de iOS y Android donde difieran (indicá ambas).")
+    if platform == "both":
+        return ("\n\nPLATAFORMA WEB + MÓVIL: diseñá cada pantalla clave en dos versiones, escritorio (1440) y teléfono (390×844 con safe areas y navegación nativa), "
+                "con el mismo sistema visual. El mockup muestra ambas.")
+    return ""
+
+
+def platform_note(platform: str) -> str:
+    """What «web», «mobile» or «both» means for the stack, the screens and what has to run at the end."""
+    if platform == "mobile":
+        return ("\n\nPLATAFORMA: APP MÓVIL (iOS y Android). Stack por defecto salvo que el brief fije otro: Expo (React Native) con TypeScript, expo-router, "
+                "app.json con nombre/ícono/splash propios, `npx expo start` como script `dev` (tiene que correr en el simulador de iOS, en el emulador de Android y en Expo Go). "
+                "Diseñá para pantalla de teléfono (390×844) con safe areas, navegación nativa (tabs/stack), gestos y estados de carga; nada de layouts de escritorio. "
+                "Tests con jest-expo. Si hace falta backend, va aparte (FastAPI o Node, con Dockerfile) y la app lo consume por HTTP con la URL en variables EXPO_PUBLIC_*. "
+                f"Igual creá `{PREVIEW_PATH}` como maqueta HTML de las pantallas en un marco de teléfono.")
+    if platform == "both":
+        return ("\n\nPLATAFORMA: WEB + MÓVIL (iOS y Android). Stack por defecto salvo que el brief fije otro: Expo (React Native) con TypeScript y expo-router, "
+                "con soporte web de primera clase (react-native-web): un solo código, `npx expo start --web` para la web y `npx expo start` para los dispositivos. "
+                "La web tiene que ser responsive y usable con mouse y teclado; el móvil con safe areas y navegación nativa. app.json con nombre/ícono/splash. "
+                "Backend aparte si hace falta (FastAPI o Node, Dockerfile), consumido por HTTP con EXPO_PUBLIC_*. "
+                f"`npx expo export --platform web` tiene que dejar un `dist/` estático publicable. Creá también `{PREVIEW_PATH}`.")
+    return ""
 
 
 CLONE_NOTE = (f"\n\nMODO CLON (ingeniería inversa activada por el usuario): el objetivo es que nuestro producto sea una RÉPLICA del referente principal, para usarla como base e iterar después. "
@@ -318,7 +346,7 @@ class Build:
             "activity": self.activity[-60:], "todos": self.todos,
             "app_run": self.app_run.state() if self.app_run else None,
             "design_review": self.status == "design_review", "design_rounds": self.design_rounds,
-            "research": self.research_refs, "references": self.req.references, "deep_analysis": self.req.deep_analysis, "fees": self.fees, "fees_usd": round(sum(float(f.get("usd") or 0) for f in self.fees), 2), "fees_due_usd": round(sum(float(f.get("usd") or 0) for f in self.fees if not f.get("paid")), 2),
+            "research": self.research_refs, "references": self.req.references, "deep_analysis": self.req.deep_analysis, "platform": self.req.platform, "fees": self.fees, "fees_usd": round(sum(float(f.get("usd") or 0) for f in self.fees), 2), "fees_due_usd": round(sum(float(f.get("usd") or 0) for f in self.fees if not f.get("paid")), 2),
             "council_sessions": self.council_sessions, "council": self.req.council,
             "versions": self.versions, "version": len(self.versions), "pending_council": self.pending_council(),
             "mode": self.mode, "audit_report": self.audit_report, "deploys": self.deploys,
@@ -508,7 +536,7 @@ class Build:
             await self._run_engine(resume_with)
             return
         system = BUILDER_SYSTEM.format(language="español", quality_bar=quality_bar([a.get("role") for a in self.team] or None), design_rule=BUILDER_DESIGN_RULE + frontend_design_guide(5000) if self.design_html else "")
-        first = f"BRIEF.md:\n\n{self.brief}{research_context(self.research_md, bool(self.req.deep_analysis))}{design_context_for_builder(self.files)}\n\n---\nEmpezá por la Etapa 1 del plan. Entregá los archivos completos."
+        first = f"BRIEF.md:\n\n{self.brief}{research_context(self.research_md, bool(self.req.deep_analysis))}{design_context_for_builder(self.files)}{platform_note(self.req.platform)}\n\n---\nEmpezá por la Etapa 1 del plan. Entregá los archivos completos."
         pending_user = resume_with or first
         if resume_with:
             self.preview_html = None  # changes invalidate the prototype; it is regenerated after the next <done>
@@ -598,6 +626,7 @@ class Build:
                       f"Cuando termines, resumí en 5-10 líneas qué quedó construido, cómo correrlo y qué verificar.\n\n"
                       f"ESTÁNDAR DE CALIDAD (el equipo que diseñó el producto lo va a revisar con esta vara; construí para aprobarla a la primera):\n{bar}"
                       + (BUILDER_DESIGN_RULE if (self.workdir / "design" / "mockup.html").exists() else "")
+                      + platform_note(self.req.platform)
                       + (self._build_ref_prompt() if (self.workdir / RESEARCH_PATH).exists() else "")
                       + (REA_PROMPT if self.req.deep_analysis else ""))
         elif resume_with == CONTINUE:
@@ -606,6 +635,7 @@ class Build:
         else:
             prompt = (f"Pedido de cambios sobre el proyecto de este directorio (ver BRIEF.md):\n{resume_with}\n\nAplicá TODOS los cambios con archivos completos, "
                       f"actualizá README/NOTES si corresponde, regenerá `{PREVIEW_PATH}` para reflejarlos, y resumí qué cambió y cómo verificarlo."
+                      + platform_note(self.req.platform)
                       + (self._build_ref_prompt() if (self.workdir / RESEARCH_PATH).exists() else "")
                       + (REA_PROMPT if self.req.deep_analysis else ""))
         self.turns += 1
@@ -941,7 +971,7 @@ class Build:
             return
         designer = next((a for a in self.team if a.get("role") == "product-designer"), None)
         system = design_system_prompt("español") + ("\n\n" + skillmod.prompt_block(self.user.id, designer.get("skills")) if designer and designer.get("skills") else "")
-        user_msg = DESIGN_USER.format(brief=self.brief[:30000]) + research_context(self.research_md, bool(self.req.deep_analysis)) + (self._ref_note() if self.research_md else "")
+        user_msg = DESIGN_USER.format(brief=self.brief[:30000]) + design_platform_note(self.req.platform) + research_context(self.research_md, bool(self.req.deep_analysis)) + (self._ref_note() if self.research_md else "")
         if feedback:
             prev = self.files.get("design/DESIGN.md", "")[:12000]
             user_msg += f"\n\n---\nYA HAY UNA VERSIÓN DEL DISEÑO (abajo). El usuario la vio y pide ESTOS CAMBIOS, que son prioridad absoluta:\n{feedback}\n\nRediseñá entregando los tres archivos completos otra vez, aplicando los cambios y mejorando el resto.\n\nDISEÑO ANTERIOR (DESIGN.md):\n{prev}"
@@ -980,7 +1010,7 @@ class Build:
         try:
             designer = next((a for a in self.team if a.get("role") == "product-designer"), None)
             fb = getattr(self, "_design_feedback_now", None)
-            dprompt = ENGINE_DESIGN_PROMPT + frontend_design_guide() + (self._design_ref_prompt() if self.research_md else "") + (REA_PROMPT if self.req.deep_analysis else "") + (f"\n\nYA EXISTE design/ y el usuario lo revisó. Pide ESTOS CAMBIOS (prioridad absoluta): {fb}\nRediseñá los tres archivos aplicándolos y mejorando el resto." if fb else "") + ("\n\n" + skillmod.prompt_block(self.user.id, designer.get("skills")) if designer and designer.get("skills") else "")
+            dprompt = ENGINE_DESIGN_PROMPT + frontend_design_guide() + design_platform_note(self.req.platform) + (self._design_ref_prompt() if self.research_md else "") + (REA_PROMPT if self.req.deep_analysis else "") + (f"\n\nYA EXISTE design/ y el usuario lo revisó. Pide ESTOS CAMBIOS (prioridad absoluta): {fb}\nRediseñá los tres archivos aplicándolos y mejorando el resto." if fb else "") + ("\n\n" + skillmod.prompt_block(self.user.id, designer.get("skills")) if designer and designer.get("skills") else "")
             res = await run_engine(self.engine, dprompt, self.workdir, resume_session=self.engine_session, model=self._engine_model(), mcp=self._engine_mcp(), on_event=on_event)
             if res.get("session_id"):
                 self.engine_session = res["session_id"]
@@ -1450,6 +1480,7 @@ def rehydrate(user: User, session_id: str, build_id: str, cred: Cred, team: list
     b.research_refs = d.get("research", [])
     b.fees = d.get("fees", [])
     b.build_seconds = float(d.get("build_seconds") or 0)
+    b.req.platform = d.get("platform") or getattr(b.req, "platform", "web")
     saved_hist = [m for m in d.get("history", []) if isinstance(m, dict) and (m.get("content") or "").strip()]
     # keep alternation user/assistant intact; otherwise fall back to a summary of the files written so far
     ok = len(saved_hist) % 2 == 0 and all(m["role"] == ("user" if i % 2 == 0 else "assistant") for i, m in enumerate(saved_hist))

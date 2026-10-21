@@ -17,6 +17,43 @@ const STEP = (): Record<string, string> => ({
   idle: tr('Lista para correr', 'Ready to run'),
 })
 
+/** The iOS Simulator / Android emulator screen, refreshed every second, inside a phone frame. Android takes taps. */
+function DeviceView({ target, sessionId, buildId }: { target: 'ios' | 'android'; sessionId: string; buildId: string }) {
+  const T = useT()
+  const [src, setSrc] = useState<string>(() => api.runScreenUrl(sessionId, buildId, target) + Date.now())
+  const [failed, setFailed] = useState(false)
+  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null)
+  useEffect(() => {
+    const id = window.setInterval(() => setSrc(api.runScreenUrl(sessionId, buildId, target) + Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [sessionId, buildId, target])
+  const onTap = async (e: React.MouseEvent<HTMLImageElement>) => {
+    if (target !== 'android' || !natural) return
+    const r = e.currentTarget.getBoundingClientRect()
+    const x = Math.round(((e.clientX - r.left) / r.width) * natural.w)
+    const y = Math.round(((e.clientY - r.top) / r.height) * natural.h)
+    await api.runTap(sessionId, buildId, target, x, y).catch(() => {})
+  }
+  return (
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-paper/60 p-4">
+      <div className="relative flex max-h-full items-center justify-center rounded-[38px] border-[10px] border-[#1E2622] bg-black shadow-[0_30px_60px_-24px_rgba(30,38,34,.7)]" style={{ aspectRatio: natural ? `${natural.w} / ${natural.h}` : '9 / 19.5', height: 'min(100%, 760px)' }}>
+        {!failed ? (
+          <img src={src} alt="" onLoad={(e) => { setFailed(false); const im = e.currentTarget; if (im.naturalWidth && (!natural || natural.w !== im.naturalWidth)) setNatural({ w: im.naturalWidth, h: im.naturalHeight }) }} onError={() => setFailed(true)} onClick={onTap} className={`h-full w-full rounded-[28px] object-contain ${target === 'android' ? 'cursor-pointer' : ''}`} draggable={false} />
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-[28px] bg-[#111] px-6 text-center text-[12.5px] text-white/80">
+            <Loader2 size={18} className="animate-spin text-white/60" />
+            {T('Esperando al dispositivo… Expo lo enciende e instala Expo Go la primera vez (puede tardar un minuto).', 'Waiting for the device… Expo boots it and installs Expo Go the first time (it can take a minute).')}
+            <button onClick={() => { setFailed(false); setSrc(api.runScreenUrl(sessionId, buildId, target) + Date.now()) }} className="mt-1 rounded-full border border-white/30 px-3 py-1 text-[11.5px] text-white/80 hover:bg-white/10">{T('Reintentar', 'Retry')}</button>
+          </div>
+        )}
+      </div>
+      <div className="text-[11.5px] text-ink-3">
+        {target === 'android' ? T('Tocá la pantalla para interactuar (los toques van al emulador).', 'Tap the screen to interact (taps go to the emulator).') : T('Vista en vivo del simulador. Para interactuar, usá la ventana del Simulador de iOS que se abrió en tu Mac.', 'Live view of the simulator. To interact, use the iOS Simulator window that opened on your Mac.')}
+      </div>
+    </div>
+  )
+}
+
 /** "App real": run the built product on this machine and show it live (instead of the static prototype). */
 export default function AppRunner({ autoStart = false }: { autoStart?: boolean }) {
   const T = useT()
@@ -118,7 +155,7 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
               {services.map((s) => <option key={s.id} value={s.id}>{s.label}{s.web ? '' : T(' (sin UI)', ' (no UI)')}</option>)}
             </select>
             {!active ? (
-              <button disabled={busy || !service} onClick={start} className="flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-[12.5px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40">
+              <button disabled={busy || !service || sel?.available === false} onClick={start} className="flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-[12.5px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40">
                 {busy ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />} {T('Correr la app', 'Run the app')}
               </button>
             ) : (
@@ -139,6 +176,9 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
           </>
         )}
       </div>
+      {sel?.device && sel.available === false && (
+        <div className="border-b border-line px-3 py-2"><BlockedNotice kind="blocked" title={sel.device === 'ios' ? T('El simulador de iOS no está disponible en esta máquina', 'The iOS Simulator is not available on this machine') : T('El emulador de Android no está disponible en esta máquina', 'The Android emulator is not available on this machine')} text={sel.hint ?? ''} /></div>
+      )}
       {sel && !active && run.status !== 'error' && (
         <div className="px-3 py-1.5 text-[11.5px] text-ink-3 border-b border-line font-mono">{sel.dir === '.' ? '' : `${sel.dir}/ · `}{sel.needs_install ? `${sel.install} → ` : ''}{sel.run.replace('{port}', T('<puerto libre>', '<free port>'))}</div>
       )}
@@ -155,6 +195,8 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
           <PanelLoader caption={T('Analizando el proyecto…', 'Analyzing the project…')} sub={T('Buscando qué se puede correr: package.json, APIs en Python, docker compose.', 'Looking for what can run: package.json, Python APIs, docker compose.')} />
         ) : (run.status === 'installing' || run.status === 'starting') && !logsOpen ? (
           <PanelLoader caption={step[run.status]} sub={run.status === 'installing' ? T('La primera vez tarda: instala las dependencias del proyecto. Abrí los logs abajo para ver el detalle.', 'The first time takes a while: it installs the project dependencies. Open the logs below to see the detail.') : T('Esperando a que el servidor responda en un puerto libre.', 'Waiting for the server to answer on a free port.')} />
+        ) : run.status === 'running' && sel?.device && b.sessionId && b.id ? (
+          <DeviceView target={sel.device} sessionId={b.sessionId} buildId={b.id} />
         ) : run.status === 'running' && run.url && sel?.web !== false ? (
           <div className="flex-1 min-h-0 p-3">
             <div className="flex h-full flex-col overflow-hidden rounded-xl border border-line bg-white shadow-[0_14px_30px_-18px_rgba(30,38,34,.45)]">

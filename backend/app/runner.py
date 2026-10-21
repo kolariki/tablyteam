@@ -85,6 +85,19 @@ def detect(root: Path) -> list[dict]:
         if not script:
             continue
         deps = {**(d.get("dependencies") or {}), **(d.get("devDependencies") or {})}
+        if "expo" in deps:
+            # a mobile app: Expo's dev server serves the web build (framed like any web app) and opens the simulators
+            rel_dir = _rel(pj.parent, root) or "."
+            pm = _pm(pj.parent)
+            inst = f"{pm} install"
+            label = d.get("name") or rel.parent or "app"
+            dev = devices()
+            out.append({"id": f"{rel_dir}#web", "dir": rel_dir, "label": f"{label} · Expo web", "kind": "expo", "web": True, "install": inst, "run": "npx expo start --web --port {port}", "needs_install": not (pj.parent / "node_modules").exists()})
+            out.append({"id": f"{rel_dir}#ios", "dir": rel_dir, "label": f"{label} · simulador iOS", "kind": "expo", "web": True, "device": "ios", "available": dev["ios"]["ok"], "hint": dev["ios"]["hint"],
+                        "install": inst, "run": "npx expo start --ios --port {port}", "needs_install": not (pj.parent / "node_modules").exists()})
+            out.append({"id": f"{rel_dir}#android", "dir": rel_dir, "label": f"{label} · emulador Android", "kind": "expo", "web": True, "device": "android", "available": dev["android"]["ok"], "hint": dev["android"]["hint"],
+                        "install": inst, "run": "npx expo start --android --port {port}", "needs_install": not (pj.parent / "node_modules").exists()})
+            continue
         kind = "next" if "next" in deps else "vite" if "vite" in deps else "nuxt" if "nuxt" in deps else "node"
         web = kind != "node" or any(k in deps for k in ("react", "vue", "svelte", "express", "fastify", "koa", "hono"))
         pm = _pm(pj.parent)
@@ -370,3 +383,73 @@ RUNS: dict[str, AppRun] = {}
 async def stop_all() -> None:
     for r in list(RUNS.values()):
         await r.stop()
+
+
+# ------------------------------------------------------------------ devices (iOS Simulator · Android emulator)
+
+def _adb() -> str | None:
+    for c in (shutil.which("adb"), os.path.expanduser("~/Library/Android/sdk/platform-tools/adb"), os.path.join(os.environ.get("ANDROID_HOME", ""), "platform-tools", "adb"), os.path.join(os.environ.get("ANDROID_SDK_ROOT", ""), "platform-tools", "adb")):
+        if c and os.path.exists(c):
+            return c
+    return None
+
+
+def _sh(cmd: list[str], timeout: float = 15) -> tuple[int, bytes]:
+    import subprocess
+
+    try:
+        p = subprocess.run(cmd, capture_output=True, timeout=timeout)
+        return p.returncode, p.stdout
+    except Exception:  # noqa: BLE001
+        return 1, b""
+
+
+def devices() -> dict:
+    """What this machine can run: the iOS Simulator (macOS + Xcode with an iOS runtime) and the Android emulator (SDK + adb)."""
+    ios = {"ok": False, "hint": None, "booted": None}
+    if shutil.which("xcrun"):
+        code, out = _sh(["xcrun", "simctl", "list", "devices", "available", "-j"], 20)
+        try:
+            devs = [d for v in json.loads(out or b"{}").get("devices", {}).values() for d in v if "iPhone" in d.get("name", "")]
+        except Exception:  # noqa: BLE001
+            devs = []
+        if code != 0:
+            ios["hint"] = "Xcode no está instalado o no está seleccionado (xcode-select)."
+        elif not devs:
+            ios["hint"] = "Xcode no tiene ningún simulador de iPhone: en Xcode → Settings → Components instalá un runtime de iOS."
+        else:
+            ios["ok"] = True
+            ios["booted"] = next((d["name"] for d in devs if d.get("state") == "Booted"), None)
+    else:
+        ios["hint"] = "El simulador de iOS necesita una Mac con Xcode."
+    android = {"ok": False, "hint": None, "booted": None}
+    adb = _adb()
+    if adb:
+        code, out = _sh([adb, "devices"], 10)
+        lines = [l for l in out.decode(errors="replace").splitlines()[1:] if l.strip() and "\tdevice" in l]
+        android["ok"] = True
+        android["booted"] = lines[0].split("\t")[0] if lines else None
+        if not lines:
+            android["hint"] = "No hay un emulador encendido: abrí uno desde Android Studio → Device Manager (Expo lo detecta solo)."
+    else:
+        android["hint"] = "Instalá Android Studio (SDK + adb) y creá un dispositivo virtual en Device Manager."
+    return {"ios": ios, "android": android}
+
+
+def screenshot(target: str) -> bytes | None:
+    """PNG of the booted device's screen (what the panel shows, refreshed every second)."""
+    if target == "ios":
+        code, out = _sh(["xcrun", "simctl", "io", "booted", "screenshot", "--type=png", "-"], 10)
+        return out if code == 0 and out[:4] == b"\x89PNG" else None
+    adb = _adb()
+    if not adb:
+        return None
+    code, out = _sh([adb, "exec-out", "screencap", "-p"], 10)
+    return out if code == 0 and out[:4] == b"\x89PNG" else None
+
+
+def tap(target: str, x: int, y: int) -> bool:
+    """A tap at device pixels. Android via adb; the iOS Simulator has no public tap API (the user taps in the Simulator window)."""
+    if target == "android" and (adb := _adb()):
+        return _sh([adb, "shell", "input", "tap", str(int(x)), str(int(y))], 10)[0] == 0
+    return False

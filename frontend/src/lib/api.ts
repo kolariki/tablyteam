@@ -160,6 +160,9 @@ export const api = {
   appRun: (sessionId: string, id: string) => j<{ services: RunService[]; run: AppRunState | null }>(authed(`/api/sessions/${sessionId}/builds/${id}/run`)),
   appStart: (sessionId: string, id: string, service: string) => j(post(`/api/sessions/${sessionId}/builds/${id}/run`, { service })),
   appStop: (sessionId: string, id: string) => j(authed(`/api/sessions/${sessionId}/builds/${id}/run`, { method: 'DELETE' })),
+  devices: () => j<{ ios: { ok: boolean; hint: string | null; booted: string | null }; android: { ok: boolean; hint: string | null; booted: string | null } }>(authed('/api/devices')),
+  runScreenUrl: (sessionId: string, id: string, target: 'ios' | 'android') => `/api/sessions/${sessionId}/builds/${id}/run/screen?target=${target}&token=${encodeURIComponent(getToken() ?? '')}&t=`,
+  runTap: (sessionId: string, id: string, target: 'ios' | 'android', x: number, y: number) => j<{ ok: boolean }>(post(`/api/sessions/${sessionId}/builds/${id}/run/tap`, { target, x, y })),
   deploy: (sessionId: string, id: string, target: string) => j(post(`/api/sessions/${sessionId}/builds/${id}/deploy`, { target })),
   cloudStatus: () => j<CloudStatus & { github: { set: boolean; last4: string | null }; apps: CloudApp[] }>(authed('/api/cloud/status')),
   saveGithubToken: (token: string | null, clear = false) =>
@@ -333,6 +336,9 @@ export interface RunService {
   label: string
   kind: string
   web: boolean
+  device?: 'ios' | 'android'  // Expo: runs on the iOS Simulator / Android emulator (the panel shows the device screen)
+  available?: boolean  // that device can run on this machine
+  hint?: string | null  // what is missing when it cannot
   install: string
   run: string
   needs_install: boolean

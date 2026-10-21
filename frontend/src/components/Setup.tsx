@@ -1,7 +1,7 @@
 import { useArena } from '../store'
 import { useBuild, type Activity } from '../buildStore'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bookmark, Check, Eye, FolderOpen, Gavel, Loader2, LogOut, Play, Plus, Puzzle, Settings2, Trash2, Users, X } from 'lucide-react'
+import { Bookmark, Check, Eye, FolderOpen, Gavel, Globe, Loader2, LogOut, MonitorSmartphone, Play, Plus, Puzzle, Settings2, Smartphone, Trash2, Users, X } from 'lucide-react'
 import { toast, useConfirm, usePrompt } from './Toast'
 import SkillPicker from './SkillPicker'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
@@ -426,6 +426,25 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                 if (baseline.current) baseline.current = { ...baseline.current, agents: {} }
               }}
             />
+            {/* what gets built: the brief, the designer, the builder and «Correr la app» all follow this */}
+            <div>
+              <span className="flex items-center gap-1 text-xs uppercase tracking-widest text-ink-3">{T('Plataforma', 'Platform')} <Hint text={T('Qué construye el equipo: una web app, una app móvil para iOS y Android (con Expo, se corre en el simulador y el emulador desde acá) o las dos con un solo código.', 'What the team builds: a web app, a mobile app for iOS and Android (with Expo, run on the simulator and the emulator from here) or both from one codebase.')} /></span>
+              <div className="mt-1 grid grid-cols-3 gap-2">
+                {([
+                  { id: 'web' as const, icon: <Globe size={15} />, title: T('Web app', 'Web app'), text: T('Navegador, escritorio y móvil', 'Browser, desktop and mobile') },
+                  { id: 'mobile' as const, icon: <Smartphone size={15} />, title: T('App móvil', 'Mobile app'), text: T('iOS y Android · Expo', 'iOS and Android · Expo') },
+                  { id: 'both' as const, icon: <MonitorSmartphone size={15} />, title: T('Ambas', 'Both'), text: T('Un solo código, web + tiendas', 'One codebase, web + stores') },
+                ]).map((o) => {
+                  const on = (cfg.platform ?? 'web') === o.id
+                  return (
+                    <button key={o.id} type="button" onClick={() => setCfg((c) => ({ ...c, platform: o.id }))} className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 text-left transition ${on ? 'border-accent bg-accent-soft shadow-[0_0_0_3px_rgba(47,107,93,.12)]' : 'border-line bg-surface hover:border-accent hover:bg-accent-soft'}`}>
+                      <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${on ? 'bg-accent text-white' : 'bg-surface-2 text-ink-3'}`}>{o.icon}</span>
+                      <span className="min-w-0"><span className={`block text-[13px] font-semibold ${on ? 'text-accent' : 'text-ink'}`}>{o.title}</span><span className="block text-[11px] leading-snug text-ink-3">{o.text}</span></span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
             {/* reference apps: the build's research phase visits them before designing (empty → the team proposes them) */}
             <div>
               <span className="flex items-center gap-1 text-xs uppercase tracking-widest text-ink-3">{T('Apps de referencia', 'Reference apps')} <Hint text={T('Apps o sitios parecidos que el equipo va a mirar antes de diseñar: entra, saca capturas y anota qué emular y qué evitar. Podés dejarlo vacío y el equipo propone los líderes de la categoría.', 'Similar apps or sites the team studies before designing: it visits them, takes screenshots and notes what to emulate and avoid. Leave it empty and the team proposes the category leaders.')} /></span>
