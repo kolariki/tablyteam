@@ -1,8 +1,8 @@
 import DOMPurify from 'dompurify'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Copy, FolderOpen, GitBranch, Loader2, Search, Terminal, Wrench, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Copy, FolderOpen, GitBranch, Loader2, Search, Send, Terminal, Wrench, X } from 'lucide-react'
 import { marked } from 'marked'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, type AgentPart, type AgentSessionDetail, type AgentSessionList, type AgentSessionSummary } from '../lib/api'
 import { readCache, writeCache } from '../lib/cache'
 import { fmtDur } from '../lib/duration'
@@ -80,11 +80,62 @@ function Conversation({ engine, id, onClose }: { engine: Engine; id: string; onC
   const T = useT()
   const [d, setD] = useState<AgentSessionDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // chatting from here: the real CLI session is resumed; what streams back is shown live, then the file is re-read
+  const [draft, setDraft] = useState('')
+  const [sending, setSending] = useState(false)
+  const [pending, setPending] = useState<{ user: string; parts: AgentPart[]; text: string } | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const load = () => api.agentSession(engine, id).then(setD).catch((e) => setError((e as Error).message))
   useEffect(() => {
     setD(null)
     setError(null)
-    api.agentSession(engine, id).then(setD).catch((e) => setError((e as Error).message))
+    setPending(null)
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, id])
+  useEffect(() => { if (pending && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight }, [pending])
+
+  const send = async () => {
+    const text = draft.trim()
+    if (!text || sending) return
+    setSending(true)
+    setDraft('')
+    setPending({ user: text, parts: [], text: '' })
+    try {
+      const res = await api.agentChat(engine, id, text)
+      if (!res.ok || !res.body) throw new Error((await res.json().catch(() => ({}))).detail ?? res.statusText)
+      const reader = res.body.getReader()
+      const dec = new TextDecoder()
+      let buf = ''
+      for (;;) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buf += dec.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.trim()) continue
+          let ev: Record<string, string>
+          try { ev = JSON.parse(line) } catch { continue }
+          setPending((p) => {
+            if (!p) return p
+            if (ev.kind === 'text_delta') return { ...p, text: p.text + (ev.text ?? '') }
+            if (ev.kind === 'text') return { ...p, text: '', parts: [...p.parts, { type: 'text', text: ev.text ?? '' }] }
+            if (ev.kind === 'activity') return { ...p, parts: [...p.parts, { type: 'tool', name: ev.label ?? ev.act ?? 'tool', summary: ev.path ?? '', input: ev.path ?? '', result: null }] }
+            if (ev.kind === 'error') return { ...p, parts: [...p.parts, { type: 'text', text: `**Error:** ${ev.error ?? ''}` }] }
+            if (ev.kind === 'result' && ev.error) return { ...p, parts: [...p.parts, { type: 'text', text: `**Error:** ${ev.error}` }] }
+            return p
+          })
+        }
+      }
+    } catch (e) {
+      setPending((p) => (p ? { ...p, parts: [...p.parts, { type: 'text', text: `**Error:** ${(e as Error).message}` }] } : p))
+    } finally {
+      setSending(false)
+      await load()
+      setPending(null)
+    }
+  }
   if (error) return <div className="flex flex-1 items-center justify-center p-8 text-[13px] text-danger">{error}</div>
   if (!d) return <PanelLoader caption={T('Abriendo la conversación…', 'Opening the conversation…')} />
   const turns = d.items.filter((i) => i.role === 'user').length
@@ -116,7 +167,7 @@ function Conversation({ engine, id, onClose }: { engine: Engine; id: string; onC
         </div>
       </div>
       {/* messages */}
-      <div className="min-h-0 flex-1 overflow-y-auto scroll-thin bg-paper/40 px-6 py-6">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto scroll-thin bg-paper/40 px-6 py-6">
         <div className="mx-auto max-w-[860px] space-y-5">
           {d.truncated && <div className="rounded-xl border border-gold/40 bg-gold/10 px-3 py-2 text-[12px]">{T('Conversación muy larga: se muestran los primeros 2500 mensajes.', 'Very long conversation: the first 2500 messages are shown.')}</div>}
           {d.items.map((it, i) =>
@@ -138,7 +189,37 @@ function Conversation({ engine, id, onClose }: { engine: Engine; id: string; onC
               </div>
             ),
           )}
+          {pending && (
+            <>
+              <div className="flex justify-end">
+                <div className="max-w-[78%] rounded-2xl rounded-tr-md bg-accent-soft px-4 py-3 text-[13.5px] leading-relaxed text-ink"><div className="whitespace-pre-wrap break-words">{pending.user}</div></div>
+              </div>
+              <div className="flex gap-3">
+                <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface ring-1 ring-black/10"><ProviderLogo provider={engine === 'claude' ? 'anthropic' : 'openai'} size={14} /></span>
+                <div className="min-w-0 flex-1">
+                  {pending.parts.map((p, j) => (p.type === 'text' ? <article key={j} className="md text-[13.5px]" dangerouslySetInnerHTML={{ __html: md(p.text ?? '') }} /> : <ToolPart key={j} p={p} />))}
+                  {pending.text && <article className="md text-[13.5px]" dangerouslySetInnerHTML={{ __html: md(pending.text) }} />}
+                  {sending && <div className="mt-1 flex items-center gap-1.5 text-[12px] text-ink-3"><Loader2 size={12} className="animate-spin" /> {T('respondiendo…', 'answering…')}</div>}
+                </div>
+              </div>
+            </>
+          )}
         </div>
+      </div>
+      {/* composer: continues the real session with the CLI, in its own folder */}
+      <div className="border-t border-line bg-surface px-6 py-3">
+        <div className="mx-auto flex max-w-[860px] items-end gap-2">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
+            rows={2}
+            placeholder={T('Seguí la conversación acá: corre el mismo agente, en la misma carpeta, con toda la memoria de la sesión…', 'Continue the conversation here: the same agent runs, in the same folder, with the whole session memory…')}
+            className="min-h-[44px] flex-1 resize-none rounded-2xl border border-line bg-paper px-4 py-2.5 text-[13.5px] outline-none focus:border-accent"
+          />
+          <button onClick={send} disabled={!draft.trim() || sending} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-white shadow-sm transition hover:brightness-110 disabled:opacity-40" title={T('Enviar (Enter)', 'Send (Enter)')}>{sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}</button>
+        </div>
+        <div className="mx-auto mt-1 max-w-[860px] text-[11px] text-ink-4">{engine === 'claude' ? T('Usa tu Claude Code con tu suscripción; los cambios en archivos quedan en la carpeta del proyecto.', 'Uses your Claude Code on your subscription; file changes land in the project folder.') : T('Usa tu Codex CLI con tu cuenta de ChatGPT; los cambios en archivos quedan en la carpeta del proyecto.', 'Uses your Codex CLI with your ChatGPT account; file changes land in the project folder.')}</div>
       </div>
     </div>
   )

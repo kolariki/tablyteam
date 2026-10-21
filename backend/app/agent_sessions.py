@@ -8,6 +8,7 @@ full when opened and cached by (path, mtime, size).
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -396,3 +397,47 @@ def get_session(engine: str, session_id: str) -> dict | None:
         _detail_cache.pop(next(iter(_detail_cache)))
     _detail_cache[key] = ((st.st_mtime, st.st_size), result)
     return result
+
+
+# ------------------------------------------------------------------------------------------------ chat (resume the session)
+
+async def chat(engine: str, session_id: str, text: str):
+    """Continue the conversation with the real CLI (`claude --resume` / `codex resume`) in its own folder, streaming
+    the engine's events as JSON lines: text_delta / text / thinking / activity / result / error."""
+    from .local_engine import run_claude_code, run_codex
+    from .tasks import spawn
+
+    path = _find(engine, session_id)
+    if not path:
+        yield json.dumps({"kind": "error", "error": "Sesión no encontrada"}) + "\n"
+        return
+    summary = (_claude_session_summary if engine == "claude" else _codex_session_summary)(path) or {}
+    cwd = Path(summary.get("cwd") or "")
+    if not cwd.is_dir():
+        yield json.dumps({"kind": "error", "error": f"La carpeta de la sesión ya no existe: {cwd}"}) + "\n"
+        return
+    q: asyncio.Queue = asyncio.Queue()
+
+    async def on_event(kind: str, **d) -> None:
+        await q.put({"kind": kind, **d})
+
+    async def runner() -> None:
+        try:
+            if engine == "claude":
+                res = await run_claude_code(text, cwd, resume_session=session_id, on_event=on_event)
+            else:
+                res = await run_codex(text, cwd, resume_session=session_id, on_event=on_event)
+            await q.put({"kind": "result", "text": res.get("text", ""), "cost": res.get("cost", 0), "is_error": res.get("is_error", False), "error": res.get("error")})
+        except Exception as e:  # noqa: BLE001
+            log.exception("agent chat")
+            await q.put({"kind": "error", "error": str(e)[:300]})
+        await q.put(None)
+
+    spawn(runner())
+    _detail_cache.pop(f"{engine}:{path}", None)
+    while True:
+        ev = await q.get()
+        if ev is None:
+            break
+        yield json.dumps(ev, ensure_ascii=False) + "\n"
+    _detail_cache.pop(f"{engine}:{path}", None)

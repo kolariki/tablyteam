@@ -1985,6 +1985,18 @@ def agent_session_get(engine: str, session_id: str, user: User = CurrentUser):
     return d
 
 
+@app.post("/api/agents/sessions/{engine}/{session_id}/message")
+async def agent_session_message(engine: str, session_id: str, body: dict, user: User = CurrentUser):
+    """Chat from the sessions screen: resumes the real CLI session and streams its events as JSON lines."""
+    if engine not in ("claude", "codex"):
+        raise HTTPException(400, "engine: claude | codex")
+    text = (body.get("text") or "").strip()[:20000]
+    if not text:
+        raise HTTPException(400, "Escribí un mensaje")
+    _check_capacity(user.id)
+    return StreamingResponse(agent_sessions.chat(engine, session_id, text), media_type="application/x-ndjson", headers={"cache-control": "no-store", "x-accel-buffering": "no"})
+
+
 @app.get("/api/devices")
 def devices_status(user: User = CurrentUser):
     """What this machine can run for mobile apps (iOS Simulator, Android emulator)."""

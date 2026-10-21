@@ -341,7 +341,9 @@ async def run_codex(prompt: str, cwd: Path, *, system: str | None = None, contin
     cmd += ["--sandbox", "read-only"] if read_only else ["--full-auto"]
     if model:
         cmd += ["-m", model]
-    if continue_:
+    if resume_session:
+        cmd += ["resume", resume_session]  # same Codex thread: full memory of the conversation
+    elif continue_:
         cmd += ["resume", "--last"]
     cmd += [full]
     env_ = {**os.environ, **({"PATH": f"{mcp['path_dir']}:{os.environ.get('PATH', '')}"} if mcp and mcp.get("path_dir") else {})}

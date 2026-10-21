@@ -161,6 +161,7 @@ export const api = {
   appStart: (sessionId: string, id: string, service: string) => j(post(`/api/sessions/${sessionId}/builds/${id}/run`, { service })),
   appStop: (sessionId: string, id: string) => j(authed(`/api/sessions/${sessionId}/builds/${id}/run`, { method: 'DELETE' })),
   agentSessions: (engine: 'claude' | 'codex') => j<AgentSessionList>(authed(`/api/agents/sessions?engine=${engine}`)),
+  agentChat: (engine: 'claude' | 'codex', id: string, text: string) => post(`/api/agents/sessions/${engine}/${id}/message`, { text }),
   agentSession: (engine: 'claude' | 'codex', id: string) => j<AgentSessionDetail>(authed(`/api/agents/sessions/${engine}/${id}`)),
   devices: () => j<{ ios: { ok: boolean; hint: string | null; booted: string | null }; android: { ok: boolean; hint: string | null; booted: string | null } }>(authed('/api/devices')),
   runScreenUrl: (sessionId: string, id: string, target: 'ios' | 'android') => `/api/sessions/${sessionId}/builds/${id}/run/screen?target=${target}&token=${encodeURIComponent(getToken() ?? '')}&t=`,
