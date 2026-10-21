@@ -157,6 +157,33 @@ async def _port_open(port: int) -> bool:
         return False
 
 
+async def _serves_html(port: int) -> bool | None:
+    """GET / and tell whether the answer looks like a web page (None: no answer at all)."""
+    try:
+        r, w = await asyncio.wait_for(asyncio.open_connection("127.0.0.1", port), 0.8)
+        w.write(b"GET / HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n")
+        await w.drain()
+        head = await asyncio.wait_for(r.read(4096), 2.0)
+        w.close()
+    except Exception:
+        return None
+    h = head.decode("utf-8", "replace").lower()
+    return "text/html" in h or "<!doctype html" in h or "<html" in h
+
+
+async def pick_web_port(candidates: list[int]) -> int | None:
+    """Several servers may come up from one `dev` script (vite + an API worker, next + a mock server…): the one to
+    frame is the one that serves a page. First HTML answer wins; else the first port that answers at all."""
+    first_open = None
+    for port in candidates:
+        kind = await _serves_html(port)
+        if kind:
+            return port
+        if kind is False and first_open is None:
+            first_open = port
+    return first_open
+
+
 class AppRun:
     """One running dev server for a build."""
 
@@ -248,12 +275,19 @@ class AppRun:
                     code = server.result()
                     self._set("error", error=f"El servidor terminó antes de arrancar (código {code}). Revisá los logs." if code else "El servidor terminó sin levantar un puerto.")
                     return
-                # a server that picked its own port tells us in the logs
-                for line in self.logs[-30:]:
-                    m = re.search(r"https?://(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::(\d+))?", line)
-                    if m and m.group(1) and int(m.group(1)) != self.port:
-                        self.port = int(m.group(1))
-                if await _port_open(self.port):
+                # servers that picked their own port say so in the logs; a dev script may start several (vite + an
+                # API worker): frame the one that serves a page, not whichever URL was printed last
+                seen: list[int] = [self.port]
+                for line in self.logs[-60:]:
+                    for m in re.finditer(r"https?://(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]):(\d+)", line):
+                        pt = int(m.group(1))
+                        if pt not in seen:
+                            seen.append(pt)
+                chosen = await pick_web_port(seen) if len(seen) > 1 else (self.port if await _port_open(self.port) else None)
+                if chosen is not None and chosen != self.port:
+                    self.port = chosen
+                    self._log(f"· la app responde en el puerto {chosen}")
+                if chosen is not None:
                     self.url = f"http://127.0.0.1:{self.port}"
                     try:  # the UI frames the proxy, not the app: production CSP/X-Frame-Options would blank the iframe
                         self.proxy = FrameProxy(self.port, free_port())
