@@ -1,4 +1,4 @@
-import { Focus, ChevronDown, Download, FileText, Hammer, Rocket, Pause, Plus, Users, Square, Trophy, RotateCcw } from 'lucide-react'
+import { Focus, ChevronDown, Download, FileText, Hammer, Home, Rocket, Pause, Users, Square, Trophy, RotateCcw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import { useT } from '../lib/i18n'
@@ -66,7 +66,7 @@ export default function TopBar({ onNew, onRerun }: { onNew: () => void; onRerun?
         )}
         {live && s.source === 'replay' && <button className={btn} onClick={onNew}><Pause size={14} /> {T('Salir', 'Exit')}</button>}
         {!live && onRerun && <button className={btn} onClick={onRerun} title={T('Volver a correr el mismo debate desde cero (misma consigna y equipo)', 'Run the same debate again from scratch (same brief and team)')}><RotateCcw size={14} /> {T('Repetir', 'Repeat')}</button>}
-        {!live && <button className={primary} onClick={onNew}><Plus size={15} /> {T('Nuevo', 'New')}</button>}
+        {!live && <button className={primary} onClick={onNew} title={T('Volver al inicio', 'Back to home')}><Home size={15} /> {T('Inicio', 'Home')}</button>}
       </div>
     </div>
   )
