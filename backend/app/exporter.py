@@ -281,7 +281,12 @@ async def stream_brief(user: User, session_id: str, req: BriefRequest) -> AsyncI
     system = BRIEF_SYSTEM.format(language=cfg.get("language", "español"), howto=TARGETS[req.target]["howto"])
     user_msg = f"DEBATE A CONVERTIR EN BRIEF:\n\n{transcript}"
     if cfg.get("context") and "Referentes" in str(cfg.get("context")):
-        user_msg += f"\n\nBENCHMARK DE REFERENTES (investigado antes del debate; el brief tiene que reflejar qué emular y qué evitar):\n{str(cfg['context'])[:20000]}"
+        clone = bool(cfg.get("deep_analysis")) or "Plano de clonación" in str(cfg.get("context"))
+        if clone:
+            user_msg += ("\n\nMODO CLON (ingeniería inversa activada por el usuario): el producto es una RÉPLICA del referente principal, igual en todo salvo nombre, logo y textos. "
+                         "El brief NO fija paleta, tipografía, grilla ni componentes propios: en diseño y comportamiento remite al plano de clonación de research/REFERENCES.md y dice "
+                         "explícitamente que el referente manda sobre cualquier decisión visual del debate. El brief define nombre, logo, textos propios, stack y funcionalidades adicionales.")
+        user_msg += f"\n\nBENCHMARK DE REFERENTES (investigado antes del debate; {'es el plano a replicar 1:1' if clone else 'el brief tiene que reflejar qué emular y qué evitar'}):\n{str(cfg['context'])[:20000]}"
     if notes:
         user_msg = f"DECISIONES FINALES EDITADAS POR EL USUARIO (tienen prioridad absoluta sobre lo dicho en el debate; si contradicen algo del debate, mandan estas):\n\n{notes}\n\n" + user_msg
     header = (

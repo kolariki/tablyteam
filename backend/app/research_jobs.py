@@ -87,13 +87,13 @@ async def _run(job: dict, user: User) -> None:
                 continue
             _act(job, "read", f"Analizando {ref['name'] or cap.title or ref['url']}", ref["url"])
             images = [im for im in (cap.desktop, cap.mobile) if im] if not mock else None
-            analysis = await _ask(rsch.ANALYZE_SYSTEM + (rsch.CLONE_ANALYZE_EXTRA if deep else ""), rsch.build_user_prompt_for_analysis(cap, job["brief"]), who, job, images=images, max_tokens=4500 if deep else 3000,
+            analysis = await _ask(rsch.analyze_system(deep), rsch.build_user_prompt_for_analysis(cap, job["brief"]), who, job, images=images, max_tokens=4500 if deep else 3000,
                                   mock_text=f"## 1. Qué es\n{cap.title or ref['url']} (simulado).\n## 2. Pantallas\nHome con buscador.\n## 3. Patrones\nCards.\n## 4. Decisiones\nSin cuentas.\n## 5. Emular / evitar\nEmular: buscador arriba.")
             notes.append(f"## {ref['name'] or cap.title or ref['url']}\nURL: {ref['url']}\n\n{analysis.strip()}")
         md = ""
         if notes:
             _act(job, "plan", "Armando el brief de referentes", "research/REFERENCES.md")
-            synth = await _ask(rsch.SYNTH_SYSTEM + (rsch.CLONE_SYNTH_EXTRA if deep else ""), f"NUESTRO BRIEF:\n{job['brief'][:8000]}\n\nREFERENTES (en orden de prioridad): {', '.join(r['name'] or r['url'] for r in refs)}\n\nNOTAS DE BENCHMARK:\n\n" + "\n\n---\n\n".join(notes), who, job, max_tokens=8000,
+            synth = await _ask(rsch.synth_system(deep), f"NUESTRO BRIEF:\n{job['brief'][:8000]}\n\nREFERENTES (en orden de prioridad): {', '.join(r['name'] or r['url'] for r in refs)}\n\nNOTAS DE BENCHMARK:\n\n" + "\n\n---\n\n".join(notes), who, job, max_tokens=8000,
                               mock_text="# Referentes\n| app | mejor | falta |\n|---|---|---|\n| Windy | mapa | texto |\n# Patrones a emular\n- Mapa protagonista\n# Patrones a evitar\n- Densidad\n# Flujo recomendado\n1. Buscar ciudad\n# Copy y tono\nDirecto.\n# Checklist\n1. Carga < 2 s")
             md = f"<!-- Benchmark generado por Tably Team el {rsch.stamp()}. Observación de productos públicos; nada copiado. -->\n\n{synth.strip()}\n\n---\n\n# Notas por referente\n\n" + "\n\n".join(notes) + "\n"
             (workdir / "REFERENCES.md").write_text(md)

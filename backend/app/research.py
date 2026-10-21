@@ -267,7 +267,8 @@ Concreto, accionable, sin relleno. Máximo 1600 palabras."""
 
 CLONE_ANALYZE_EXTRA = """
 
-MODO CLON: el equipo va a construir una RÉPLICA de este producto (todo igual salvo nombre, logo y textos literales). Además de lo anterior, escribí
+MODO CLON: el equipo va a construir una RÉPLICA de este producto (todo igual salvo nombre, logo y textos literales). El referente ES el objetivo
+visual y funcional: NO juzgues su estilo, NO listes qué evitar ni qué mejorar (en la sección 5 escribí solo «Se replica todo»). Además, escribí
 7. PLANO DE CLONACIÓN, exhaustivo y medible, para que un desarrollador lo reproduzca 1:1 sin ver el original:
    - Inventario de pantallas y rutas visibles, y cómo se navega entre ellas.
    - Por pantalla: cada región con posición y tamaño en px sobre la captura de 1440 px (y en móvil), orden de apilado, fondos.
@@ -279,13 +280,32 @@ MODO CLON: el equipo va a construir una RÉPLICA de este producto (todo igual sa
    - Textos: para cada rótulo o mensaje, su función y un texto propio equivalente (no copies el literal).
 Sin límite de palabras para esta sección: cuanto más completa, mejor."""
 
-CLONE_SYNTH_EXTRA = """
-
-MODO CLON: agregá al final una sección
+CLONE_SYNTH_SYSTEM = """Sos el Product Designer del equipo. El usuario activó la ingeniería inversa: vamos a construir una RÉPLICA del referente
+principal (el primero de la lista), igual en todo salvo el nombre, el logo y los textos literales. Con las notas de benchmark escribí research/REFERENCES.md
+para el diseñador y el constructor. El referente ES el objetivo: no lo juzgues, no propongas mejoras ni alternativas, no listes qué evitar.
+Secciones (Markdown):
+# Referente principal
+Qué es, para quién, qué pantallas tiene (una tabla: pantalla · ruta · captura a mirar en research/shots/NN-desktop.png y NN-mobile.png).
+# Regla de precedencia
+Un párrafo que diga explícitamente: en todo lo visual y de comportamiento (layout, grilla, paleta hex, tipografía, radios, sombras, componentes, estados,
+interacciones, flujos, funcionalidades) manda el referente, por encima del brief y de cualquier sistema de diseño propio. El brief solo aporta el nombre,
+el logo, los textos propios y las funcionalidades adicionales que pida.
 # Plano de clonación
-que consolide, para el referente principal, TODO el plano de clonación de sus notas (pantallas, rutas, regiones con px, componentes con estados,
-paleta con hex, tipografía con px, funcionalidades, interacciones, textos propios equivalentes), ordenado pantalla por pantalla y listo para
-implementar 1:1. Esta sección puede ser tan larga como haga falta. Lo único que cambia respecto del original: nombre, logo y textos literales."""
+Consolidá TODO el plano de clonación de las notas, pantalla por pantalla, listo para implementar 1:1: regiones con posición y tamaño en px (1440 y móvil),
+componentes con dimensiones/radio/borde/sombra/estados, paleta completa con hex exactos, tipografía con familia/px/pesos, funcionalidades y qué hace cada
+control, interacciones y motion. Esta sección puede ser tan larga como haga falta.
+# Textos propios equivalentes
+Tabla: rótulo original (función) · texto propio con el mismo sentido y largo.
+# Checklist de fidelidad 1:1 (10 ítems verificables lado a lado con la captura)
+Concreto y medible, sin relleno."""
+
+
+def analyze_system(clone: bool) -> str:
+    return ANALYZE_SYSTEM + (CLONE_ANALYZE_EXTRA if clone else "")
+
+
+def synth_system(clone: bool) -> str:
+    return CLONE_SYNTH_SYSTEM if clone else SYNTH_SYSTEM
 
 
 def build_user_prompt_for_analysis(cap: Capture, brief_head: str) -> str:
