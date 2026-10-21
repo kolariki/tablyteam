@@ -655,18 +655,19 @@ function LiveStatusBar() {
           </motion.div>
         )}
       </AnimatePresence>
-      <button type="button" onClick={() => setOpen((v) => !v)} title={open ? T('Ocultar los pasos', 'Hide the steps') : T('Ver los últimos pasos', 'See the last steps')} className="flex w-full items-center gap-2 overflow-hidden rounded-xl border border-accent/30 bg-accent-soft/60 px-3 py-2 text-left text-[12px] transition hover:bg-accent-soft">
-      <span className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-white"><Icon size={11} className={last ? '' : 'animate-spin'} /><span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent ring-2 ring-paper animate-pulse" /></span>
-      <span className="shrink-0 text-[10.5px] uppercase tracking-[0.2em] text-accent">{phase}{b.liveTurn ? ` · ${T('turno', 'turn')} ${b.liveTurn}` : ''}</span>
-      <span className="h-3 w-px shrink-0 bg-accent/30" />
+      <button type="button" onClick={() => setOpen((v) => !v)} title={open ? T('Ocultar los pasos', 'Hide the steps') : T('Ver los últimos pasos', 'See the last steps')} className="relative flex w-full items-center gap-2.5 overflow-hidden rounded-xl bg-accent px-3.5 py-2.5 text-left text-[12.5px] text-white shadow-[0_10px_28px_-12px_rgba(47,107,93,.75),0_0_0_1px_rgba(47,107,93,.35)] transition hover:brightness-110">
+      <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/15 to-transparent animate-[shimmer_2.2s_ease-in-out_infinite]" />
+      <span className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/20 text-white"><Icon size={12} className={last ? '' : 'animate-spin'} /><span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[#9FE1C3] ring-2 ring-accent animate-pulse" /></span>
+      <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.2em] text-white">{phase}{b.liveTurn ? ` · ${T('turno', 'turn')} ${b.liveTurn}` : ''}</span>
+      <span className="h-3.5 w-px shrink-0 bg-white/30" />
       <span className="min-w-0 flex-1 truncate">
-        {b.thinking && !last ? <span className="italic text-ink-2">{T('pensando…', 'thinking…')}</span> : last ? <><span className="text-ink">{last.label}</span>{last.path && <span className="ml-1.5 font-mono text-[11px] text-ink-3">{last.path}</span>}</> : <span className="text-ink-2">{T('arrancando…', 'starting…')}</span>}
+        {b.thinking && !last ? <span className="italic text-white/80">{T('pensando…', 'thinking…')}</span> : last ? <><span className="text-white">{last.label}</span>{last.path && <span className="ml-1.5 font-mono text-[11px] text-white/70">{last.path}</span>}</> : <span className="text-white/80">{T('arrancando…', 'starting…')}</span>}
       </span>
       <span className="hidden shrink-0 items-center gap-1.5 lg:flex">
-        {chips.filter(([, n]) => n).map(([l, n]) => <span key={l} className="rounded-full border border-line bg-surface px-2 py-0.5 text-[10.5px] text-ink-2"><b className="text-ink">{n}</b> {l}</span>)}
+        {chips.filter(([, n]) => n).map(([l, n]) => <span key={l} className="rounded-full bg-white/15 px-2 py-0.5 text-[10.5px] text-white/85"><b className="text-white">{n}</b> {l}</span>)}
       </span>
-      <span className="shrink-0 font-mono text-[11px] text-ink-3">{clock}</span>
-      <ChevronDown size={13} className={`shrink-0 text-ink-3 transition ${open ? '' : 'rotate-180'}`} />
+      <span className="shrink-0 font-mono text-[11px] text-white/80">{clock}</span>
+      <ChevronDown size={13} className={`shrink-0 text-white/80 transition ${open ? '' : 'rotate-180'}`} />
       </button>
     </motion.div>
   )
