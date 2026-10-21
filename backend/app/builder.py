@@ -266,6 +266,8 @@ class Build:
         self.research_refs: list[dict] = []  # [{url, name, ok, shots:[...]}]
         self.fees: list[dict] = []  # per-use charges that are not API tokens (deep analysis), [{label, usd}]
         self.council_priorities: str = req.priorities or ""  # consumed by the next council round
+        self.build_seconds = 0.0  # wall-clock of every turn so far (turn.started → turn.completed)
+        self._turn_t0: float | None = None
         self.versions: list[dict] = []  # one per build pass: v1 initial, v2 after council round 1, … (see versions.py)
         self._pending_requests: list[dict] = []  # change list the current pass is applying (→ next version's `requested`)
         self._pending_trigger = "initial"
@@ -279,6 +281,16 @@ class Build:
 
     # ------------------------------------------------------------- pub/sub
     def emit(self, type_: str, **data) -> dict:
+        # wall-clock per turn and for the whole build: the bar shows the turn, the header and the home cards the total
+        if type_ == "turn.started":
+            self._turn_t0 = time.time()
+        elif type_ == "turn.completed":
+            secs = round(time.time() - (self._turn_t0 or time.time()), 1)
+            self._turn_t0 = None
+            self.build_seconds = round(getattr(self, "build_seconds", 0.0) + secs, 1)
+            data = {**data, "seconds": secs, "build_seconds": self.build_seconds}
+            if self.chat and self.chat[-1].get("turn") == data.get("turn") and self.chat[-1].get("role") == "assistant":
+                self.chat[-1]["seconds"] = secs
         ev = {"type": type_, "seq": len(self.events), "ts": time.time(), **data}
         if type_ not in ("token", "review.token"):
             self.events.append(ev)
@@ -299,7 +311,7 @@ class Build:
         return {
             "id": self.id, "session_id": self.req.session_id, "provider": self.req.provider, "model": self.req.model, "title": self.title,
             "status": self.status, "files": {p: {"size": len(c), "lines": c.count("\n") + 1} for p, c in self.files.items()},
-            "stages": self.stages, "chat": self.chat, "cost_usd": round(self.cost, 5), "tokens": self.tokens, "turns": self.turns, "done": self.done_text,
+            "stages": self.stages, "chat": self.chat, "cost_usd": round(self.cost, 5), "tokens": self.tokens, "turns": self.turns, "done": self.done_text, "build_seconds": round(getattr(self, "build_seconds", 0.0)),
             "preview": self.preview_html is not None, "design": self.design_html is not None, "design_html": self.design_html,
             "live": {"turn": self.live["turn"], "phase": self.live["phase"], "raw": "".join(self.live["buf"])} if self.live else None,
             "engine": self.engine, "workdir": str(self.workdir) if self.workdir else None, "engine_session": self.engine_session,
@@ -1437,6 +1449,7 @@ def rehydrate(user: User, session_id: str, build_id: str, cred: Cred, team: list
     b.research_md = b.files.get(RESEARCH_PATH, "")
     b.research_refs = d.get("research", [])
     b.fees = d.get("fees", [])
+    b.build_seconds = float(d.get("build_seconds") or 0)
     saved_hist = [m for m in d.get("history", []) if isinstance(m, dict) and (m.get("content") or "").strip()]
     # keep alternation user/assistant intact; otherwise fall back to a summary of the files written so far
     ok = len(saved_hist) % 2 == 0 and all(m["role"] == ("user" if i % 2 == 0 else "assistant") for i, m in enumerate(saved_hist))
@@ -1473,7 +1486,7 @@ def list_builds(user: User, session_id: str) -> list[dict]:
     for p in sorted(user_dir(user.id).glob(f"{session_id}.build.*.json"), reverse=True):
         try:
             d = json.loads(p.read_text())
-            out.append({k: d[k] for k in ("id", "provider", "model", "status", "turns", "cost_usd")} | {"fees_usd": d.get("fees_usd", 0), "files": len(d.get("files", {})), "engine_session": d.get("engine_session"), "workdir": d.get("workdir"), "stages": len(d.get("stages", [])), "version": len(d.get("versions", [])), "readiness": (d.get("versions") or [{}])[-1].get("readiness"), "pending_council": _pending_from_saved(d)})
+            out.append({k: d[k] for k in ("id", "provider", "model", "status", "turns", "cost_usd")} | {"fees_usd": d.get("fees_usd", 0), "build_seconds": d.get("build_seconds", 0), "files": len(d.get("files", {})), "engine_session": d.get("engine_session"), "workdir": d.get("workdir"), "stages": len(d.get("stages", [])), "version": len(d.get("versions", [])), "readiness": (d.get("versions") or [{}])[-1].get("readiness"), "pending_council": _pending_from_saved(d)})
         except Exception:
             continue
     return out

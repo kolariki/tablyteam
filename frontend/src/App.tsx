@@ -232,7 +232,7 @@ function AppInner() {
     const d = await api.build(sessionId, id)
     const files = Object.fromEntries(Object.entries(d.files ?? {}).map(([k, v]) => [k, { ...(v as object), content: d.file_contents?.[k] } as never]))
     useBuild.getState().reset({
-      id, sessionId, provider: d.provider, model: d.model, title: d.title, engineSession: d.engine_session ?? null, workdir: d.workdir ?? null, versions: d.versions ?? [], pendingCouncil: d.pending_council ?? null, status: d.status === 'running' || d.status === 'reviewing' ? 'connecting' : d.status, files, chat: d.chat, stages: d.stages, cost: d.cost_usd, tokens: d.tokens, done: d.done,
+      id, sessionId, provider: d.provider, model: d.model, title: d.title, engineSession: d.engine_session ?? null, workdir: d.workdir ?? null, versions: d.versions ?? [], pendingCouncil: d.pending_council ?? null, status: d.status === 'running' || d.status === 'reviewing' ? 'connecting' : d.status, files, chat: d.chat, stages: d.stages, cost: d.cost_usd, buildSeconds: (d as { build_seconds?: number }).build_seconds ?? 0, tokens: d.tokens, done: d.done,
       selected: Object.keys(files)[0] ?? null, team: d.team ?? [], reviews: d.reviews ?? [], reviewPlan: d.review_plan ?? null, mode: d.mode ?? 'build', auditReport: d.audit_report ?? null,
       previewHtml: d.file_contents?.['preview/index.html'] ?? null, designHtml: d.file_contents?.['design/mockup.html'] ?? d.design_html ?? null, pane: d.audit_report ? 'report' : 'code',
     })

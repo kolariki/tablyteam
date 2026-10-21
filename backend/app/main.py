@@ -1128,7 +1128,7 @@ def settings_deploy_save(target: str, body: dict, user: User = CurrentUser):
 def session_builds(session_id: str, user: User = CurrentUser):
     live = [b.snapshot() | {"files": len(b.files), "stages": len(b.stages), "version": len(b.versions), "readiness": (b.versions[-1]["readiness"] if b.versions else None)} for b in BUILDS.values() if b.user.id == user.id and b.req.session_id == session_id]
     saved = [x for x in list_builds(user, session_id) if x["id"] not in {b["id"] for b in live}]
-    return [{k: b.get(k) for k in ("id", "provider", "model", "status", "turns", "cost_usd", "files", "stages", "engine_session", "workdir", "version", "readiness", "pending_council")} for b in live] + saved
+    return [{k: b.get(k) for k in ("id", "provider", "model", "status", "turns", "cost_usd", "files", "stages", "engine_session", "workdir", "version", "readiness", "pending_council", "build_seconds")} for b in live] + saved
 
 
 def _build(user: User, build_id: str, session_id: str | None = None):

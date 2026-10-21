@@ -85,6 +85,7 @@ export interface ChatItem {
   done?: string | null
   turn?: number
   phase?: 'build' | 'preview' | 'design'
+  seconds?: number  // wall-clock of that turn
   ts: number
 }
 
@@ -110,6 +111,8 @@ interface BuildState {
   chat: ChatItem[]
   stages: BuildStage[]
   liveTurn: number | null
+  turnStartedAt: number | null  // ms, for the per-turn clock
+  buildSeconds: number  // wall-clock of all turns so far
   livePhase: 'build' | 'preview' | 'report' | 'design' | 'research' | null
   previewHtml: string | null
   designHtml: string | null
@@ -172,6 +175,8 @@ const empty = {
   chat: [],
   stages: [],
   liveTurn: null,
+  turnStartedAt: null as number | null,
+  buildSeconds: 0,
   livePhase: null,
   previewHtml: null,
   designHtml: null,
@@ -254,7 +259,7 @@ export const useBuild = create<BuildState>((set, get) => ({
           activity: b.activity ?? s.activity, todos: b.todos ?? s.todos, versions: b.versions ?? s.versions, pendingCouncil: b.pending_council ?? null, designRounds: b.design_rounds ?? s.designRounds, designHtml: b.design_html ?? s.designHtml,
           appRun: b.app_run ? { status: b.app_run.status, service: b.app_run.service, label: b.app_run.label, url: b.app_run.url, embedUrl: b.app_run.embed_url ?? null, port: b.app_run.port, error: b.app_run.error, logs: b.app_run.logs ?? [] } : s.appRun,
           status: b.status === 'running' ? 'running' : b.status, files: { ...s.files, ...b.files }, chat: b.chat, stages: b.stages,
-          councilSessionsKnown: (b.council_sessions ?? []).length, cost: b.cost_usd, fees: (b as { fees_usd?: number }).fees_usd ?? 0, feesDue: (b as { fees_due_usd?: number }).fees_due_usd ?? 0, tokens: b.tokens, done: b.done, selected: s.selected ?? Object.keys(b.files)[0] ?? null,
+          councilSessionsKnown: (b.council_sessions ?? []).length, cost: b.cost_usd, buildSeconds: (b as { build_seconds?: number }).build_seconds ?? s.buildSeconds, fees: (b as { fees_usd?: number }).fees_usd ?? 0, feesDue: (b as { fees_due_usd?: number }).fees_due_usd ?? 0, tokens: b.tokens, done: b.done, selected: s.selected ?? Object.keys(b.files)[0] ?? null,
           ...(b.live ? { liveTurn: b.live.turn, livePhase: b.live.phase, liveRaw: b.live.raw, liveFile: liveFileFrom(b.live.raw) } : {}),
           team: b.team ?? s.team, reviews: b.reviews ?? s.reviews, reviewPlan: b.review_plan ?? null,
           liveReviews: b.live_reviews ?? {}, reviewRound: b.status === 'reviewing' ? (b.reviews?.length ?? 0) + 1 : null,
@@ -263,7 +268,7 @@ export const useBuild = create<BuildState>((set, get) => ({
         break
       }
       case 'turn.started':
-        set({ liveTurn: ev.turn, livePhase: ev.phase ?? 'build', liveRaw: '', liveFile: null, activity: [], thinking: '', status: 'running', pane: ev.phase === 'preview' ? s.pane : 'code' })
+        set({ liveTurn: ev.turn, turnStartedAt: Date.now(), livePhase: ev.phase ?? 'build', liveRaw: '', liveFile: null, activity: [], thinking: '', status: 'running', pane: ev.phase === 'preview' ? s.pane : 'code' })
         break
       case 'build.activity':
         set({ activity: [...s.activity.slice(-79), { kind: ev.kind, label: ev.label, path: ev.path ?? '', ts: ev.ts }], thinking: ev.kind === 'think' ? s.thinking : '' })
@@ -379,7 +384,7 @@ export const useBuild = create<BuildState>((set, get) => ({
         set({ files: { ...s.files, [ev.path]: { size: ev.size, lines: ev.lines, turn: ev.turn, content: s.files[ev.path]?.content } }, selected: ev.path })
         break
       case 'turn.completed':
-        set({ chat: [...s.chat, { role: 'assistant', turn: ev.turn, say: ev.say, files: ev.files, stage: ev.stage, done: ev.done, phase: ev.phase, activity: ev.activity, ts: ev.ts }], liveRaw: '', liveFile: null, liveTurn: null, livePhase: null, stages: ev.stage ? [...s.stages, ev.stage] : s.stages, done: ev.done ?? s.done })
+        set({ chat: [...s.chat, { role: 'assistant', turn: ev.turn, say: ev.say, files: ev.files, stage: ev.stage, done: ev.done, phase: ev.phase, activity: ev.activity, seconds: ev.seconds, ts: ev.ts }], buildSeconds: ev.build_seconds ?? s.buildSeconds, turnStartedAt: null, liveRaw: '', liveFile: null, liveTurn: null, livePhase: null, stages: ev.stage ? [...s.stages, ev.stage] : s.stages, done: ev.done ?? s.done })
         break
       case 'user.message':
         if (!s.chat.some((c) => c.role === 'user' && c.text === ev.text && Math.abs(c.ts - ev.ts) < 2)) set({ chat: [...s.chat, { role: 'user', text: ev.text, ts: ev.ts }] })

@@ -456,6 +456,7 @@ export interface BuildSummary {
   fees_due_usd?: number  // the part of those not paid yet
   turns: number
   cost_usd: number
+  build_seconds?: number  // wall-clock of all its turns
   files: number
   stages?: number
   engine_session?: string | null

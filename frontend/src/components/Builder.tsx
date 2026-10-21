@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, CheckCircle2, FlaskConical, Gauge, Home, ListChecks, Search, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2, CloudUpload } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, FlaskConical, Gauge, Home, ListChecks, Search, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2, CloudUpload, Clock3 } from 'lucide-react'
 import { marked } from 'marked'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { reconnectBuild, useBuild, type Activity, type ChatItem, type Todo } from '../buildStore'
@@ -13,6 +13,7 @@ import ProviderLogo from './ProviderLogo'
 import { LiveReview, ReviewLauncher, ReviewRoundCard } from './ReviewPanel'
 import ServicesDeploy from './ServicesDeploy'
 import CloudPanel from './CloudPanel'
+import { fmtDur } from '../lib/duration'
 import AppRunner from './AppRunner'
 import RunModal from './RunModal'
 import VersionsPanel, { ReadinessBadge } from './VersionsPanel'
@@ -257,6 +258,11 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
           <span className="hidden rounded-full border border-line bg-surface px-2.5 py-1 font-mono text-[11px] text-ink-3 xl:inline-flex" title={isEngineBuild ? T('Construido con tu suscripción: los tokens no se cobran por API', 'Built on your subscription: tokens are not billed through the API') : T('Tokens por API más cargos por uso', 'API tokens plus per-use charges')}>
             {Object.keys(b.files).length} {T('archivos', 'files')} · {isEngineBuild && !b.fees ? T('suscripción', 'subscription') : `$${((isEngineBuild ? 0 : b.cost) + b.fees).toFixed(2)}`}
           </span>
+          {b.buildSeconds > 0 && (
+            <span className="hidden items-center gap-1 rounded-full border border-line bg-surface px-2.5 py-1 font-mono text-[11px] text-ink-3 xl:inline-flex" title={T('Tiempo total de construcción (suma de todos los turnos)', 'Total build time (all turns added up)')}>
+              <Clock3 size={11} /> {fmtDur(b.buildSeconds)}
+            </span>
+          )}
           {b.feesDue > 0 && (
             <button
               disabled={payingFees}
@@ -634,9 +640,10 @@ function LiveStatusBar() {
   const acts = b.activity
   const last = acts[acts.length - 1]
   const counts = acts.reduce((c, a) => { c[a.kind] = (c[a.kind] ?? 0) + 1; return c }, {} as Record<string, number>)
-  const started = acts[0]?.ts ? acts[0].ts * (acts[0].ts < 1e12 ? 1000 : 1) : now
+  const started = b.turnStartedAt ?? (acts[0]?.ts ? acts[0].ts * (acts[0].ts < 1e12 ? 1000 : 1) : now)
   const el = Math.max(0, Math.round((now - started) / 1000))
-  const clock = `${String(Math.floor(el / 60)).padStart(2, '0')}:${String(el % 60).padStart(2, '0')}`
+  const clock = fmtDur(el)
+  const total = fmtDur(b.buildSeconds + el)
   const ICON: Record<string, typeof Search> = { read: FileText, write: FileCode2, edit: FileCode2, search: Search, run: TerminalSquare, test: FlaskConical, install: Download, build: HardHat, git: GitBranch, plan: ListChecks, think: Eye }
   const Icon = (last && ICON[last.kind]) || Loader2
   const phase = b.livePhase === 'research' ? T('investigando referentes', 'researching references') : b.livePhase === 'design' ? T('diseñando', 'designing') : b.livePhase === 'preview' ? T('armando la vista previa', 'building the preview') : b.livePhase === 'report' ? T('escribiendo el informe', 'writing the report') : T('construyendo', 'building')
@@ -666,7 +673,7 @@ function LiveStatusBar() {
       <span className="hidden shrink-0 items-center gap-1.5 lg:flex">
         {chips.filter(([, n]) => n).map(([l, n]) => <span key={l} className="rounded-full bg-white/15 px-2 py-0.5 text-[10.5px] text-white/85"><b className="text-white">{n}</b> {l}</span>)}
       </span>
-      <span className="shrink-0 font-mono text-[11px] text-white/80">{clock}</span>
+      <span className="shrink-0 font-mono text-[11px] text-white/90" title={T('Este turno · total de la construcción', 'This turn · whole build')}>{clock} <span className="text-white/55">· Σ {total}</span></span>
       <ChevronDown size={13} className={`shrink-0 text-white/80 transition ${open ? '' : 'rotate-180'}`} />
       </button>
     </motion.div>
@@ -698,7 +705,7 @@ function Bubble({ c, color, provider, onOpen }: { c: ChatItem; color: string; pr
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
       <span className="shrink-0 w-8 h-8 rounded-full bg-surface border flex items-center justify-center" style={{ borderColor: `${color}66` }}><ProviderLogo provider={provider} size={18} /></span>
       <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md bg-surface border border-line px-4 py-3">
-        <div className="text-[10px] font-mono text-ink-4 mb-1">{T('turno', 'turn')} {c.turn}{c.phase === 'preview' ? T(' · 🖼 vista previa del producto', ' · 🖼 product preview') : c.phase === 'design' ? T(' · 🎨 diseño de la interfaz', ' · 🎨 interface design') : ''}</div>
+        <div className="mb-1 flex items-center gap-2 font-mono text-[10px] text-ink-4">{T('turno', 'turn')} {c.turn}{c.phase === 'preview' ? T(' · 🖼 vista previa del producto', ' · 🖼 product preview') : c.phase === 'design' ? T(' · 🎨 diseño de la interfaz', ' · 🎨 interface design') : ''}{c.seconds != null && <span className="inline-flex items-center gap-1 rounded-full border border-line bg-paper px-1.5 py-[1px] text-ink-3" title={T('Duración del turno', 'Turn duration')}><Clock3 size={9} /> {fmtDur(c.seconds)}</span>}</div>
         {c.activity && (c.activity.written + c.activity.edited + c.activity.commands + c.activity.tests > 0) && (
           <div className="mb-2 flex flex-wrap gap-1.5 text-[11px]">
             {c.activity.written > 0 && <span className="rounded-full bg-ok/10 text-ok px-2 py-0.5">✍️ {c.activity.written} {c.activity.written === 1 ? T('archivo nuevo', 'new file') : T('archivos nuevos', 'new files')}</span>}

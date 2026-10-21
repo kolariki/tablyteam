@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { ChevronDown, Gavel, Pencil, Play, Search, Trash2, Video } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, getToken, type DashboardData } from '../lib/api'
+import { fmtDur } from '../lib/duration'
 import { readCache, writeCache } from '../lib/cache'
 import { fmtUsd } from '../lib/parse'
 import { BrandLogoRow, BrandStripes } from './ProviderLogo'
@@ -129,6 +130,7 @@ export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refres
           const latest = builds[0]
           const cost = apiCost(s) + s.runs.reduce((a, r) => a + apiCost(r), 0)
           const engineCost = builds.reduce((a, b) => a + (isEngine(b.provider) ? b.cost_usd ?? 0 : 0), 0)
+          const buildTime = builds.reduce((a, b) => a + (b.build_seconds ?? 0), 0)
           const providers = s.agents.map((a) => a.provider)
           const expanded = !!open[s.id]
           const councils = s.councils ?? []
@@ -139,6 +141,7 @@ export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refres
             ...(!isAudit && s.turns ? [{ label: tr('Turnos del debate', 'Debate turns'), value: `${s.turns}` }] : []),
             { label: 'Brief', value: s.has_brief ? tr('generado', 'generated') : tr('todavía no', 'not yet') },
             ...(builds.length ? [{ label: tr('Construcciones', 'Builds'), value: `${builds.length} · ${T('última', 'latest')} ${statusLabel(latest.status)}${latest.files ? ` · ${latest.files} ${T('archivos', 'files')}` : ''}` }] : []),
+            ...(buildTime > 0 ? [{ label: tr('Tiempo de construcción', 'Build time'), value: `${fmtDur(buildTime)}${builds.length > 1 ? ` · ${T('última', 'latest')} ${fmtDur(latest.build_seconds ?? 0)}` : ''}` }] : []),
             ...(latest?.version ? [{ label: tr('Versión', 'Version'), value: <span>v{latest.version}{latest.readiness != null ? <span style={{ color: readinessColor(latest.readiness) }}> · {latest.readiness}% {T('listo para producción', 'production-ready')}</span> : <span className="text-ink-3">{T(' · sin revisar', ' · not reviewed')}</span>}</span> }] : []),
             ...(councils.length ? [{ label: tr('Rondas de consejo', 'Council rounds'), value: (
               <span className="inline-flex flex-wrap items-center gap-1">
