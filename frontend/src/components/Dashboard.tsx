@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ChevronDown, Gavel, Pencil, Play, Search, Trash2, Video } from 'lucide-react'
+import { ChevronDown, Gavel, HardHat, MonitorPlay, Pencil, Play, Search, Trash2, Users, Video } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, getToken, type DashboardData } from '../lib/api'
 import { fmtDur } from '../lib/duration'
@@ -11,7 +11,7 @@ import { toast, useConfirm } from './Toast'
 import { tr, useT } from '../lib/i18n'
 
 interface Props {
-  onOpen: (id: string) => void
+  onOpen: (id: string, mode?: 'arena' | 'builder' | 'run') => void
   onCouncil: (id: string) => void
   onReplay: (id: string) => void
   onSettings: () => void
@@ -31,6 +31,9 @@ const STATUS: Record<string, { es: string; en: string; cls: string }> = {
   audited: { es: 'auditada', en: 'audited', cls: 'bg-gold/15 text-gold' },
   reviewing: { es: 'en revisión', en: 'under review', cls: 'bg-gold/15 text-gold' },
 }
+
+const ACT = 'flex h-8 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[12px] font-medium text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent disabled:opacity-40 disabled:hover:border-line disabled:hover:bg-surface disabled:hover:text-ink-2'
+const ACT_PRIMARY = 'flex h-8 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40'
 
 /** Home: everything the user owns (sessions, audits, builds), spend, and a setup checklist. */
 /** The project's own animated scene: a model draws it from the brief the first time the row is shown (a few seconds,
@@ -207,8 +210,16 @@ export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refres
                   <div className="hidden md:block w-[34%] max-w-[420px] shrink-0 self-stretch min-h-[44px]">
                     <BrandLogoRow providers={providers} compact />
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => onOpen(s.id)} className="flex items-center gap-1 rounded-lg bg-accent text-white px-2.5 py-1.5 text-[12px] font-medium" title={T('Abrir', 'Open')}><Play size={12} />{T(' Abrir', ' Open')}</button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isAudit ? (
+                      <button onClick={() => onOpen(s.id, 'builder')} className={ACT_PRIMARY} title={T('Abrir el informe de auditoría', 'Open the audit report')}><HardHat size={13} /> {T('Abrir', 'Open')}</button>
+                    ) : (
+                      <>
+                        <button onClick={() => onOpen(s.id, 'arena')} className={builds.length ? ACT : ACT_PRIMARY} title={T('El debate del equipo en la arena', 'The team debate in the arena')}><Users size={13} /> {T('Equipo', 'Team')}</button>
+                        <button onClick={() => onOpen(s.id, 'builder')} disabled={!builds.length} className={ACT} title={builds.length ? T('Código, diseño, versiones y publicación', 'Code, design, versions and publishing') : T('Todavía no hay construcción', 'No build yet')}><HardHat size={13} /> {T('Constructor', 'Builder')}</button>
+                        <button onClick={() => onOpen(s.id, 'run')} disabled={!latest?.files} className={builds.length ? ACT_PRIMARY : ACT} title={latest?.files ? T('Levanta la app en esta máquina y la muestra', 'Starts the app on this machine and shows it') : T('Todavía no hay archivos para correr', 'No files to run yet')}><MonitorPlay size={13} /> {T('Correr app', 'Run app')}</button>
+                      </>
+                    )}
                     {!isAudit && <button onClick={() => onReplay(s.id)} className="rounded-lg border border-line bg-surface/70 px-2 py-1.5 text-ink-3 hover:text-ink" title={T('Reproducir como video', 'Play as video')}><Video size={13} /></button>}
                     <button onClick={() => { setEditing(s.id); setTitle(s.title || s.topic) }} className="rounded-lg border border-line bg-surface/70 px-2 py-1.5 text-ink-3 hover:text-ink" title={T('Renombrar', 'Rename')}><Pencil size={13} /></button>
                     <button

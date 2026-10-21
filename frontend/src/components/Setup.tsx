@@ -29,8 +29,10 @@ interface Props {
   onAudit: () => void
   onStart: (cfg: SessionConfig) => Promise<void>
   onReplay: (id: string) => void
-  onOpen: (id: string) => void
+  onOpen: (id: string, mode?: OpenMode) => void
 }
+
+export type OpenMode = 'arena' | 'builder' | 'run'
 
 export default function Setup({ user, onLogout, onSettings, onAudit, onStart, onReplay, onOpen }: Props) {
   const T = useT()
@@ -666,7 +668,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
             })()}
         </div>
 
-        <Dashboard onOpen={(id) => { setOpening(T('Abriendo el proyecto…', 'Opening the project…')); onOpen(id) }} onCouncil={(id) => { setOpening(T('Abriendo el consejo…', 'Opening the council…')); useArena.getState().set({ pendingLive: id }) }} onReplay={onReplay} onSettings={onSettings} onAudit={onAudit} onLoaded={() => mark('dashboard')} />
+        <Dashboard onOpen={(id, mode) => { if (mode !== 'run') setOpening(mode === 'arena' ? T('Abriendo el equipo…', 'Opening the team…') : T('Abriendo el constructor…', 'Opening the builder…')); onOpen(id, mode) }} onCouncil={(id) => { setOpening(T('Abriendo el consejo…', 'Opening the council…')); useArena.getState().set({ pendingLive: id }) }} onReplay={onReplay} onSettings={onSettings} onAudit={onAudit} onLoaded={() => mark('dashboard')} />
       </div>
     </div>
   )

@@ -18,6 +18,7 @@ import TopBar from './components/TopBar'
 import { PauseModal, TeamModal } from './components/TeamModal'
 import Verdict from './components/Verdict'
 import VideoExport, { type VideoOptions } from './components/VideoExport'
+import RunModal from './components/RunModal'
 import ResearchOverlay from './components/ResearchOverlay'
 import { api, auth, connect, connectBuild, replay } from './lib/api'
 import { tr, useT } from './lib/i18n'
@@ -226,7 +227,7 @@ function AppInner() {
   }
 
   /** Reopens a previous build (live → websocket, finished → saved snapshot). */
-  const openBuild = async (id: string) => {
+  const openBuild = async (id: string, show = true) => {
     const st = useArena.getState()
     const sessionId = st.sessionId!
     const d = await api.build(sessionId, id)
@@ -236,10 +237,31 @@ function AppInner() {
       selected: Object.keys(files)[0] ?? null, team: d.team ?? [], reviews: d.reviews ?? [], reviewPlan: d.review_plan ?? null, mode: d.mode ?? 'build', auditReport: d.audit_report ?? null,
       previewHtml: d.file_contents?.['preview/index.html'] ?? null, designHtml: d.file_contents?.['design/mockup.html'] ?? d.design_html ?? null, pane: d.audit_report ? 'report' : 'code',
     })
-    st.set({ showBriefExport: false, view: 'builder' })
+    if (show) st.set({ showBriefExport: false, view: 'builder' })
     buildWs.current?.()
     if (d.status === 'running' || d.status === 'reviewing' || d.status === 'design_review') openBuildWs(id)  // waiting for design approval is live too
   }
+
+  /** «Correr app» from the home: the run view opens right there, over the home, without entering the builder. */
+  const [runOverlay, setRunOverlay] = useState(false)
+  const runApp = async (sessionId: string) => {
+    const builds = await api.builds(sessionId).catch(() => [])
+    const latest = builds.find((x) => x.status !== 'error' && x.files) ?? builds[0]
+    if (!latest) throw new Error(tr('Este proyecto todavía no tiene una construcción para correr.', 'This project has no build to run yet.'))
+    useArena.getState().set({ sessionId })
+    await openBuild(latest.id, false)
+    setRunOverlay(true)
+  }
+  const runOverlayLayer = runOverlay ? (
+    <RunModal
+      onClose={() => setRunOverlay(false)}
+      onDownload={async () => {
+        const b = useBuild.getState()
+        if (!b.sessionId || !b.id) return
+        downloadBlob(await api.buildZip(b.sessionId, b.id), `${slug(b.title) || 'proyecto'}.zip`)
+      }}
+    />
+  ) : null
 
   // user-facing feedback for long jobs (build/review/deploy/arena), including browser notifications when the tab is hidden
   useEffect(() => {
@@ -465,7 +487,7 @@ function AppInner() {
   }
   if (view === 'audit') return <>{banner}{demoLayer}<AuditSetup onBack={() => useArena.getState().set({ view: 'setup' })} onStart={startAudit} /></>
   if (view === 'settings') return <>{banner}{demoLayer}<Settings onBack={() => useArena.getState().set({ view: 'setup' })} /></>
-  if (view === 'setup') return <>{banner}{demoLayer}<Setup key={user.id} user={user} onLogout={logout} onSettings={() => useArena.getState().set({ view: 'settings' })} onAudit={() => useArena.getState().set({ view: 'audit' })} onStart={start} onReplay={startReplay} onOpen={(id) => openSaved(id).catch((e) => toast.error(tr('No se pudo abrir', 'Could not open'), (e as Error).message))} /></>
+  if (view === 'setup') return <>{banner}{demoLayer}<Setup key={user.id} user={user} onLogout={logout} onSettings={() => useArena.getState().set({ view: 'settings' })} onAudit={() => useArena.getState().set({ view: 'audit' })} onStart={start} onReplay={startReplay} onOpen={(id, mode) => (mode === 'run' ? runApp(id) : openSaved(id, mode !== 'arena')).catch((e) => toast.error(tr('No se pudo abrir', 'Could not open'), (e as Error).message))} />{runOverlayLayer}</>
 
   const exporter = (
     <>
