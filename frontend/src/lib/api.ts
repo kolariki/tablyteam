@@ -160,6 +160,8 @@ export const api = {
   appRun: (sessionId: string, id: string) => j<{ services: RunService[]; run: AppRunState | null }>(authed(`/api/sessions/${sessionId}/builds/${id}/run`)),
   appStart: (sessionId: string, id: string, service: string) => j(post(`/api/sessions/${sessionId}/builds/${id}/run`, { service })),
   appStop: (sessionId: string, id: string) => j(authed(`/api/sessions/${sessionId}/builds/${id}/run`, { method: 'DELETE' })),
+  agentSessions: (engine: 'claude' | 'codex') => j<AgentSessionList>(authed(`/api/agents/sessions?engine=${engine}`)),
+  agentSession: (engine: 'claude' | 'codex', id: string) => j<AgentSessionDetail>(authed(`/api/agents/sessions/${engine}/${id}`)),
   devices: () => j<{ ios: { ok: boolean; hint: string | null; booted: string | null }; android: { ok: boolean; hint: string | null; booted: string | null } }>(authed('/api/devices')),
   runScreenUrl: (sessionId: string, id: string, target: 'ios' | 'android') => `/api/sessions/${sessionId}/builds/${id}/run/screen?target=${target}&token=${encodeURIComponent(getToken() ?? '')}&t=`,
   runTap: (sessionId: string, id: string, target: 'ios' | 'android', x: number, y: number) => j<{ ok: boolean }>(post(`/api/sessions/${sessionId}/builds/${id}/run/tap`, { target, x, y })),
@@ -282,6 +284,34 @@ export interface CloudInfo {
   github: { set: boolean; last4: string | null }
   publishing: boolean
   version: number
+}
+export interface AgentSessionSummary {
+  id: string
+  engine: 'claude' | 'codex'
+  title: string
+  first_prompt: string | null
+  cwd: string | null
+  branch: string | null
+  model: string | null
+  created: number
+  updated: number
+  size: number
+  live: boolean
+}
+export interface AgentSessionList {
+  engine: 'claude' | 'codex'
+  available: boolean
+  count: number
+  projects: { key: string; name: string; path: string | null; updated: number; sessions: AgentSessionSummary[] }[]
+}
+export interface AgentPart { type: 'text' | 'thinking' | 'tool'; text?: string; name?: string; summary?: string; input?: string; result?: string | null; is_error?: boolean }
+export interface AgentSessionDetail extends AgentSessionSummary {
+  items: { role: 'user' | 'assistant'; ts: number | null; parts: AgentPart[] }[]
+  meta: { cwd: string | null; branch: string | null; model: string | null; version: string | null }
+  usage: { input: number; output: number; cache_read: number; cache_write: number }
+  truncated: boolean
+  resume: string
+  file: string
 }
 export interface DeployTarget {
   id: string

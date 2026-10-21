@@ -51,6 +51,7 @@ from . import runner as runmod
 from . import skills as skillmod
 from . import cloud as cloudmod
 from . import gitserver
+from . import agent_sessions
 from . import skills_catalog as catalog
 from .i18n_data import GROUPS_EN, preset_en, role_en, template_en
 from . import fde as fdemod
@@ -1964,6 +1965,24 @@ async def git_http(user_id: str, repo: str, path: str, request: Request):
     body = await request.body()
     status, headers, payload = gitserver.http_backend(user_id, repo, path, request.method, request.url.query, request.headers.get("content-type"), body)
     return Response(status_code=status, headers={k: v for k, v in headers}, content=payload)
+
+
+@app.get("/api/agents/sessions")
+def agent_sessions_list(engine: str = "claude", user: User = CurrentUser):
+    """Your Claude Code / Codex conversations on this machine, grouped by project (read-only)."""
+    if engine not in ("claude", "codex"):
+        raise HTTPException(400, "engine: claude | codex")
+    return agent_sessions.list_sessions(engine)
+
+
+@app.get("/api/agents/sessions/{engine}/{session_id}")
+def agent_session_get(engine: str, session_id: str, user: User = CurrentUser):
+    if engine not in ("claude", "codex"):
+        raise HTTPException(400, "engine: claude | codex")
+    d = agent_sessions.get_session(engine, session_id)
+    if not d:
+        raise HTTPException(404, "Sesión no encontrada")
+    return d
 
 
 @app.get("/api/devices")
