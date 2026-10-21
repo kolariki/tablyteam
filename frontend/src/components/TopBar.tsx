@@ -1,16 +1,16 @@
-import { Focus, ChevronDown, Download, FileText, Hammer, Rocket, Video, Pause, Plus, Users, Square, Trophy, Volume2, VolumeX, RotateCcw } from 'lucide-react'
+import { Focus, ChevronDown, Download, FileText, Hammer, Rocket, Pause, Plus, Users, Square, Trophy, RotateCcw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import { useT } from '../lib/i18n'
 import { downloadBlob, slug } from '../lib/recorder'
-import { setSfx, sfxEnabled } from '../lib/sfx'
+import { setSfx } from '../lib/sfx'
 import { useArena } from '../store'
 
 export default function TopBar({ onNew, onRerun }: { onNew: () => void; onRerun?: () => void }) {
   const T = useT()
   const s = useArena()
   const compact = s.layout === 'vertical'
-  const [sound, setSound] = useState(sfxEnabled)
+  useEffect(() => { setSfx(true) }, [])  // sound effects are always on
   const live = s.status === 'running' || s.status === 'paused' || s.status === 'voting' || s.status === 'connecting'
   // the same pill language as the home and builder headers: 36 px, rounded, lifts on hover
   const btn = 'flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-sm text-ink-2 shadow-sm transition hover:bg-accent-soft hover:border-accent hover:text-accent disabled:opacity-40'
@@ -55,10 +55,12 @@ export default function TopBar({ onNew, onRerun }: { onNew: () => void; onRerun?
         {s.config?.mode === 'review' && s.config.review_of && (
           <button className={primary} onClick={() => s.set({ showVerdict: false, pendingBuild: { buildId: s.config!.review_of!.build_id, sessionId: s.config!.review_of!.session_id } })} title={T('Volver al constructor de este proyecto', "Back to this project's builder")}><Hammer size={14} /> {T('Constructor', 'Builder')} · v{s.config.review_of.version ?? ''}</button>
         )}
+        {s.sessionId && !live && s.config?.mode !== 'review' && (
+          <button className={primary} onClick={() => s.set({ showBriefExport: true })} title={T('El equipo construye el producto: brief, diseño y código, acá adentro', 'The team builds the product: brief, design and code, right here')}><Rocket size={14} /> {T('Construir la app', 'Build the app')}</button>
+        )}
         {s.verdict && <button className={btn} onClick={() => s.set({ showVerdict: true })}><Trophy size={14} /> {s.config?.mode === 'review' ? T('Veredicto del consejo', 'Council verdict') : T('Veredicto', 'Verdict')}</button>}
         {s.config && s.source === 'live' && <button className={btn} onClick={() => s.set({ showTeam: true })} title={T('Cambiar el modelo de cualquier rol', 'Change the model of any role')}><Users size={14} /> {T('Equipo', 'Team')}</button>}
         <button className={`${btn} ${s.focus ? 'border-accent bg-accent-soft text-accent' : ''}`} onClick={() => s.set({ focus: !s.focus })} title={T('Foco: los agentes debatiendo ocupan la pantalla; transcripción y métricas se achican', 'Focus: the debating agents fill the screen; transcript and metrics shrink')}><Focus size={14} /> {T('Foco', 'Focus')}</button>
-        <button className={`${btn} w-10 justify-center px-0 ${sound ? 'text-accent' : 'text-ink-2'}`} onClick={() => { setSfx(!sound); setSound(!sound) }} title={sound ? T('Silenciar efectos', 'Mute effects') : T('Activar efectos de sonido', 'Turn sound effects on')}>{sound ? <Volume2 size={22} strokeWidth={2} className="shrink-0" /> : <VolumeX size={22} strokeWidth={2} className="shrink-0" />}</button>
         {live && s.source === 'live' && s.sessionId && (
           <button className={`${btn} border-danger/40 text-danger hover:border-danger hover:text-danger`} onClick={() => api.stop(s.sessionId!)}><Square size={14} /> {T('Detener', 'Stop')}</button>
         )}
@@ -76,6 +78,7 @@ function ExportMenu({ btn }: { btn: string }) {
   const sessionId = useArena((s) => s.sessionId)
   const config = useArena((s) => s.config)
   const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState<{ top: number; right: number }>({ top: 64, right: 16 })
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false)
@@ -90,22 +93,14 @@ function ExportMenu({ btn }: { btn: string }) {
   const item = 'flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-surface-2'
   return (
     <div ref={ref} className="relative shrink-0">
-      <button className={`${btn} ${open ? 'border-accent text-accent' : ''}`} onClick={() => setOpen(!open)}>
+      <button className={`${btn} ${open ? 'border-accent text-accent' : ''}`} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) }); setOpen(!open) }}>
         <Download size={14} /> {T('Exportar', 'Export')} <ChevronDown size={13} className={`transition ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="fixed right-4 top-16 z-[70] w-72 rounded-2xl border border-line bg-surface p-1.5 text-sm shadow-[0_18px_40px_-18px_rgba(30,38,34,.55)]">
-          <button className={item} onClick={() => { setOpen(false); set({ showVideoExport: true }) }}>
-            <Video size={17} className="mt-0.5 text-accent" />
-            <span><b className="font-medium">Video</b><span className="block text-xs text-ink-3">{T('MP4 9:16 o 16:9 para redes', 'MP4 9:16 or 16:9 for social media')}</span></span>
-          </button>
+        <div className="fixed z-[70] w-72 rounded-2xl border border-line bg-surface p-1.5 text-sm shadow-[0_18px_40px_-18px_rgba(30,38,34,.55)]" style={{ top: pos.top, right: pos.right }}>
           <button className={item} onClick={() => { setOpen(false); set({ showBriefExport: true }) }}>
             <Hammer size={17} className="mt-0.5 text-accent" />
             <span><b className="font-medium">{T('Brief para construir', 'Build brief')}</b><span className="block text-xs text-ink-3">{T('Markdown + prompt para Claude Code, Cursor…', 'Markdown + prompt for Claude Code, Cursor…')}</span></span>
-          </button>
-          <button className={item} onClick={() => { setOpen(false); set({ showBriefExport: true }) }}>
-            <Rocket size={17} className="mt-0.5 text-accent" />
-            <span><b className="font-medium">{T('Construir en la app', 'Build in the app')}</b><span className="block text-xs text-ink-3">{T('Un modelo escribe el proyecto, archivo por archivo', 'A model writes the project, file by file')}</span></span>
           </button>
           <button className={item} onClick={transcript}>
             <FileText size={17} className="mt-0.5 text-accent" />
