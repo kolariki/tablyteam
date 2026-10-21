@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, CheckCircle2, FlaskConical, Gauge, ListChecks, Search, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, FlaskConical, Gauge, Home, ListChecks, Search, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2 } from 'lucide-react'
 import { marked } from 'marked'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { reconnectBuild, useBuild, type Activity, type ChatItem, type Todo } from '../buildStore'
@@ -82,7 +82,7 @@ function liveParts(raw: string) {
   return { say, files, stage, done }
 }
 
-export default function Builder({ onBack }: { onBack: () => void }) {
+export default function Builder({ onBack, onHome }: { onBack: () => void; onHome?: () => void }) {
   const T = useT()
   const b = useBuild()
   const color = BRAND_COLOR[b.provider ?? ''] ?? '#2F6B5D'
@@ -211,10 +211,11 @@ export default function Builder({ onBack }: { onBack: () => void }) {
     <div className="h-full flex flex-col bg-paper">
       {/* top bar */}
       <div className="flex h-16 shrink-0 items-center gap-3 border-b border-line bg-surface/90 px-4 backdrop-blur">
-        <button onClick={onBack} className="flex shrink-0 items-center rounded-lg transition hover:opacity-80" title={T('Tably Team · volver al inicio', 'Tably Team · back to the home')}>
+        <button onClick={onHome ?? onBack} className="flex shrink-0 items-center rounded-lg transition hover:opacity-80" title={T('Tably Team · ir al inicio', 'Tably Team · go home')}>
           <img src="/icon.svg" alt="Tably Team" className="h-9 w-9 rounded-xl shadow-sm" draggable={false} />
         </button>
-        <button onClick={onBack} className={`${HBTN} px-3`}><ArrowLeft size={14} /> {T('Volver', 'Back')}</button>
+        <button onClick={onHome ?? onBack} className={`${HBTN} px-3`} title={T('Ir al inicio: tus proyectos y experimentos', 'Go home: your projects and experiments')}><Home size={14} /> {T('Inicio', 'Home')}</button>
+        <button onClick={onBack} className={`${HBTN} px-3`} title={T('Volver al consejo de este proyecto', 'Back to this project\u2019s council')}><ArrowLeft size={14} /> {T('Consejo', 'Council')}</button>
         <span className="mx-1 h-7 w-px bg-line" />
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface shadow-sm" style={{ border: `1.5px solid ${color}` }}><ProviderLogo provider={b.provider} size={20} /></span>
         <div className="min-w-0 flex-1">

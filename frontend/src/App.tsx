@@ -459,7 +459,7 @@ function AppInner() {
       <div data-capture="builder" className="h-full">
         {banner}
         {demoLayer}
-        {intro ? <BuilderIntro provider={intro.provider} model={intro.model} title={intro.title} onDone={() => setIntro(null)} /> : <Builder onBack={leaveBuilder} />}
+        {intro ? <BuilderIntro provider={intro.provider} model={intro.model} title={intro.title} onDone={() => setIntro(null)} /> : <Builder onBack={leaveBuilder} onHome={() => { buildWs.current?.(); buildWs.current = null; setIntro(null); leave() }} />}
       </div>
     )
   }
