@@ -133,23 +133,28 @@ function AppInner() {
     else useArena.getState().set({ view: 'setup' })
   }
 
-  const openSaved = async (id: string, preferBuild = true) => {
+  const openSaved = async (id: string, preferBuild = true, direct = false) => {
     const data = await api.session(id)
     if (data.config?.mode === 'audit') return openAuditSession(id, data.config)
     cleanup.current?.()
-    useArena.getState().reset({ view: 'arena', source: 'replay', status: 'connecting', sessionId: id })
+    // the arena state is loaded in any case (the builder's "← Consejo" needs it), but when the destination is the
+    // builder the arena is never shown: the home loader stays up until the build is ready
+    const toBuilder = preferBuild && data.config?.mode !== 'review'
+    const prevView = useArena.getState().view
+    useArena.getState().reset({ view: toBuilder ? prevView : 'arena', source: 'replay', status: 'connecting', sessionId: id })
     history.replaceState(null, '', `#live=${id}`)
     for (const ev of data.events) useArena.getState().apply(ev)
     // a finished council round opens on its verdict (the change list + "build with these changes"); debates open quiet
     useArena.getState().set({ showVerdict: data.config?.mode === 'review' && !!useArena.getState().council })
-    // a project that already has a build opens on the build (the debate stays one click away: "← Arena")
-    if (preferBuild && data.config?.mode !== 'review') {
+    // a project that already has a build opens on the build (the debate stays one click away: "← Consejo")
+    if (toBuilder) {
       const builds = await api.builds(id).catch(() => [])
       // a build waiting for the user (design approval) or still working comes first; then the newest usable one
       const latest = builds.find((x) => ['design_review', 'running', 'reviewing'].includes(x.status)) ?? builds.find((x) => x.status !== 'error') ?? builds[0]
-      if (latest?.pending_council) return openSaved(latest.pending_council, false)  // the council already spoke: decide first
-      if (latest) await openBuild(latest.id)
+      if (latest?.pending_council && !direct) return openSaved(latest.pending_council, false)  // the council already spoke: decide first
+      if (latest) return openBuild(latest.id)
     }
+    useArena.getState().set({ view: 'arena' })
   }
 
   const startReplay = async (id: string) => {
@@ -487,7 +492,7 @@ function AppInner() {
   }
   if (view === 'audit') return <>{banner}{demoLayer}<AuditSetup onBack={() => useArena.getState().set({ view: 'setup' })} onStart={startAudit} /></>
   if (view === 'settings') return <>{banner}{demoLayer}<Settings onBack={() => useArena.getState().set({ view: 'setup' })} /></>
-  if (view === 'setup') return <>{banner}{demoLayer}<Setup key={user.id} user={user} onLogout={logout} onSettings={() => useArena.getState().set({ view: 'settings' })} onAudit={() => useArena.getState().set({ view: 'audit' })} onStart={start} onReplay={startReplay} onOpen={(id, mode) => (mode === 'run' ? runApp(id) : openSaved(id, mode !== 'arena')).catch((e) => toast.error(tr('No se pudo abrir', 'Could not open'), (e as Error).message))} />{runOverlayLayer}</>
+  if (view === 'setup') return <>{banner}{demoLayer}<Setup key={user.id} user={user} onLogout={logout} onSettings={() => useArena.getState().set({ view: 'settings' })} onAudit={() => useArena.getState().set({ view: 'audit' })} onStart={start} onReplay={startReplay} onOpen={(id, mode) => (mode === 'run' ? runApp(id) : openSaved(id, mode !== 'arena', mode === 'builder')).catch((e) => toast.error(tr('No se pudo abrir', 'Could not open'), (e as Error).message))} />{runOverlayLayer}</>
 
   const exporter = (
     <>
