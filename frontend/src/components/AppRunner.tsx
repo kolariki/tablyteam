@@ -6,6 +6,7 @@ import { api, type RunService } from '../lib/api'
 import { tr, useT } from '../lib/i18n'
 import { toast } from './Toast'
 import BlockedNotice, { BuilderBusyNotice } from './BlockedNotice'
+import { PanelLoader } from './HomeLoader'
 
 const STEP = (): Record<string, string> => ({
   installing: tr('Instalando dependencias…', 'Installing dependencies…'),
@@ -108,7 +109,7 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
       {/* toolbar */}
       <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-line">
         {services === null ? (
-          <span className="text-[12.5px] text-ink-3">{T('Analizando el proyecto…', 'Analyzing the project…')}</span>
+          <span className="flex items-center gap-1.5 text-[12.5px] text-ink-3"><Loader2 size={12} className="animate-spin" /> {T('Analizando el proyecto…', 'Analyzing the project…')}</span>
         ) : services.length === 0 ? (
           <span className="text-[12.5px] text-ink-2">{T('No encontré nada que se pueda correr (sin package.json con script ', 'Found nothing runnable (no package.json with a ')}<code className="font-mono">dev</code>{T(', ni API Python, ni docker compose).', ' script, no Python API, no docker compose).')}</span>
         ) : (
@@ -150,7 +151,11 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
       )}
       {/* body */}
       <div className="flex-1 min-h-0 flex flex-col">
-        {run.status === 'running' && run.url && sel?.web !== false ? (
+        {services === null ? (
+          <PanelLoader caption={T('Analizando el proyecto…', 'Analyzing the project…')} sub={T('Buscando qué se puede correr: package.json, APIs en Python, docker compose.', 'Looking for what can run: package.json, Python APIs, docker compose.')} />
+        ) : (run.status === 'installing' || run.status === 'starting') && !logsOpen ? (
+          <PanelLoader caption={step[run.status]} sub={run.status === 'installing' ? T('La primera vez tarda: instala las dependencias del proyecto. Abrí los logs abajo para ver el detalle.', 'The first time takes a while: it installs the project dependencies. Open the logs below to see the detail.') : T('Esperando a que el servidor responda en un puerto libre.', 'Waiting for the server to answer on a free port.')} />
+        ) : run.status === 'running' && run.url && sel?.web !== false ? (
           <div className="flex-1 min-h-0 p-3">
             <div className="flex h-full flex-col overflow-hidden rounded-xl border border-line bg-white shadow-[0_14px_30px_-18px_rgba(30,38,34,.45)]">
               <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-line bg-surface-2/70 px-3">

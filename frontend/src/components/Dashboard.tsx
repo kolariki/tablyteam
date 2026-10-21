@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ChevronDown, Gavel, HardHat, MonitorPlay, Pencil, Play, Search, Trash2, Users, Video } from 'lucide-react'
+import { ChevronDown, Gavel, HardHat, Loader2, MonitorPlay, Pencil, Play, Search, Trash2, Users, Video } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, getToken, type DashboardData } from '../lib/api'
 import { fmtDur } from '../lib/duration'
@@ -11,7 +11,7 @@ import { toast, useConfirm } from './Toast'
 import { tr, useT } from '../lib/i18n'
 
 interface Props {
-  onOpen: (id: string, mode?: 'arena' | 'builder' | 'run') => void
+  onOpen: (id: string, mode?: 'arena' | 'builder' | 'run') => void | Promise<unknown>
   onCouncil: (id: string) => void
   onReplay: (id: string) => void
   onSettings: () => void
@@ -67,6 +67,17 @@ export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refres
   const T = useT()
   const statusLabel = (code: string) => (STATUS[code] ? T(STATUS[code].es, STATUS[code].en) : code)
   const [data, setData] = useState<DashboardData | null>(() => readCache<DashboardData>('dashboard'))
+  // which card action is loading (the build is several MB: the button says so until the screen opens)
+  const [busyAct, setBusyAct] = useState<string | null>(null)
+  const go = async (id: string, mode: 'arena' | 'builder' | 'run') => {
+    setBusyAct(`${id}:${mode}`)
+    try {
+      await onOpen(id, mode)
+    } finally {
+      setBusyAct(null)
+    }
+  }
+  const actLabel = (id: string, mode: 'arena' | 'builder' | 'run', icon: ReactNode, label: string) => (busyAct === `${id}:${mode}` ? <><Loader2 size={13} className="animate-spin" /> {T('Abriendo…', 'Opening…')}</> : <>{icon} {label}</>)
   const [q, setQ] = useState('')
   const [editing, setEditing] = useState<string | null>(null)
   const [title, setTitle] = useState('')
@@ -212,12 +223,12 @@ export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refres
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     {isAudit ? (
-                      <button onClick={() => onOpen(s.id, 'builder')} className={ACT_PRIMARY} title={T('Abrir el informe de auditoría', 'Open the audit report')}><HardHat size={13} /> {T('Abrir', 'Open')}</button>
+                      <button onClick={() => go(s.id, 'builder')} disabled={!!busyAct} className={ACT_PRIMARY} title={T('Abrir el informe de auditoría', 'Open the audit report')}>{actLabel(s.id, 'builder', <HardHat size={13} />, T('Abrir', 'Open'))}</button>
                     ) : (
                       <>
-                        <button onClick={() => onOpen(s.id, 'arena')} className={builds.length ? ACT : ACT_PRIMARY} title={T('El debate del equipo en la arena', 'The team debate in the arena')}><Users size={13} /> {T('Equipo', 'Team')}</button>
-                        <button onClick={() => onOpen(s.id, 'builder')} disabled={!builds.length} className={ACT} title={builds.length ? T('Código, diseño, versiones y publicación', 'Code, design, versions and publishing') : T('Todavía no hay construcción', 'No build yet')}><HardHat size={13} /> {T('Constructor', 'Builder')}</button>
-                        <button onClick={() => onOpen(s.id, 'run')} disabled={!latest?.files} className={builds.length ? ACT_PRIMARY : ACT} title={latest?.files ? T('Levanta la app en esta máquina y la muestra', 'Starts the app on this machine and shows it') : T('Todavía no hay archivos para correr', 'No files to run yet')}><MonitorPlay size={13} /> {T('Correr app', 'Run app')}</button>
+                        <button onClick={() => go(s.id, 'arena')} disabled={!!busyAct} className={builds.length ? ACT : ACT_PRIMARY} title={T('El debate del equipo en la arena', 'The team debate in the arena')}>{actLabel(s.id, 'arena', <Users size={13} />, T('Equipo', 'Team'))}</button>
+                        <button onClick={() => go(s.id, 'builder')} disabled={!builds.length || !!busyAct} className={ACT} title={builds.length ? T('Código, diseño, versiones y publicación', 'Code, design, versions and publishing') : T('Todavía no hay construcción', 'No build yet')}>{actLabel(s.id, 'builder', <HardHat size={13} />, T('Constructor', 'Builder'))}</button>
+                        <button onClick={() => go(s.id, 'run')} disabled={!latest?.files || !!busyAct} className={builds.length ? ACT_PRIMARY : ACT} title={latest?.files ? T('Levanta la app en esta máquina y la muestra', 'Starts the app on this machine and shows it') : T('Todavía no hay archivos para correr', 'No files to run yet')}>{actLabel(s.id, 'run', <MonitorPlay size={13} />, T('Correr app', 'Run app'))}</button>
                       </>
                     )}
                     {!isAudit && <button onClick={() => onReplay(s.id)} className="rounded-lg border border-line bg-surface/70 px-2 py-1.5 text-ink-3 hover:text-ink" title={T('Reproducir como video', 'Play as video')}><Video size={13} /></button>}
