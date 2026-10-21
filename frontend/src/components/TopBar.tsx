@@ -1,5 +1,6 @@
 import { Focus, ChevronDown, Download, FileText, Hammer, Home, Rocket, Pause, Users, Square, Trophy, RotateCcw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { api } from '../lib/api'
 import { useT } from '../lib/i18n'
 import { downloadBlob, slug } from '../lib/recorder'
@@ -80,8 +81,9 @@ function ExportMenu({ btn }: { btn: string }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; right: number }>({ top: 64, right: 16 })
   const ref = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false)
+    const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && !menuRef.current?.contains(e.target as Node) && setOpen(false)
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
   }, [])
@@ -96,8 +98,8 @@ function ExportMenu({ btn }: { btn: string }) {
       <button className={`${btn} ${open ? 'border-accent text-accent' : ''}`} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) }); setOpen(!open) }}>
         <Download size={14} /> {T('Exportar', 'Export')} <ChevronDown size={13} className={`transition ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && (
-        <div className="fixed z-[70] w-72 rounded-2xl border border-line bg-surface p-1.5 text-sm shadow-[0_18px_40px_-18px_rgba(30,38,34,.55)]" style={{ top: pos.top, right: pos.right }}>
+      {open && createPortal(
+        <div ref={menuRef} className="fixed z-[400] w-72 rounded-2xl border border-line bg-surface p-1.5 text-sm shadow-[0_18px_40px_-18px_rgba(30,38,34,.55)]" style={{ top: pos.top, right: pos.right }}>
           <button className={item} onClick={() => { setOpen(false); set({ showBriefExport: true }) }}>
             <Hammer size={17} className="mt-0.5 text-accent" />
             <span><b className="font-medium">{T('Brief para construir', 'Build brief')}</b><span className="block text-xs text-ink-3">{T('Markdown + prompt para Claude Code, Cursor…', 'Markdown + prompt for Claude Code, Cursor…')}</span></span>
@@ -106,7 +108,8 @@ function ExportMenu({ btn }: { btn: string }) {
             <FileText size={17} className="mt-0.5 text-accent" />
             <span><b className="font-medium">{T('Transcripción', 'Transcript')}</b><span className="block text-xs text-ink-3">{T('El debate completo en .md', 'The full debate as .md')}</span></span>
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
