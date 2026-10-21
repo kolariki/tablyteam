@@ -45,6 +45,7 @@ from .local_engine import ENGINES, engine_status, is_engine, snapshot_dir
 from . import deploy as deploymod
 from . import service_guide
 from . import billing
+from . import research_jobs
 from . import providers as provmod
 from . import runner as runmod
 from . import skills as skillmod
@@ -834,6 +835,23 @@ def _brief_for(user: User, session_id: str, target: str) -> str:
     if not path.exists():
         raise HTTPException(409, "Primero generá el brief de construcción para esta sesión.")
     return path.read_text()
+
+
+@app.post("/api/research/jobs")
+async def research_job_start(body: dict, user: User = CurrentUser):
+    """Benchmark the reference apps before a debate; poll the job for the reverse-engineering screen."""
+    refs = [r.strip() for r in body.get("references", []) if isinstance(r, str) and r.strip()] if isinstance(body.get("references"), list) else []
+    if not refs:
+        raise HTTPException(400, "Sin referencias")
+    return research_jobs.start(user, refs, str(body.get("brief") or ""), bool(body.get("deep_analysis")))
+
+
+@app.get("/api/research/jobs/{jid}")
+def research_job_get(jid: str, user: User = CurrentUser):
+    j = research_jobs.get(user, jid)
+    if not j:
+        raise HTTPException(404)
+    return j
 
 
 @app.get("/api/research/status")

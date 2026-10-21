@@ -280,6 +280,8 @@ async def stream_brief(user: User, session_id: str, req: BriefRequest) -> AsyncI
     cfg = data["config"]
     system = BRIEF_SYSTEM.format(language=cfg.get("language", "español"), howto=TARGETS[req.target]["howto"])
     user_msg = f"DEBATE A CONVERTIR EN BRIEF:\n\n{transcript}"
+    if cfg.get("context") and "Referentes" in str(cfg.get("context")):
+        user_msg += f"\n\nBENCHMARK DE REFERENTES (investigado antes del debate; el brief tiene que reflejar qué emular y qué evitar):\n{str(cfg['context'])[:20000]}"
     if notes:
         user_msg = f"DECISIONES FINALES EDITADAS POR EL USUARIO (tienen prioridad absoluta sobre lo dicho en el debate; si contradicen algo del debate, mandan estas):\n\n{notes}\n\n" + user_msg
     header = (

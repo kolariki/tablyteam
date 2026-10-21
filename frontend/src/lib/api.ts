@@ -124,6 +124,8 @@ export const api = {
     j<{ id: string }>(post('/api/builds', { session_id, provider, model, target, review_rounds, priorities, design, research: opts.research ?? false, references: opts.references ?? [], deep_analysis: opts.deep_analysis ?? false })),
   sceneStatus: (sessionId: string) => j<{ ready: boolean; pending: boolean; failed_recently: boolean }>(authed(`/api/sessions/${sessionId}/scene/status`)),
   sceneRegenerate: (sessionId: string) => j<{ ready: boolean; pending: boolean }>(authed(`/api/sessions/${sessionId}/scene/regenerate`, { method: 'POST' })),
+  researchJobStart: (references: string[], brief: string, deep_analysis: boolean) => j<ResearchJob>(post('/api/research/jobs', { references, brief, deep_analysis })),
+  researchJob: (id: string) => j<ResearchJob>(authed(`/api/research/jobs/${id}`)),
   researchStatus: () => j<{ chrome: string | null; rea: { ok: boolean; cli: string | null; registered: boolean; fee_usd: number }; deep_fee_usd: number; max_references: number }>(authed('/api/research/status')),
   buildCouncil: (id: string, session_id: string | null, max_rounds: number, priorities = '', references: string[] = [], deep_analysis = false, focus: 'production' | 'design' = 'production') => j<{ session_id: string | null; researching?: number }>(post(`/api/builds/${id}/council`, { session_id, max_rounds, priorities, references, deep_analysis, focus })),
   councilApply: (id: string, session_id: string | null, changes: { severity: string; role: string; text: string }[], max_rounds: number, council_session: string | null, priorities = '', references: string[] = [], deep_analysis = false) =>
@@ -297,6 +299,18 @@ export interface AppRunState {
   port: number
   error: string | null
   logs?: string[]
+}
+
+export interface ResearchJob {
+  id: string
+  refs: string[]
+  deep: boolean
+  status: 'running' | 'done' | 'error'
+  visited: { name?: string; url?: string | null; ok?: boolean; error?: string | null }[]
+  activity: { kind: string; label: string; path: string; ts: number }[]
+  md: string
+  error: string | null
+  model?: string
 }
 
 export interface StripeStatus { enabled: boolean; mode: 'test' | 'live' | 'off'; webhook: boolean; app_url: string }

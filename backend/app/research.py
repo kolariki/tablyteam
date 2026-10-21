@@ -12,6 +12,7 @@ user supplies. Only available when REA is installed on this machine.
 from __future__ import annotations
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import html
 import json
 import logging
@@ -133,6 +134,34 @@ def _run(cmd: list[str], timeout: int) -> tuple[int, str]:
         return 124, ""
 
 
+def _run_for_file(cmd: list[str], out: Path, timeout: int) -> int:
+    """Run a `--screenshot` Chrome and stop as soon as the file is written and stable.
+
+    With software WebGL, headless Chrome often writes the screenshot and then hangs on teardown; waiting for it to exit
+    meant every capture cost the full timeout. Polling the output file keeps a typical capture to a few seconds.
+    """
+    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    t0, last = time.monotonic(), -1
+    try:
+        while time.monotonic() - t0 < timeout:
+            if proc.poll() is not None:
+                return proc.returncode
+            if out.exists():
+                size = out.stat().st_size
+                if size > 0 and size == last:
+                    proc.kill()
+                    return 0
+                last = size
+            time.sleep(0.5)
+        proc.kill()
+        return 124
+    finally:
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
+
+
 def _dom_summary(cap: Capture, dom: str) -> None:
     def strip(t: str) -> str:
         return html.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", t))).strip()
@@ -155,23 +184,35 @@ def capture(url: str) -> Capture:
         cap.error = "No se encontró Chrome/Chromium para sacar capturas (instalá Google Chrome o definí ARENA_CHROME)."
         return cap
     with tempfile.TemporaryDirectory(prefix="arena-ref-") as tmp:
-        # software WebGL (SwiftShader) instead of --disable-gpu: map/canvas apps such as Windy refuse to render without
-        # WebGL and show an error banner, which is all the vision model would see. A real desktop UA and no automation
-        # flag keep bot walls quieter; a longer virtual-time budget lets heavy front-ends finish their first paint.
+        # WebGL on (no --disable-gpu): map/canvas apps such as Windy refuse to render without it and show an error
+        # banner, which is all the vision model would see. SwiftShader was tried and dropped: it rendered the same but
+        # added 12-15 s per run. A real desktop UA and no automation flag keep bot walls quieter; a longer virtual-time
+        # budget lets heavy front-ends finish their first paint.
         base = [chrome, "--headless=new", "--no-sandbox", "--hide-scrollbars", "--no-first-run", "--disable-extensions",
-                "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--enable-webgl",
+                "--ignore-gpu-blocklist", "--enable-webgl",
                 "--disable-blink-features=AutomationControlled",
                 "--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
-                f"--user-data-dir={tmp}/profile", "--virtual-time-budget=15000", "--timeout=30000", "--lang=es"]
+                "--virtual-time-budget=15000", "--timeout=30000", "--lang=es"]
         d = Path(tmp) / "desktop.png"
         m = Path(tmp) / "mobile.png"
-        code, _ = _run(base + ["--window-size=1440,1100", f"--screenshot={d}", url], SHOT_TIMEOUT)
+        # The three Chrome runs are independent (each gets its own profile dir), so they go in parallel: one heavy
+        # front-end rendered through SwiftShader takes ~40 s per run, and serially a single reference cost 2+ minutes.
+        jobs = {
+            "desktop": base + [f"--user-data-dir={tmp}/p1", "--window-size=1440,1100", f"--screenshot={d}", url],
+            "mobile": base + [f"--user-data-dir={tmp}/p2", "--window-size=430,932", "--user-agent=Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", f"--screenshot={m}", url],
+            "dom": base + [f"--user-data-dir={tmp}/p3", "--window-size=1440,1100", "--dump-dom", url],
+        }
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            f_desktop = pool.submit(_run_for_file, jobs["desktop"], d, SHOT_TIMEOUT)
+            f_mobile = pool.submit(_run_for_file, jobs["mobile"], m, SHOT_TIMEOUT)
+            f_dom = pool.submit(_run, jobs["dom"], SHOT_TIMEOUT)
+            code = f_desktop.result()
+            f_mobile.result()
+            _, dom = f_dom.result()
         if d.exists():
             cap.desktop = d.read_bytes()
-        _run(base + ["--window-size=430,932", "--user-agent=Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", f"--screenshot={m}", url], SHOT_TIMEOUT)
         if m.exists():
             cap.mobile = m.read_bytes()
-        _, dom = _run(base + ["--window-size=1440,1100", "--dump-dom", url], SHOT_TIMEOUT)
         if dom:
             _dom_summary(cap, dom)
         cap.ok = bool(cap.desktop or cap.text)

@@ -1,4 +1,5 @@
 import { useArena } from '../store'
+import { useBuild, type Activity } from '../buildStore'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Bookmark, Check, Eye, FolderOpen, Gavel, Loader2, LogOut, Play, Plus, Puzzle, Settings2, Trash2, Users, X } from 'lucide-react'
 import { toast, useConfirm, usePrompt } from './Toast'
@@ -184,8 +185,32 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
     if (!cfg.topic.trim()) return setError(tr('Falta el tema', 'The topic is missing'))
     setBusy(true)
     try {
-      await onStart({ ...cfg, min_turns: Math.min(cfg.min_turns, cfg.max_turns) })
+      let context = cfg.context ?? null
+      const refs = (cfg.references ?? []).map((r) => r.trim()).filter(Boolean)
+      if (refs.length) {
+        // benchmark the references first (the reverse-engineering screen shows it); the team then debates with the notes
+        const job = await api.researchJobStart(refs, `${cfg.title ?? ''}\n\n${cfg.topic}`, !!cfg.deep_analysis)
+        useBuild.getState().set({ researching: { refs, started: Date.now(), visited: [], finished: false }, activity: [] })
+        const md = await new Promise<string>((resolve) => {
+          const tick = async () => {
+            try {
+              const j = await api.researchJob(job.id)
+              const st = useBuild.getState()
+              st.set({ researching: st.researching ? { ...st.researching, visited: j.visited, finished: j.status !== 'running' } : st.researching, activity: j.activity.map((a) => ({ kind: a.kind as Activity['kind'], label: a.label, path: a.path, ts: a.ts })) })
+              if (j.status === 'done') return resolve(j.md)
+              if (j.status === 'error') { toast.error(tr('La investigación falló', 'The research failed'), j.error ?? ''); return resolve('') }
+            } catch { /* next tick */ }
+            window.setTimeout(tick, 2000)
+          }
+          tick()
+        })
+        if (md) context = (context ? `${context}\n\n` : '') + md
+        const st = useBuild.getState()
+        st.set({ researching: st.researching ? { ...st.researching, finished: true, opening: true } : null })
+      }
+      await onStart({ ...cfg, context, min_turns: Math.min(cfg.min_turns, cfg.max_turns) })
     } catch (e) {
+      useBuild.getState().set({ researching: null })
       setError((e as Error).message)
     } finally {
       setBusy(false)
