@@ -148,9 +148,34 @@ def free_port() -> int:
         return s.getsockname()[1]
 
 
+HOSTS = ("127.0.0.1", "::1")  # dev servers bind to one or the other (vite without --host listens on ::1 only)
+
+
+async def _connect(port: int, timeout: float = 0.8):
+    last: Exception | None = None
+    for host in HOSTS:
+        try:
+            return await asyncio.wait_for(asyncio.open_connection(host, port), timeout)
+        except Exception as e:  # noqa: BLE001
+            last = e
+    raise last or OSError("no host")
+
+
+async def _host_of(port: int) -> str:
+    """Which loopback address the server actually listens on (the proxy must target that one)."""
+    for host in HOSTS:
+        try:
+            _, w = await asyncio.wait_for(asyncio.open_connection(host, port), 0.8)
+            w.close()
+            return host
+        except Exception:  # noqa: BLE001
+            continue
+    return "127.0.0.1"
+
+
 async def _port_open(port: int) -> bool:
     try:
-        _, w = await asyncio.wait_for(asyncio.open_connection("127.0.0.1", port), 0.8)
+        _, w = await _connect(port)
         w.close()
         return True
     except Exception:
@@ -160,8 +185,8 @@ async def _port_open(port: int) -> bool:
 async def _serves_html(port: int) -> bool | None:
     """GET / and tell whether the answer looks like a web page (None: no answer at all)."""
     try:
-        r, w = await asyncio.wait_for(asyncio.open_connection("127.0.0.1", port), 0.8)
-        w.write(b"GET / HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n")
+        r, w = await _connect(port)
+        w.write(b"GET / HTTP/1.0\r\nHost: localhost\r\n\r\n")
         await w.drain()
         head = await asyncio.wait_for(r.read(4096), 2.0)
         w.close()
@@ -288,9 +313,10 @@ class AppRun:
                     self.port = chosen
                     self._log(f"· la app responde en el puerto {chosen}")
                 if chosen is not None:
-                    self.url = f"http://127.0.0.1:{self.port}"
+                    host = await _host_of(self.port)
+                    self.url = f"http://localhost:{self.port}" if host != "127.0.0.1" else f"http://127.0.0.1:{self.port}"
                     try:  # the UI frames the proxy, not the app: production CSP/X-Frame-Options would blank the iframe
-                        self.proxy = FrameProxy(self.port, free_port())
+                        self.proxy = FrameProxy(self.port, free_port(), host)
                         await self.proxy.start()
                         self.embed_url = self.proxy.url
                         self._log(f"· vista embebida en {self.embed_url} (sin cabeceras anti-iframe)")

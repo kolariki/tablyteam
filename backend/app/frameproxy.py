@@ -21,8 +21,9 @@ DROP = {b"content-security-policy", b"content-security-policy-report-only", b"x-
 HOP = {b"host", b"connection", b"keep-alive", b"accept-encoding", b"content-length"}
 
 
-def make_app(target_port: int) -> Callable[..., Awaitable[None]]:
-    client = httpx.AsyncClient(base_url=f"http://127.0.0.1:{target_port}", timeout=httpx.Timeout(60, connect=5), follow_redirects=False)
+def make_app(target_port: int, target_host: str = "127.0.0.1") -> Callable[..., Awaitable[None]]:
+    host = f"[{target_host}]" if ":" in target_host else target_host  # IPv6 loopback needs brackets in a URL
+    client = httpx.AsyncClient(base_url=f"http://{host}:{target_port}", timeout=httpx.Timeout(60, connect=5), follow_redirects=False)
 
     async def app(scope, receive, send) -> None:
         if scope["type"] == "lifespan":
@@ -65,8 +66,8 @@ def make_app(target_port: int) -> Callable[..., Awaitable[None]]:
 
 
 class FrameProxy:
-    def __init__(self, target_port: int, port: int) -> None:
-        self.target_port, self.port = target_port, port
+    def __init__(self, target_port: int, port: int, target_host: str = "127.0.0.1") -> None:
+        self.target_port, self.port, self.target_host = target_port, port, target_host
         self.server: uvicorn.Server | None = None
         self.task: asyncio.Task | None = None
 
@@ -75,7 +76,7 @@ class FrameProxy:
         return f"http://127.0.0.1:{self.port}"
 
     async def start(self) -> None:
-        cfg = uvicorn.Config(make_app(self.target_port), host="127.0.0.1", port=self.port, log_level="warning", lifespan="on", access_log=False)
+        cfg = uvicorn.Config(make_app(self.target_port, self.target_host), host="127.0.0.1", port=self.port, log_level="warning", lifespan="on", access_log=False)
         self.server = uvicorn.Server(cfg)
         self.server.install_signal_handlers = lambda: None  # type: ignore[method-assign]
         self.task = asyncio.create_task(self.server.serve())
