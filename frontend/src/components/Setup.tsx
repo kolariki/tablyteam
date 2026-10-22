@@ -194,6 +194,9 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
 
   /** Benchmark the references first, with the reverse-engineering screen; then the team intro; then the council. */
   const [directBusy, setDirectBusy] = useState(false)
+  // how the user wants to build: alone with the builder (direct) or with the whole team (council first)
+  const [lane, setLaneState] = useState<'direct' | 'team' | null>(() => { try { const v = localStorage.getItem('tably.lane'); return v === 'direct' || v === 'team' ? v : null } catch { return null } })
+  const setLane = (l: 'direct' | 'team' | null) => { setLaneState(l); try { if (l) localStorage.setItem('tably.lane', l); else localStorage.removeItem('tably.lane') } catch { /* private mode */ } }
   const research = async (direct = false) => {
     if (!validate()) return
     let context = cfg.context ?? null
@@ -408,19 +411,49 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
           </AnimatePresence>
         </motion.div>
 
-        {/* the user's saved experiments first, in their own block, so a fresh save is impossible to miss */}
-        {presets.some((p) => p.custom) && (
+        {/* the two ways in: the builder alone (one good prompt) or the whole team (council first) */}
+        {lane === null ? (
+          <div className="mt-10 grid gap-5 md:grid-cols-2">
+            {([
+              { id: 'direct' as const, icon: <Zap size={22} />, title: T('Constructor directo', 'Direct builder'), text: T('Contás qué querés, el prompt engineering lo convierte en un brief completo y el constructor arranca ya. Lo más rápido y lo más barato. El equipo queda a un clic para revisar después.', 'Say what you want, prompt engineering turns it into a full brief and the builder starts right away. Fastest and cheapest. The team is one click away to review afterwards.'), tag: T('Un prompt → una app', 'One prompt → one app') },
+              { id: 'team' as const, icon: <Users size={22} />, title: T('Constructor con equipo de desarrollo', 'Builder with a development team'), text: T('CEO, CTO, Producto, Diseño y QA debaten tu idea en vivo, deciden producto, alcance y stack, y recién ahí construyen. Para cuando querés decisiones justificadas y revisión por roles.', 'CEO, CTO, Product, Design and QA debate your idea live, decide product, scope and stack, and only then build. For when you want justified decisions and role-by-role review.'), tag: T('Debate → brief → construcción', 'Debate → brief → build') },
+            ]).map((o) => (
+              <button key={o.id} type="button" onClick={() => setLane(o.id)} className="group panel relative flex flex-col items-start gap-3 rounded-3xl p-7 text-left transition hover:border-accent hover:bg-accent-soft/40">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-white shadow-sm transition group-hover:scale-105">{o.icon}</span>
+                <span className="rounded-full border border-line bg-surface px-2.5 py-0.5 text-[11px] uppercase tracking-[0.2em] text-ink-3">{o.tag}</span>
+                <span className="text-[24px] leading-tight">{o.title}</span>
+                <span className="text-[14px] leading-relaxed text-ink-2">{o.text}</span>
+                <span className="mt-1 inline-flex items-center gap-1.5 text-[13px] font-semibold text-accent">{T('Elegir', 'Choose')} <Play size={13} /></span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-8 flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-white">{lane === 'direct' ? <Zap size={16} /> : <Users size={16} />}</span>
+            <div>
+              <div className="text-[10.5px] uppercase tracking-[0.3em] text-accent">{T('Modo', 'Mode')}</div>
+              <div className="text-[17px] leading-tight">{lane === 'direct' ? T('Constructor directo', 'Direct builder') : T('Constructor con equipo de desarrollo', 'Builder with a development team')}</div>
+            </div>
+            <button type="button" onClick={() => setLane(null)} className="ml-2 rounded-full border border-line bg-surface px-3 py-1 text-[12px] text-ink-2 transition hover:border-accent hover:bg-accent-soft hover:text-accent">{T('Cambiar', 'Change')}</button>
+          </div>
+        )}
+        {lane === 'team' && presets.some((p) => p.custom) && (
           <>
             <h2 className="mt-10 flex items-center gap-2 font-sans text-xs uppercase tracking-widest text-ink-3"><Bookmark size={13} /> {T('Tus experimentos', 'Your experiments')} <span className="text-ink-4">({presets.filter((p) => p.custom).length})</span></h2>
             <div className="mt-3 grid gap-3 grid-cols-[repeat(auto-fill,minmax(220px,1fr))]">{presets.filter((p) => p.custom).map(presetCard)}</div>
           </>
         )}
-        <h2 className="mt-10 font-sans text-xs uppercase tracking-widest text-ink-3">{T('Experimentos', 'Experiments')}</h2>
-        <div className="mt-3 grid gap-3 grid-cols-[repeat(auto-fill,minmax(220px,1fr))]">
-          {presets.filter((p) => !p.custom).map(presetCard)}
-        </div>
+        {lane === 'team' && (
+          <>
+            <h2 className="mt-10 font-sans text-xs uppercase tracking-widest text-ink-3">{T('Experimentos', 'Experiments')}</h2>
+            <div className="mt-3 grid gap-3 grid-cols-[repeat(auto-fill,minmax(220px,1fr))]">
+              {presets.filter((p) => !p.custom).map(presetCard)}
+            </div>
+          </>
+        )}
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_1.3fr]">
+        {lane !== null && (
+        <div data-lane={lane} className={`mt-8 grid gap-6 ${lane === 'direct' ? 'max-w-3xl lg:grid-cols-1' : 'lg:grid-cols-[1fr_1.3fr]'}`}>
           <div className="panel relative isolate flex flex-col rounded-2xl p-5">
             {/* the companies in the team as vertical brand stripes behind the brief (one per AI, its colour); the stripes and the veil carry the card's radius themselves, so the border and shadow stay intact */}
             <BrandStripes providers={cfg.agents.map((a) => a.wanted_provider ?? a.provider)} logos={false} />
@@ -491,7 +524,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                 <Hint text={rstatus && !rstatus.rea.ok ? T('REA no está instalado en esta máquina: corré `npx rea-agents setup`. Hasta entonces el equipo solo observa las apps (capturas y notas), que es gratis.', 'REA is not installed on this machine: run `npx rea-agents setup`. Until then the team only observes the apps (screenshots and notes), which is free.') : T('Durante la construcción, REA analiza bundles, rutas y APIs de las apps de referencia para entender cómo están hechas. Requiere Claude Code o Codex como constructor. Se cobra por build, además de los tokens.', 'During the build, REA analyses the reference apps\' bundles, routes and APIs to understand how they are built. Requires Claude Code or Codex as builder. Charged per build, on top of tokens.')} />
               </label>
             </div>
-            <div>
+            <div className="team-only">
               <span className="text-xs uppercase tracking-widest text-ink-3">{T('Modo', 'Mode')}</span>
               <div className="mt-1 grid grid-cols-3 gap-2">
                 {(Object.keys(MODE_INFO).filter((m) => m !== 'audit' && m !== 'review') as Mode[]).map((m) => (
@@ -502,13 +535,13 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
               </div>
               <p className="mt-2 text-xs text-ink-3">{pick(MODE_INFO[cfg.mode], 'desc')}</p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="team-only grid grid-cols-2 gap-4">
               <Range label={T('Turnos máx.', 'Max turns')} help={T('Cantidad máxima de intervenciones en total. Al llegar, el debate termina aunque nadie haya dicho FIN.', 'Maximum number of interventions overall. When reached, the debate ends even if nobody said END.')} value={cfg.max_turns} min={2} max={40} onChange={(v) => setCfg({ ...cfg, max_turns: v })} />
               <Range label={T('Turnos mín. antes de FIN', 'Min turns before END')} help={T('Antes de este turno ningún agente puede cerrar el debate: garantiza un mínimo de discusión.', 'Before this turn no agent can close the debate: it guarantees a minimum of discussion.')} value={cfg.min_turns} min={1} max={20} onChange={(v) => setCfg({ ...cfg, min_turns: v })} />
               <Range label={T('Pausa entre turnos', 'Pause between turns')} help={T('Espera entre una intervención y la siguiente, para que la cámara y el espectador puedan seguir el ritmo. No afecta el costo.', 'Wait between one intervention and the next, so the camera and the viewer can follow. Does not affect cost.')} value={cfg.pace_ms} min={0} max={3000} step={100} fmt={(v) => `${v}ms`} onChange={(v) => setCfg({ ...cfg, pace_ms: v })} />
               <Range label={T('Tokens máx. por turno', 'Max tokens per turn')} help={T('Largo máximo de cada intervención (≈ 1 token por cada 3-4 caracteres). Más tokens: respuestas más largas y más costo por turno.', 'Maximum length of each intervention (≈ 1 token per 3-4 characters). More tokens: longer answers and more cost per turn.')} value={cfg.max_tokens} min={300} max={6000} step={100} onChange={(v) => setCfg({ ...cfg, max_tokens: v })} />
             </div>
-            <CostEstimate cfg={cfg} align="left" />
+            <div className="team-only"><CostEstimate cfg={cfg} align="left" /></div>
             <div className="grid grid-cols-2 gap-4 items-end">
               <label className="block">
                 <span className="flex items-center gap-1 text-xs uppercase tracking-widest text-ink-3">{T('Idioma', 'Language')} <Hint text={T('El idioma en el que van a hablar los agentes del consejo durante el debate y en el brief. Es independiente del idioma de esta interfaz.', 'The language the council agents will speak in during the debate and in the brief. Independent from the language of this interface.')} /></span>
@@ -516,7 +549,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                   {(DEBATE_LANGUAGES.includes(cfg.language) ? DEBATE_LANGUAGES : [cfg.language, ...DEBATE_LANGUAGES]).map((l) => <option key={l} value={l}>{l}</option>)}
                 </select>
               </label>
-              <div className="space-y-1.5 pb-1">
+              <div className="team-only space-y-1.5 pb-1">
                 {([
                   { key: 'closing_round', checked: cfg.closing_round ?? true, label: T('Ronda de cierre', 'Closing round'), help: T('Al terminar el debate, cada rol entrega sus decisiones finales en un turno propio. Sirve para que el brief tenga conclusiones de todos, no solo de quien habló último.', 'When the debate ends, each role delivers its final decisions in its own turn. It makes the brief carry conclusions from everyone, not just whoever spoke last.'), set: (v: boolean) => setCfg({ ...cfg, closing_round: v }) },
                   { key: 'final_vote', checked: cfg.final_vote, label: T('Votación final', 'Final vote'), help: T('Cada agente vota quién aportó el argumento más sólido y el juez explica el veredicto. Si lo apagás, el debate termina sin ganador.', 'Each agent votes for who made the strongest argument and the judge explains the verdict. Turn it off and the debate ends without a winner.'), set: (v: boolean) => setCfg({ ...cfg, final_vote: v }) },
@@ -532,13 +565,13 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
             </div>
             </div>
             {/* the logos live under the fields and follow the scroll (sticky) until the box ends; they never rise above this point */}
-            <div className="relative mt-2 flex-1 min-h-[150px]">
+            <div className="team-only relative mt-2 flex-1 min-h-[150px]">
               <div className="sticky top-24">
                 <BrandLogoRow providers={cfg.agents.map((a) => a.wanted_provider ?? a.provider)} align="start" />
               </div>
             </div>
           </div>
-          <div ref={teamRef} className="panel flex h-full flex-col rounded-2xl p-5">
+          <div ref={teamRef} className="team-only panel flex h-full flex-col rounded-2xl p-5">
             <div className="flex items-center">
               <span className="text-xs uppercase tracking-widest text-ink-3">{T('Agentes', 'Agents')} ({cfg.agents.length}/8)</span>
               <button
@@ -658,8 +691,12 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
           </div>
         </div>
 
-        {error && <div className="mt-4 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}
+        )}
+
+        {lane !== null && error && <div className="mt-4 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}
+        {lane !== null && (
         <div className="mt-6 flex items-center justify-end gap-4">
+          {lane === 'team' && (
           <button
               type="button"
               onClick={async () => {
@@ -676,6 +713,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
               className="flex items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-2 text-sm hover:bg-surface-2"
               title={T('Guarda esta configuración (tema, modo, equipo, skills) como una tarjeta propia', 'Saves this setup (topic, mode, team, skills) as your own card')}
             ><Bookmark size={15} />{T(' Guardar como experimento', ' Save as experiment')}</button>
+          )}
             {(() => {
               // the start button wears the team: one horizontal band per company (same soft blend as the panel) and their small logos side by side
               const team = cfg.agents.map((a) => a.wanted_provider ?? a.provider)
@@ -684,15 +722,18 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
               const background = order.length === 1 ? brandTheme(order[0]).tint : `linear-gradient(90deg, ${stops})`
               return (
                 <>
+                {lane === 'direct' && (
                 <button
                   onClick={() => research(true)}
                   disabled={busy || launching || directBusy}
                   title={T('Sin consejo: el pedido (con prompt engineering) se convierte en brief y el constructor arranca ya. Más rápido y más barato; el consejo queda a un clic después.', 'No council: the (prompt-engineered) request becomes the brief and the builder starts right away. Faster and cheaper; the council is one click away afterwards.')}
-                  className="group flex items-center gap-2.5 rounded-2xl border border-accent/40 bg-surface px-5 py-3.5 text-lg font-bold text-accent shadow-sm transition hover:bg-accent-soft disabled:opacity-50"
+                  className="group flex items-center gap-2.5 rounded-2xl bg-accent px-6 py-3.5 text-lg font-bold text-white shadow-sm transition hover:brightness-110 disabled:opacity-50"
                 >
                   {directBusy ? <Loader2 size={20} className="animate-spin" /> : <Zap size={20} className="transition group-hover:scale-110" />}
                   {directBusy ? tr('Arrancando…', 'Starting…') : tr('Construir directo', 'Build directly')}
                 </button>
+                )}
+                {lane === 'team' && (
                 <button onClick={() => research(false)} disabled={busy || launching || directBusy || cfg.agents.length < 2} style={{ background }} className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-black/10 text-ink px-6 py-3.5 font-bold text-lg shadow-sm hover:scale-[1.02] transition disabled:opacity-50" title={order.join(' · ')}>
                   {/* launch: the play icon slides out to the right, then the logos follow one by one (each one shows up big on stage as it leaves) */}
                   <span className="flex items-center -space-x-1">
@@ -712,10 +753,12 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                   </motion.span>
                   {launching ? tr('Entrando a la arena…', 'Entering the arena…') : busy ? tr('Investigando referencias…', 'Researching references…') : tr('Iniciar experimento', 'Start experiment')}
                 </button>
+                )}
                 </>
               )
             })()}
         </div>
+        )}
 
         <Dashboard onOpen={(id, mode) => { if (mode !== 'run') setOpening(mode === 'arena' ? T('Convocando al equipo…', 'Gathering the team…') : T('Abriendo el constructor…', 'Opening the builder…')); return onOpen(id, mode) }} onCouncil={(id) => { setOpening(T('Abriendo el consejo…', 'Opening the council…')); useArena.getState().set({ pendingLive: id }) }} onReplay={onReplay} onSettings={onSettings} onAudit={onAudit} onLoaded={() => mark('dashboard')} />
       </div>

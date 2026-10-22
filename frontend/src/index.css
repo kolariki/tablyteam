@@ -104,3 +104,6 @@ input[type="color"] { border: 1px solid var(--color-line); padding: 2px; }
 [data-hero-title] { perspective: 700px; }
 .hero-char { display: inline-block; transform-style: preserve-3d; will-change: transform, opacity; }
 [data-hero-demo] { will-change: transform, opacity; backface-visibility: hidden; }
+
+/* the home form in the direct lane: the team-only sections stay out */
+[data-lane="direct"] .team-only { display: none; }
