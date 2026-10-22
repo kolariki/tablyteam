@@ -606,6 +606,38 @@ class Build:
             self._save()
             self.emit("pass.completed", status=self.status, build=self.snapshot())
 
+    def set_builder(self, provider: str, model: str | None) -> None:
+        """Change who builds from now on (Claude Code / Codex on the subscription, or an API model). An API build that
+        moves to a local engine gets its files written to a real folder first."""
+        from .local_engine import workdir as mk_workdir
+
+        if is_engine(provider):
+            cred = Cred("local", None, model or "default", "local")
+            model = model or "default"
+        else:
+            cred = self.creds_all.get(provider)
+            if not cred or cred.source == "none":
+                raise ValueError(f"Falta la API key de {provider}")
+            model = model or cred.model or PROVIDERS[provider].default_model
+        same = provider == self.req.provider and model == self.req.model
+        self.req.provider, self.req.model, self.cred = provider, model, cred
+        was_engine = self.engine
+        self.engine = provider if is_engine(provider) else None
+        if self.engine and not self.workdir:
+            self.workdir = mk_workdir(self.user.id, self.id)
+        if self.engine:
+            for rel, content in self.files.items():  # the folder must hold the latest files (an API build kept them in memory only)
+                dest = self.workdir / rel
+                if not dest.exists() or dest.read_text(errors="replace") != content:
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    dest.write_text(content)
+        if was_engine != self.engine:
+            self.engine_session = None  # a different agent: no session to resume
+        if not same:
+            self.chat.append({"role": "system", "text": f"Constructor cambiado a {provider} · {model}.", "ts": time.time()})
+            self.emit("build.status", status=self.status, build=self.snapshot())
+            self._save()
+
     def _files_named_in(self, text: str) -> list[str]:
         """Existing project files mentioned in a request (paths like src/x/y.ts or `y.ts` when unique), most relevant first."""
         found: list[str] = []

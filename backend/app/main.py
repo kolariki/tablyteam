@@ -1267,6 +1267,11 @@ async def build_council_apply(build_id: str, body: dict, user: User = CurrentUse
         raise HTTPException(400, "No hay cambios seleccionados")
     if b.status in ("running", "reviewing"):
         raise HTTPException(409, "La construcción ya está en curso")
+    if body.get("provider"):  # the user picked who builds this list (Claude Code / Codex / an API model)
+        try:
+            b.set_builder(str(body["provider"]), str(body.get("model") or "") or None)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
     rounds = int(body.get("max_rounds") or 0)
     b.review_plan = {"max_rounds": len(b.council_sessions) + rounds} if rounds > 0 else None
     b.council_priorities = str(body.get("priorities") or "")

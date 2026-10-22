@@ -128,8 +128,8 @@ export const api = {
   researchJob: (id: string) => j<ResearchJob>(authed(`/api/research/jobs/${id}`)),
   researchStatus: () => j<{ chrome: string | null; rea: { ok: boolean; cli: string | null; registered: boolean; fee_usd: number }; deep_fee_usd: number; max_references: number }>(authed('/api/research/status')),
   buildCouncil: (id: string, session_id: string | null, max_rounds: number, priorities = '', references: string[] = [], deep_analysis = false, focus: 'production' | 'design' = 'production') => j<{ session_id: string | null; researching?: number }>(post(`/api/builds/${id}/council`, { session_id, max_rounds, priorities, references, deep_analysis, focus })),
-  councilApply: (id: string, session_id: string | null, changes: { severity: string; role: string; text: string }[], max_rounds: number, council_session: string | null, priorities = '', references: string[] = [], deep_analysis = false) =>
-    j<{ ok: boolean; researching?: number }>(post(`/api/builds/${id}/council/apply`, { session_id, changes, max_rounds, council_session, priorities, references, deep_analysis })),
+  councilApply: (id: string, session_id: string | null, changes: { severity: string; role: string; text: string }[], max_rounds: number, council_session: string | null, priorities = '', references: string[] = [], deep_analysis = false, builder?: { provider: string; model: string }) =>
+    j<{ ok: boolean; researching?: number }>(post(`/api/builds/${id}/council/apply`, { session_id, changes, max_rounds, council_session, priorities, references, deep_analysis, ...(builder ?? {}) })),
   buildReview: (id: string, session_id: string | null, max_rounds: number) => j(post(`/api/builds/${id}/review`, { session_id, max_rounds })),
   builds: (sessionId: string) => j<BuildSummary[]>(authed(`/api/sessions/${sessionId}/builds`)),
   build: (sessionId: string, id: string) => j<Record<string, any> & { file_contents?: Record<string, string> }>(authed(`/api/sessions/${sessionId}/builds/${id}`)),

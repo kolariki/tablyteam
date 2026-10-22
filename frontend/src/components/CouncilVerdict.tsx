@@ -2,8 +2,10 @@ import { motion } from 'framer-motion'
 import { Check, CheckCircle2, ChevronDown, Hammer, HardHat, Link2, Loader2, Minus, Plus, RefreshCw, X, XCircle } from 'lucide-react'
 import ReferencesField from './ReferencesField'
 import { useBuild } from '../buildStore'
-import { useState } from 'react'
-import { api } from '../lib/api'
+import { useEffect, useState } from 'react'
+import { api, type EngineStatus } from '../lib/api'
+import type { Provider } from '../types'
+import ModelSelect from './ModelSelect'
 import { tr, useT } from '../lib/i18n'
 import { agentMap, useAgentColor, useArena } from '../store'
 import ProviderLogo from './ProviderLogo'
@@ -27,6 +29,24 @@ export default function CouncilVerdict() {
   const [refs, setRefs] = useState<string[]>([])
   const [deep, setDeep] = useState(false)
   const [refsOpen, setRefsOpen] = useState(false)
+  // who builds the list: a local agent on the subscription or an API model (defaults to the build's current builder)
+  const [engines, setEngines] = useState<EngineStatus[]>([])
+  const [providers, setProviders] = useState<Provider[]>([])
+  const [bProvider, setBProvider] = useState('')
+  const [bModel, setBModel] = useState('')
+  const buildProvider = useBuild((b) => b.provider)
+  const buildModel = useBuild((b) => b.model)
+  useEffect(() => {
+    api.engines().then(setEngines).catch(() => {})
+    api.providers().then((ps) => setProviders(ps.filter((p) => p.configured && p.id !== 'mock') .concat(ps.filter((p) => p.id === 'mock' && p.configured)))).catch(() => {})
+  }, [])
+  useEffect(() => {
+    if (bProvider) return
+    if (buildProvider) { setBProvider(buildProvider); setBModel(buildModel || 'default'); return }
+    const ok = engines.find((e) => e.ok)
+    if (ok) { setBProvider(ok.id); setBModel('default') } else if (providers[0]) { setBProvider(providers[0].id); setBModel(providers[0].default_model) }
+  }, [engines, providers, buildProvider, buildModel, bProvider])
+  const isEngineSel = engines.some((e) => e.id === bProvider)
   if (!show || !config || config.mode !== 'review') return null
   const map = agentMap(config)
   const ro = config.review_of
@@ -41,7 +61,7 @@ export default function CouncilVerdict() {
     if (!ro) return
     setBusy(true)
     try {
-      const r = await api.councilApply(ro.build_id, ro.session_id, chosen, rounds, useArena.getState().sessionId, rounds > 0 ? priorities.trim() : '', refs, deep)
+      const r = await api.councilApply(ro.build_id, ro.session_id, chosen, rounds, useArena.getState().sessionId, rounds > 0 ? priorities.trim() : '', refs, deep, bProvider ? { provider: bProvider, model: bModel } : undefined)
       if (r.researching) useBuild.getState().set({ researching: { refs, started: Date.now(), visited: [], finished: false } })
       set({ showVerdict: false, pendingBuild: { buildId: ro.build_id, sessionId: ro.session_id } })
     } catch (e) {
@@ -186,6 +206,31 @@ export default function CouncilVerdict() {
                 <button onClick={openBuild} className={primary}><CheckCircle2 size={16} /> {T('Ver el proyecto aprobado', 'View the approved project')}</button>
               ) : (
                 <button onClick={openBuild} className={primary}><Hammer size={16} /> {T('Volver al constructor', 'Back to the builder')}</button>
+              )}
+              {chosen.length > 0 && (
+                <div className="flex h-11 shrink-0 items-center gap-2 rounded-full border border-line bg-surface pl-2 pr-2 text-[12px] text-ink-2 shadow-sm" title={T('Quién aplica los cambios: un agente local con tu suscripción o un modelo por API', 'Who applies the changes: a local agent on your subscription or an API model')}>
+                  <ProviderLogo provider={engines.find((e) => e.id === bProvider)?.logo ?? bProvider} size={16} />
+                  <select
+                    value={bProvider}
+                    onChange={(e) => {
+                      const id = e.target.value
+                      const eng = engines.find((x) => x.id === id)
+                      setBProvider(id)
+                      setBModel(eng ? 'default' : providers.find((p) => p.id === id)?.default_model ?? '')
+                    }}
+                    className="h-8 max-w-[220px] appearance-none rounded-full bg-transparent pr-1 text-[12.5px] text-ink outline-none"
+                  >
+                    {engines.length > 0 && (
+                      <optgroup label={T('Con tu suscripción', 'On your subscription')}>
+                        {engines.map((e) => <option key={e.id} value={e.id} disabled={!e.ok}>{e.label.split(' · ')[0]}{e.ok ? '' : ` (${e.installed ? T('sin login', 'not logged in') : T('no instalado', 'not installed')})`}</option>)}
+                      </optgroup>
+                    )}
+                    <optgroup label={T('Por API', 'Via API')}>
+                      {providers.map((p) => <option key={p.id} value={p.id}>{p.label.split(' · ')[0]}</option>)}
+                    </optgroup>
+                  </select>
+                  {!isEngineSel && bProvider && <span className="w-[200px]"><ModelSelect provider={bProvider} value={bModel} onChange={setBModel} /></span>}
+                </div>
               )}
               {chosen.length > 0 && (
                 <div className="flex h-11 shrink-0 items-center gap-2 rounded-full border border-line bg-surface px-3 text-[12px] text-ink-2 shadow-sm">
