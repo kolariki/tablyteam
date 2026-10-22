@@ -5,7 +5,7 @@ import { ArrowLeftRight, Bookmark, Check, Eye, FolderOpen, Gavel, Globe, Loader2
 import { toast, useConfirm, usePrompt } from './Toast'
 import SkillPicker from './SkillPicker'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { api, type User } from '../lib/api'
+import { api, type EngineStatus, type User } from '../lib/api'
 import { fmtUsd } from '../lib/parse'
 import Dashboard from './Dashboard'
 import HomeLoader from './HomeLoader'
@@ -43,6 +43,20 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   const [refDraft, setRefDraft] = useState('')
   const [rstatus, setRstatus] = useState<{ rea: { ok: boolean; fee_usd: number }; deep_fee_usd: number } | null>(null)
   useEffect(() => { api.researchStatus().then(setRstatus).catch(() => {}) }, [])
+  // the direct lane's builder: a local engine (subscription) or an API provider + model; remembered, defaults to the first engine that is ready
+  const [engines, setEngines] = useState<EngineStatus[]>([])
+  const [builder, setBuilderState] = useState<{ provider: string; model: string }>(() => readCache<{ provider: string; model: string }>('direct-builder') ?? { provider: '', model: '' })
+  const setBuilder = (b: { provider: string; model: string }) => { setBuilderState(b); writeCache('direct-builder', b) }
+  useEffect(() => {
+    api.engines().then((es) => {
+      setEngines(es)
+      setBuilderState((b) => {
+        if (b.provider && (es.some((e) => e.id === b.provider && e.ok) || !es.some((e) => e.id === b.provider))) return b
+        const ok = es.find((e) => e.ok)
+        return ok ? { provider: ok.id, model: 'default' } : { provider: '', model: '' }
+      })
+    }).catch(() => {})
+  }, [])
   const commitRefs = () => {
     const parts = refDraft.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean)
     if (parts.length) setCfg((c) => ({ ...c, references: [...new Set([...(c.references ?? []), ...parts])].slice(0, 6) }))
@@ -77,6 +91,8 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   }, [chooser])
   const lang = useLang()
   const [providers, setProviders] = useState<Provider[]>(() => readCache<Provider[]>('providers') ?? [])
+  const apiProviders = providers.filter((p) => p.id !== 'mock' || !providers.some((x) => x.configured && x.id !== 'mock'))
+  const isApiBuilder = !!builder.provider && !engines.some((e) => e.id === builder.provider)
   const [roles, setRoles] = useState<{ groups: string[]; groups_en?: string[]; roles: Role[] }>({ groups: [], roles: [] })
   const [presets, setPresets] = useState<Preset[]>(() => readCache<Preset[]>('presets') ?? [])
   const [error, setError] = useState<string | null>(null)
@@ -236,7 +252,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
       setDirectBusy(true)
       setOpening(T('Escribiendo el brief y arrancando el constructor…', 'Writing the brief and starting the builder…'))
       try {
-        await onDirect({ ...cfg, context })
+        await onDirect({ ...cfg, context, builder: builder.provider ? builder : undefined })
       } catch (e) {
         setError((e as Error).message)
         setOpening(null)
@@ -466,6 +482,42 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                 if (baseline.current) baseline.current = { ...baseline.current, agents: {} }
               }}
             />
+            {/* the direct lane: who builds, a local agent on the subscription (Claude Code / Codex) or an API model */}
+            {lane === 'direct' && (
+              <div>
+                <span className="flex items-center gap-1 text-xs uppercase tracking-widest text-ink-3">{T('Constructor', 'Builder')} <Hint text={T('Quién escribe el código: Claude Code o Codex instalados en esta máquina (con tu suscripción, sin gastar API) o un modelo por API con tu key.', 'Who writes the code: Claude Code or Codex installed on this machine (on your subscription, no API spend) or an API model with your key.')} /></span>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {engines.map((e) => {
+                    const on = builder.provider === e.id
+                    return (
+                      <button key={e.id} type="button" disabled={!e.ok} onClick={() => setBuilder({ provider: e.id, model: 'default' })} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition ${on ? 'border-accent bg-accent-soft' : 'border-line hover:bg-surface-2'} disabled:cursor-not-allowed disabled:opacity-50`}>
+                        <ProviderLogo provider={e.logo} size={22} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium">{e.label.split(' · ')[0]} · {T('escritorio', 'desktop')}</span>
+                          <span className="block truncate text-[11.5px] text-ink-3">{e.ok ? T('Con tu suscripción, sin gastar API', 'On your subscription, no API spend') : e.installed ? T('Instalado, falta iniciar sesión', 'Installed, sign in first') : T('No instalado en esta máquina', 'Not installed on this machine')}</span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                  <div className={`flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 transition sm:col-span-2 ${isApiBuilder ? 'border-accent bg-accent-soft' : 'border-line'}`}>
+                    <button type="button" onClick={() => { if (!isApiBuilder) { const p = apiProviders[0]; if (p) setBuilder({ provider: p.id, model: p.default_model }) } }} className="flex items-center gap-3 text-left">
+                      <ProviderLogo provider={isApiBuilder ? builder.provider : apiProviders[0]?.id ?? 'mock'} size={22} />
+                      <span>
+                        <span className="block text-sm font-medium">{T('Por API', 'Via API')}</span>
+                        <span className="block text-[11.5px] text-ink-3">{T('Un modelo con tu API key; se cobran los tokens', 'A model with your API key; tokens are billed')}</span>
+                      </span>
+                    </button>
+                    <div className="ml-auto flex flex-wrap items-center gap-2">
+                      <select value={isApiBuilder ? builder.provider : ''} onChange={(e) => { const p = apiProviders.find((x) => x.id === e.target.value); if (p) setBuilder({ provider: p.id, model: p.default_model }) }} className="h-9 rounded-lg border border-line bg-surface px-2 text-sm outline-none">
+                        {!isApiBuilder && <option value="">{T('elegir proveedor…', 'pick a provider…')}</option>}
+                        {apiProviders.map((p) => <option key={p.id} value={p.id}>{p.label.split(' · ')[0]}{p.configured ? '' : ` (${T('sin key', 'no key')})`}</option>)}
+                      </select>
+                      {isApiBuilder && <span className="w-[220px]"><ModelSelect provider={builder.provider} value={builder.model} onChange={(m) => setBuilder({ ...builder, model: m })} /></span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             {/* what gets built: the brief, the designer, the builder and «Correr la app» all follow this */}
             <div>
               <span className="flex items-center gap-1 text-xs uppercase tracking-widest text-ink-3">{T('Plataforma', 'Platform')} <Hint text={T('Qué construye el equipo: una web app, una app móvil para iOS y Android (con Expo, se corre en el simulador y el emulador desde acá) o las dos con un solo código.', 'What the team builds: a web app, a mobile app for iOS and Android (with Expo, run on the simulator and the emulator from here) or both from one codebase.')} /></span>
@@ -504,12 +556,11 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                   className="min-w-[200px] flex-1 bg-transparent text-sm outline-none placeholder:text-ink-4"
                 />
               </div>
-              {/* level 2, paid per use: REA reverse-engineers those apps during the build (needs REA installed + Claude Code / Codex as builder) */}
+              {/* level 2: REA reverse-engineers those apps during the build (needs REA installed + Claude Code / Codex as builder) */}
               <label className={`mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm ${rstatus && !rstatus.rea.ok ? 'opacity-60' : ''}`}>
                 <input type="checkbox" className="accent-accent h-4 w-4 shrink-0" checked={cfg.deep_analysis ?? false} disabled={!!rstatus && !rstatus.rea.ok} onChange={(e) => setCfg({ ...cfg, deep_analysis: e.target.checked })} />
                 <span>{T('Análisis profundo e ingeniería inversa', 'Deep analysis and reverse engineering')}</span>
-                <span className="rounded-full border border-gold/50 bg-gold/10 px-2 py-[1px] text-[10.5px] font-semibold text-gold">{T('pago por uso', 'pay per use')} · USD {(rstatus?.deep_fee_usd ?? 9).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                <Hint text={rstatus && !rstatus.rea.ok ? T('REA no está instalado en esta máquina: corré `npx rea-agents setup`. Hasta entonces el equipo solo observa las apps (capturas y notas), que es gratis.', 'REA is not installed on this machine: run `npx rea-agents setup`. Until then the team only observes the apps (screenshots and notes), which is free.') : T('Durante la construcción, REA analiza bundles, rutas y APIs de las apps de referencia para entender cómo están hechas. Requiere Claude Code o Codex como constructor. Se cobra por build, además de los tokens.', 'During the build, REA analyses the reference apps\' bundles, routes and APIs to understand how they are built. Requires Claude Code or Codex as builder. Charged per build, on top of tokens.')} />
+                <Hint text={rstatus && !rstatus.rea.ok ? T('REA no está instalado en esta máquina: corré `npx rea-agents setup`. Hasta entonces el equipo solo observa las apps (capturas y notas), que es gratis.', 'REA is not installed on this machine: run `npx rea-agents setup`. Until then the team only observes the apps (screenshots and notes), which is free.') : T('Durante la construcción, REA analiza bundles, rutas y APIs de las apps de referencia para entender cómo están hechas. Requiere Claude Code o Codex como constructor. Corre con tu suscripción o tu API key.', 'During the build, REA analyses the reference apps\' bundles, routes and APIs to understand how they are built. Requires Claude Code or Codex as builder. Runs on your subscription or your API key.')} />
               </label>
             </div>
             <div className="team-only">

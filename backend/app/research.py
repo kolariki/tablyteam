@@ -39,7 +39,7 @@ CHROME_CANDIDATES = [
 ]
 MAX_REFERENCES = 6
 SHOT_TIMEOUT = 45
-DEEP_ANALYSIS_FEE_USD = float(env("DEEP_ANALYSIS_FEE_USD", "9"))
+DEEP_ANALYSIS_FEE_USD = float(env("DEEP_ANALYSIS_FEE_USD", "0"))  # 0: deep analysis runs on the user's own key / subscription, nothing is charged
 
 
 def chrome_path() -> str | None:

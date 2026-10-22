@@ -37,7 +37,8 @@ export interface SessionConfig {
   auto_skills?: boolean
   platform?: 'web' | 'mobile' | 'both'  // what gets built: web app, mobile app (iOS + Android) or both
   references?: string[]  // reference apps / URLs the team studies before designing
-  deep_analysis?: boolean  // paid per use: REA reverse engineering of those apps during the build
+  deep_analysis?: boolean  // REA reverse engineering of those apps during the build (on the user's own key / subscription)
+  builder?: { provider: string; model: string }  // direct lane: who builds (a local engine or an API provider + model)
   starter?: string | null
   max_tokens: number
   pace_ms: number

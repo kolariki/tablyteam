@@ -938,7 +938,7 @@ class Build:
 
     async def research_phase(self, only: list[str] | None = None) -> None:
         """Level 1: visit the reference apps (headless Chrome), describe each one with a vision model, merge into research/REFERENCES.md."""
-        if self.req.deep_analysis and not any(f.get("label") == DEEP_ANALYSIS_LABEL for f in self.fees):
+        if self.req.deep_analysis and rsch.DEEP_ANALYSIS_FEE_USD > 0 and not any(f.get("label") == DEEP_ANALYSIS_LABEL for f in self.fees):
             self.fees.append({"label": DEEP_ANALYSIS_LABEL, "usd": rsch.DEEP_ANALYSIS_FEE_USD, "ts": time.time()})
         self.status = "running"
         self.turns += 1

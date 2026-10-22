@@ -98,8 +98,8 @@ function AppInner() {
     const ok = engines.find((e) => e.ok)
     const providers = await api.providers().catch(() => [])
     const apiProv = providers.find((p) => p.configured && p.id !== 'mock') ?? providers.find((p) => p.id === 'mock')
-    const provider = ok?.id ?? apiProv?.id ?? 'mock'
-    const model = ok ? 'default' : apiProv?.default_model ?? 'mock-1'
+    const provider = cfg.builder?.provider || (ok?.id ?? apiProv?.id ?? 'mock')
+    const model = cfg.builder?.provider ? cfg.builder.model : ok ? 'default' : apiProv?.default_model ?? 'mock-1'
     const r = await api.directBuild({ topic: cfg.topic, title: cfg.title, platform: cfg.platform, references: cfg.references ?? [], deep_analysis: !!cfg.deep_analysis, context: cfg.context ?? null, language: cfg.language, agents: cfg.agents, provider, model, target: 'claude-code', design: true })
     await openSaved(r.session_id, true, true)
   }
