@@ -1,7 +1,7 @@
 import { useArena } from '../store'
 import { useBuild, type Activity } from '../buildStore'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bookmark, Check, Eye, FolderOpen, Gavel, Globe, Loader2, LogOut, MonitorSmartphone, Play, Plus, Puzzle, Settings2, Smartphone, Trash2, Users, X, Zap } from 'lucide-react'
+import { ArrowLeftRight, Bookmark, Check, Eye, FolderOpen, Gavel, Globe, Loader2, LogOut, MonitorSmartphone, Play, Plus, Puzzle, Settings2, Smartphone, Trash2, Users, X, Zap } from 'lucide-react'
 import { toast, useConfirm, usePrompt } from './Toast'
 import SkillPicker from './SkillPicker'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
@@ -416,13 +416,13 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
         {lane === null ? (
           <LaneCards onPick={setLane} />
         ) : (
-          <div className="mt-8 flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-white">{lane === 'direct' ? <Zap size={16} /> : <Users size={16} />}</span>
+          <div className="mt-8 flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
             <div>
-              <div className="text-[10.5px] uppercase tracking-[0.3em] text-accent">{T('Modo', 'Mode')}</div>
-              <div className="text-[17px] leading-tight">{lane === 'direct' ? T('Constructor directo', 'Direct builder') : T('Constructor con equipo de desarrollo', 'Builder with a development team')}</div>
+              <div className="text-[10.5px] uppercase tracking-[0.3em] text-ink-3">{T('Modo de construcción', 'Build mode')}</div>
+              <div className="mt-1 text-[22px] leading-tight">{lane === 'direct' ? T('Constructor directo', 'Direct builder') : T('Constructor con equipo de desarrollo', 'Builder with a development team')}</div>
+              <div className="mt-1 text-[13px] text-ink-2">{lane === 'direct' ? T('Tu pedido pasa por prompt engineering y va directo al constructor, sin consejo previo.', 'Your request goes through prompt engineering and straight to the builder, with no council first.') : T('El equipo debate tu idea, acuerda el brief y recién entonces construye.', 'The team debates your idea, agrees on the brief and only then builds.')}</div>
             </div>
-            <button type="button" onClick={() => setLane(null)} className="ml-2 rounded-full border border-line bg-surface px-3 py-1 text-[12px] text-ink-2 transition hover:border-accent hover:bg-accent-soft hover:text-accent">{T('Cambiar', 'Change')}</button>
+            <button type="button" onClick={() => setLane(null)} className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-[13px] font-medium text-ink shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent"><ArrowLeftRight size={14} /> {T('Cambiar de modo', 'Change mode')}</button>
           </div>
         )}
         {lane === 'team' && presets.some((p) => p.custom) && (

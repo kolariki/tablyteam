@@ -1,5 +1,5 @@
 import { Check, Play } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useT } from '../lib/i18n'
 import AgentAvatar from './AgentAvatar'
 
@@ -7,18 +7,15 @@ import AgentAvatar from './AgentAvatar'
  * The two doors of the home. Behind the copy of each card runs its own pipeline ("the circuit"), full-bleed and faded:
  *  direct: the prompt being typed → prompt engineering → the builder writing files → ready
  *  team:   the prompt → prompt engineering → the team debating (avatars taking turns) → the brief → the builder → ready
- * The scene is laid out on a fixed 640×360 canvas and scaled to the card's width, so the wires (SVG) and the nodes (HTML,
- * so the avatars can live there) always line up. Pure CSS keyframes (index.css), looping; --lane-loop is the loop length.
+ * The nodes (HTML, so the avatars can live there) are anchored to the card's edges; the wires (SVG) are drawn from the
+ * nodes' measured positions, so they line up at any card size. Pure CSS keyframes (index.css), looping; --lane-loop is the loop length.
  */
 type Lane = 'direct' | 'team'
-type Box = { x: number; y: number; w: number; h: number }
-
-const W = 640
-const H = 360
+type Box = { left?: string; right?: string; top?: string; bottom?: string; w: number; h: number }
 
 const LAYOUT: Record<Lane, Record<string, Box>> = {
-  direct: { prompt: { x: 28, y: 284, w: 222, h: 60 }, eng: { x: 330, y: 206, w: 150, h: 62 }, build: { x: 476, y: 70, w: 148, h: 80 } },
-  team: { prompt: { x: 28, y: 288, w: 196, h: 58 }, eng: { x: 258, y: 238, w: 128, h: 58 }, team: { x: 428, y: 222, w: 160, h: 60 }, brief: { x: 372, y: 140, w: 122, h: 56 }, build: { x: 494, y: 58, w: 130, h: 76 } },
+  direct: { prompt: { left: '3.5%', bottom: '7%', w: 250, h: 62 }, eng: { left: '46%', bottom: '11%', w: 166, h: 62 }, build: { right: '4%', top: '18%', w: 172, h: 86 } },
+  team: { prompt: { left: '3.5%', bottom: '7%', w: 232, h: 60 }, eng: { left: '42%', bottom: '9%', w: 152, h: 58 }, team: { right: '4%', top: '56%', w: 176, h: 62 }, brief: { right: '4%', top: '32%', w: 132, h: 56 }, build: { right: '4%', top: '5%', w: 148, h: 76 } },
 }
 const ORDER: Record<Lane, string[]> = { direct: ['prompt', 'eng', 'build'], team: ['prompt', 'eng', 'team', 'brief', 'build'] }
 // when each node lights up (seconds into the loop) and the loop length
@@ -34,8 +31,9 @@ const TEAM = [
   { name: 'QA', role: 'qa', provider: 'anthropic' },
 ]
 
-/** a smooth S-curve from the right edge of a box to the left edge of the next (or bottom → top when stacked) */
-function wire(a: Box, b: Box): string {
+type R = { x: number; y: number; w: number; h: number }
+/** a smooth S-curve between two measured boxes: side to side, or bottom → top when they are stacked */
+function wire(a: R, b: R): string {
   const stacked = Math.abs(a.x + a.w / 2 - (b.x + b.w / 2)) < Math.max(a.w, b.w) * 0.7
   if (stacked) {
     const x1 = a.x + a.w / 2, y1 = a.y, x2 = b.x + b.w / 2, y2 = b.y + b.h
@@ -47,9 +45,9 @@ function wire(a: Box, b: Box): string {
   return `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`
 }
 
-function Node({ box, label, at, className = '', children }: { box: Box; label: string; at: number; className?: string; children?: ReactNode }) {
+function Node({ k, box, label, at, className = '', children }: { k: string; box: Box; label: string; at: number; className?: string; children?: ReactNode }) {
   return (
-    <div className={`lane-node ${className}`} style={{ left: box.x, top: box.y, width: box.w, height: box.h, animationDelay: `${at}s` }}>
+    <div data-k={k} className={`lane-node ${className}`} style={{ left: box.left, right: box.right, top: box.top, bottom: box.bottom, width: box.w, height: box.h, animationDelay: `${at}s` }}>
       <div className="lane-node-label">{label}</div>
       {children}
     </div>
@@ -61,29 +59,50 @@ function Scene({ lane }: { lane: Lane }) {
   const L = LAYOUT[lane]
   const { at, loop } = TIMING[lane]
   const order = ORDER[lane]
+  const ref = useRef<HTMLDivElement>(null)
+  const [paths, setPaths] = useState<string[]>([])
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = () => {
+      const base = el.getBoundingClientRect()
+      const rect = (k: string): R | null => {
+        const n = el.querySelector<HTMLElement>(`[data-k="${k}"]`)
+        if (!n) return null
+        const r = n.getBoundingClientRect()
+        return { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height }
+      }
+      const out: string[] = []
+      for (let i = 0; i < order.length - 1; i++) {
+        const a = rect(order[i]), b = rect(order[i + 1])
+        if (a && b) out.push(wire(a, b))
+      }
+      setPaths(out)
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [order])
   return (
-    <div className={`lane-scene lane-scene--${lane}`} style={{ width: W, height: H, ['--lane-loop' as string]: `${loop}s` }} aria-hidden>
-      <svg className="lane-wires" viewBox={`0 0 ${W} ${H}`} width={W} height={H}>
-        {order.slice(0, -1).map((k, i) => {
-          const d = wire(L[k], L[order[i + 1]])
-          const start = at[order[i + 1]] - 1.1
-          return (
-            <g key={k}>
-              <path d={d} className="lane-wire-base" pathLength={100} />
-              <path d={d} className="lane-wire-pulse" pathLength={100} style={{ animationDelay: `${start}s` }} />
-            </g>
-          )
-        })}
+    <div ref={ref} className={`lane-scene lane-scene--${lane}`} style={{ ['--lane-loop' as string]: `${loop}s` }} aria-hidden>
+      <svg className="lane-wires">
+        {paths.map((d, i) => (
+          <g key={i}>
+            <path d={d} className="lane-wire-base" pathLength={100} />
+            <path d={d} className="lane-wire-pulse" pathLength={100} style={{ animationDelay: `${at[order[i + 1]] - 1.1}s` }} />
+          </g>
+        ))}
       </svg>
-      <Node box={L.prompt} label={T('Tu pedido', 'Your request')} at={at.prompt} className="lane-node--prompt">
-        <div className="lane-type">{T('Una app para reservar turnos en mi peluquería, con recordatorios por WhatsApp', 'An app to book appointments at my salon, with WhatsApp reminders')}</div>
+      <Node k="prompt" box={L.prompt} label={T('Tu pedido', 'Your request')} at={at.prompt} className="lane-node--prompt">
+        <div className="lane-type"><span className="lane-type-in" style={{ width: L.prompt.w - 24 }}>{T('Una app para reservar turnos en mi peluquería…', 'An app to book appointments at my salon…')}</span></div>
       </Node>
-      <Node box={L.eng} label="Prompt engineering" at={at.eng} className="lane-node--eng">
+      <Node k="eng" box={L.eng} label="Prompt engineering" at={at.eng} className="lane-node--eng">
         <div className="lane-bars">{[72, 100, 58, 86].map((w, i) => <span key={w} style={{ width: `${w}%`, animationDelay: `${at.eng + 0.25 + i * 0.22}s` }} />)}</div>
       </Node>
       {lane === 'team' && (
         <>
-          <Node box={L.team} label={T('El equipo debate', 'The team debates')} at={at.team} className="lane-node--team">
+          <Node k="team" box={L.team} label={T('El equipo debate', 'The team debates')} at={at.team} className="lane-node--team">
             <div className="lane-team">
               {TEAM.map((a, i) => (
                 <span key={a.name} className="lane-avatar" style={{ animationDelay: `${at.team + 0.3 + i * 0.7}s` }}>
@@ -92,12 +111,12 @@ function Scene({ lane }: { lane: Lane }) {
               ))}
             </div>
           </Node>
-          <Node box={L.brief} label="Brief" at={at.brief} className="lane-node--brief">
+          <Node k="brief" box={L.brief} label="Brief" at={at.brief} className="lane-node--brief">
             <div className="lane-lines">{[88, 64, 76].map((w, i) => <span key={w} style={{ width: `${w}%`, animationDelay: `${at.brief + 0.25 + i * 0.22}s` }} />)}</div>
           </Node>
         </>
       )}
-      <Node box={L.build} label={T('Construcción', 'Build')} at={at.build} className="lane-node--build">
+      <Node k="build" box={L.build} label={T('Construcción', 'Build')} at={at.build} className="lane-node--build">
         <div className="lane-files">
           {['src/App.tsx', 'api/routes.ts', 'db/schema.sql'].map((f, i) => (
             <span key={f} style={{ animationDelay: `${at.build + 0.35 + i * 0.4}s` }}>{f}</span>
@@ -109,22 +128,10 @@ function Scene({ lane }: { lane: Lane }) {
   )
 }
 
-/** scales the 640×360 canvas to the card's width (the scene keeps its proportions, anchored to the card's bottom-right) */
 function Circuit({ lane }: { lane: Lane }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [scale, setScale] = useState(1)
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const ro = new ResizeObserver(([e]) => setScale(e.contentRect.width / W))
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
   return (
-    <div ref={ref} className="lane-circuit">
-      <div className="lane-circuit-inner" style={{ transform: `scale(${scale})` }}>
-        <Scene lane={lane} />
-      </div>
+    <div className="lane-circuit">
+      <Scene lane={lane} />
       <div className="lane-veil" />
     </div>
   )

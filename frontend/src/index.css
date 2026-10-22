@@ -111,15 +111,13 @@ input[type="color"] { border: 1px solid var(--color-line); padding: 2px; }
 /* home chooser cards: the pipeline ("the circuit") runs full-bleed behind the copy, faded. A 640×360 canvas scaled to the
    card's width (LaneCards.tsx); --lane-loop is the loop length per card. */
 .lane-circuit { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; border-radius: inherit; }
-.lane-circuit-inner { position: absolute; right: 0; bottom: 0; width: 640px; height: 360px; transform-origin: right bottom; }
-.lane-scene { position: relative; opacity: .85; transition: opacity .35s; }
+.lane-scene { position: absolute; inset: 0; opacity: .85; transition: opacity .35s; }
 .lane-card:hover .lane-scene { opacity: 1; }
-/* keeps the copy readable: a soft white veil that fades out towards the bottom-right, where the circuit lives */
 .lane-veil { position: absolute; inset: 0 0 90px 0; background: linear-gradient(90deg, color-mix(in srgb, var(--color-surface) 92%, transparent) 40%, color-mix(in srgb, var(--color-surface) 50%, transparent) 54%, transparent 66%);
   mask-image: linear-gradient(180deg, #000 70%, transparent 100%); -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent 100%); }
 .lane-card::after { content: ""; position: absolute; right: -80px; bottom: -80px; width: 320px; height: 320px; border-radius: 999px; z-index: 0; pointer-events: none;
   background: radial-gradient(closest-side, color-mix(in srgb, var(--color-accent) 12%, transparent), transparent); }
-.lane-wires { position: absolute; inset: 0; overflow: visible; }
+.lane-wires { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .lane-wire-base { fill: none; stroke: var(--color-ink-4); stroke-width: 1.5; stroke-dasharray: 2 5; stroke-linecap: round; opacity: .9; }
 .lane-wire-pulse { fill: none; stroke: var(--color-accent) !important; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 22 100; stroke-dashoffset: 100; opacity: 0;
   animation: lane-pulse var(--lane-loop) cubic-bezier(.4,0,.2,1) infinite both; filter: drop-shadow(0 0 3px color-mix(in srgb, var(--color-accent) 60%, transparent)); }
@@ -133,6 +131,9 @@ input[type="color"] { border: 1px solid var(--color-line); padding: 2px; }
   50%, 100% { border-color: var(--color-ink-4); box-shadow: 0 1px 2px rgba(0,0,0,.04); transform: translateY(0) scale(1); } }
 /* the prompt being typed: a monospace line revealed by width, with a blinking caret */
 .lane-type { display: inline-block; max-width: 100%; overflow: hidden; white-space: nowrap; font-family: var(--font-mono); font-size: 11px; color: var(--color-ink-2); border-right: 1.5px solid var(--color-accent);
+  vertical-align: top; }
+.lane-type-in { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lane-type {
   animation: lane-type var(--lane-loop) steps(48, end) infinite both, blink .7s step-end infinite; }
 @keyframes lane-type { 0% { width: 0; } 30% { width: 100%; } 92% { width: 100%; } 100% { width: 0; } }
 /* prompt engineering: bars that grow as the brief takes shape, with a shimmer running across */
