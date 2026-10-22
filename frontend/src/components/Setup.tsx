@@ -552,7 +552,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                 const p = providers.find((x) => x.id === a.provider)
                 const color = a.color || p?.color || '#8A9299'
                 return (
-                  <div key={i} className="relative overflow-hidden rounded-xl border p-3" style={{ background: brandTheme(a.wanted_provider ?? a.provider).bg, borderColor: brandTheme(a.wanted_provider ?? a.provider).border }}>
+                  <div key={i} className="relative isolate overflow-hidden rounded-xl border p-3" style={{ background: brandTheme(a.wanted_provider ?? a.provider).bg, borderColor: brandTheme(a.wanted_provider ?? a.provider).border, clipPath: 'inset(0 round 0.75rem)' }}>
                     <LogoWatermark provider={a.wanted_provider ?? a.provider} opacity={0.1} />
                     <div className="relative">
                     <div className="grid grid-cols-[auto_auto_1fr_1fr_1.6fr_auto] gap-2 items-center">
