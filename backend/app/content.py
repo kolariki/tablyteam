@@ -17,6 +17,13 @@ from pathlib import Path
 import markdown
 
 from .config import env
+from .providers import PROVIDERS
+
+
+def _brand(provider: str | None) -> tuple[str, str]:
+    """(logo path, brand color) for the AI an article is about."""
+    spec = PROVIDERS.get(provider or "")
+    return (f"/logos/{provider}.png", spec.color if spec else "#2F6B5D") if provider else ("", "#2F6B5D")
 
 CONTENT_DIR = Path(env("ARENA_CONTENT_DIR", str(Path(__file__).resolve().parents[1] / "content")))
 SITE_URL = (env("ARENA_PUBLIC_URL", "https://tablyteam.com") or "https://tablyteam.com").rstrip("/")
@@ -161,8 +168,8 @@ header.top nav a{text-decoration:none;color:var(--ink-2);padding:7px 12px;border
 header.top nav a.on{color:var(--accent);background:var(--accent-soft)}
 header.top nav a.cta{background:var(--accent);color:#fff;margin-left:6px;padding:8px 16px}header.top nav a.cta:hover{filter:brightness(1.08);background:var(--accent)}
 @media(max-width:640px){header.top nav a.hide-sm{display:none}}
-main{max-width:1120px;margin:0 auto;padding:48px 28px 72px}
-.hero{max-width:820px;margin-bottom:36px}
+main{max-width:1120px;margin:0 auto;padding:48px 28px 72px;min-height:calc(100vh - 60px)}
+.hero{max-width:820px;margin-bottom:28px}
 .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);font-weight:600}
 .eyebrow::before{content:"";width:18px;height:1px;background:var(--accent)}
 h1{font-family:"Newsreader",serif;font-weight:400;font-size:clamp(36px,5vw,56px);line-height:1.04;margin:14px 0 16px;letter-spacing:-.015em}
@@ -211,7 +218,7 @@ a.tag:hover{border-color:var(--accent);color:var(--accent)}
 .prose tr:last-child td{border-bottom:0}
 .prose img{max-width:100%;border-radius:14px}
 .prose hr{border:0;border-top:1px solid var(--line);margin:40px 0}
-.faq{max-width:820px}
+.faq{max-width:none}
 .faq details{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:6px 22px;margin:0 0 10px;transition:border-color .2s}
 .faq details[open]{border-color:var(--accent)}
 .faq summary{cursor:pointer;font-weight:600;font-size:16px;padding:14px 0;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:16px;line-height:1.35}
@@ -221,7 +228,8 @@ a.tag:hover{border-color:var(--accent);color:var(--accent)}
 .faq .a{padding:0 0 18px;color:var(--ink-2);line-height:1.65}.faq .a p{margin:0 0 10px}.faq .a p:last-child{margin:0}
 .faq-head{display:grid;gap:24px;grid-template-columns:1fr;align-items:end;margin-bottom:28px}
 @media(min-width:900px){.faq-head{grid-template-columns:1fr 320px}}
-.search{width:100%;height:46px;border:1px solid var(--line);border-radius:999px;background:var(--surface);padding:0 18px;font:inherit;font-size:15px;color:var(--ink);outline:none}
+.search-row{display:flex;align-items:center;gap:16px;margin:0 0 20px}.search-row .count{font-size:13px;color:var(--ink-3);white-space:nowrap}
+.search{flex:1;width:100%;height:50px;border:1px solid var(--line);border-radius:999px;background:var(--surface);padding:0 18px;font:inherit;font-size:15px;color:var(--ink);outline:none}
 .search:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .cta-box{margin:64px 0 0;background:var(--ink);color:#fff;border-radius:24px;padding:36px 40px;display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;position:relative;overflow:hidden}
 .cta-box::after{content:"";position:absolute;right:-80px;top:-80px;width:280px;height:280px;border-radius:999px;background:radial-gradient(closest-side,rgba(47,107,93,.7),transparent)}
@@ -239,6 +247,20 @@ footer .legal{grid-column:1/-1;padding-top:18px;border-top:1px solid var(--line)
 .more{margin-top:64px;padding-top:40px;border-top:1px solid var(--line)}.more h2{font-family:"Newsreader",serif;font-weight:400;font-size:30px;margin:0 0 18px;letter-spacing:-.01em}
 .crumbs{font-size:12.5px;color:var(--ink-3);margin-bottom:8px}.crumbs a{color:var(--ink-3);text-decoration:none}.crumbs a:hover{color:var(--accent)}
 .progress{position:fixed;left:0;top:0;height:3px;width:0;background:var(--accent);z-index:6;transition:width .1s linear}
+.card.brand{--brand:#2F6B5D;background:linear-gradient(160deg,var(--surface) 45%,color-mix(in srgb,var(--brand) 14%,var(--surface)))}
+.card.brand::before{content:"";position:absolute;right:-30px;top:-30px;width:180px;height:180px;border-radius:999px;background:radial-gradient(closest-side,color-mix(in srgb,var(--brand) 28%,transparent),transparent)}
+.card.brand .wm{position:absolute;right:-18px;bottom:-22px;width:150px;height:150px;opacity:.14;filter:blur(1.5px) saturate(1.2);pointer-events:none;transform:rotate(-8deg)}
+.card.brand:hover .wm{opacity:.22}
+.card.brand>*:not(.wm){position:relative}
+.hero.brand{--brand:#2F6B5D;position:relative;max-width:none;margin:-48px -28px 36px;padding:56px 28px 44px;overflow:hidden;background:linear-gradient(160deg,color-mix(in srgb,var(--brand) 10%,var(--paper)),var(--paper) 70%)}
+.hero.brand::before{content:"";position:absolute;right:-120px;top:-160px;width:560px;height:560px;border-radius:999px;background:radial-gradient(closest-side,color-mix(in srgb,var(--brand) 30%,transparent),transparent)}
+.hero.brand .wm{position:absolute;right:4%;top:50%;width:min(34vw,360px);height:min(34vw,360px);transform:translateY(-50%) rotate(-8deg);opacity:.16;filter:blur(2px) saturate(1.2);pointer-events:none}
+.hero.brand>*:not(.wm){position:relative;max-width:760px}
+.hero.brand .meta .logo{box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.cta-box{background:var(--accent)}
+.cta-box::after{background:radial-gradient(closest-side,rgba(255,255,255,.22),transparent)}
+.cta-box a{background:#fff;color:var(--accent)}.cta-box a:hover{background:var(--accent-soft)}
+.cta-box p{opacity:.9}
 """
 
 _FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
@@ -297,10 +319,11 @@ def _page(*, title: str, description: str, path: str, body: str, ld: list[dict],
   <nav aria-label="Principal">
     <a href="/blog"{" class=on" if current == "blog" else ""}>Blog</a>
     <a href="/faq"{" class=on" if current == "faq" else ""}>Preguntas frecuentes</a>
-    <a class="hide-sm" href="/#login">Iniciar sesión</a>
-    <a class="cta" href="/#signup">Crear cuenta</a>
+    <a class="hide-sm" id="nav-login" href="/#login">Iniciar sesión</a>
+    <a class="cta" id="nav-signup" href="/#signup">Crear cuenta</a>
   </nav>
 </header>
+<script>try{{if(localStorage.getItem("arena.token")){{const l=document.getElementById("nav-login"),c=document.getElementById("nav-signup");l.remove();c.textContent="Abrir la app";c.href="/";document.querySelectorAll(".cta-box a").forEach(a=>{{a.textContent="Abrir la app";a.href="/"}})}}}}catch(e){{}}</script>
 {'<div class="progress" id="progress"></div><script>addEventListener("scroll",()=>{const d=document.documentElement;const p=d.scrollTop/(d.scrollHeight-d.clientHeight||1);document.getElementById("progress").style.width=(p*100)+"%"},{passive:true})</script>' if og_type == "article" else ""}
 <main>
 {body}
@@ -323,8 +346,11 @@ def _page(*, title: str, description: str, path: str, body: str, ld: list[dict],
 
 def _card(p: Post, feature: bool = False) -> str:
     esc = html.escape
-    logo = f'<img src="/logos/{esc(p.provider)}.png" alt="" aria-hidden="true">' if p.provider else f'<span class="kind">{esc(p.tags[0]) if p.tags else "Guía"}</span>'
-    return (f'<a class="card{" feature" if feature else ""}" href="/blog/{esc(p.slug)}"><div class="top">{logo}<time datetime="{esc(p.date)}">{_fmt_date(p.date)}</time></div>'
+    logo_src, color = _brand(p.provider)
+    logo = f'<img src="{esc(logo_src)}" alt="" aria-hidden="true">' if p.provider else f'<span class="kind">{esc(p.tags[0]) if p.tags else "Guía"}</span>'
+    wm = f'<img class="wm" src="{esc(logo_src)}" alt="" aria-hidden="true">' if p.provider else ""
+    cls = "card" + (" feature" if feature else "") + (" brand" if p.provider else "")
+    return (f'<a class="{cls}" style="--brand:{esc(color)}" href="/blog/{esc(p.slug)}">{wm}<div class="top">{logo}<time datetime="{esc(p.date)}">{_fmt_date(p.date)}</time></div>'
             f'<h2>{esc(p.title)}</h2><p>{esc(p.description)}</p>'
             f'<div class="foot"><span>{p.reading_min} min de lectura</span><span class="read">Leer →</span></div></a>')
 
@@ -371,9 +397,11 @@ def post_html(p: Post) -> str:
              f'<a href="https://www.linkedin.com/sharing/share-offsite/?url={esc(p.url())}" rel="noopener" target="_blank">LinkedIn</a>'
              f'<a href="https://wa.me/?text={esc(p.title)}%20{esc(p.url())}" rel="noopener" target="_blank">WhatsApp</a></div>')
     toc = f'<aside class="toc-box"><div class="t">En este artículo</div>{p.toc_html}{share}</aside>' if p.toc_html.strip() else f'<aside class="toc-box">{share}</aside>'
-    logo = f'<img class="logo" src="/logos/{esc(p.provider)}.png" alt="">' if p.provider else ""
+    logo_src, color = _brand(p.provider)
+    logo = f'<img class="logo" src="{esc(logo_src)}" alt="">' if p.provider else ""
+    wm = f'<img class="wm" src="{esc(logo_src)}" alt="" aria-hidden="true">' if p.provider else ""
     tags = "".join(f'<a class="tag" href="/blog?tag={esc(t)}">{esc(t)}</a>' for t in p.tags)
-    body = (f'<div class="hero"><div class="crumbs"><a href="/">Inicio</a> › <a href="/blog">Blog</a></div><div class="eyebrow">{esc(p.tags[0]) if p.tags else "Guía"}</div><h1>{esc(p.title)}</h1><p class="lede">{esc(p.description)}</p>'
+    body = (f'<div class="hero{" brand" if p.provider else ""}" style="--brand:{esc(color)}">{wm}<div class="crumbs"><a href="/">Inicio</a> › <a href="/blog">Blog</a></div><div class="eyebrow">{esc(p.tags[0]) if p.tags else "Guía"}</div><h1>{esc(p.title)}</h1><p class="lede">{esc(p.description)}</p>'
             f'<div class="meta">{logo}<time datetime="{esc(p.date)}">{_fmt_date(p.date)}</time>'
             + (f'<span>actualizado el {_fmt_date(p.updated)}</span>' if p.updated != p.date else "")
             + f'<span>{p.reading_min} min de lectura</span><span>por el equipo de {SITE_NAME}</span><span class="tags">{tags}</span></div></div>'
@@ -391,11 +419,11 @@ def post_html(p: Post) -> str:
 def faq_html() -> str:
     esc = html.escape
     items = faq()
-    body = (f'<div class="faq-head"><div class="hero" style="margin:0"><div class="eyebrow">Preguntas frecuentes</div><h1>Lo que te preguntás antes de construir</h1>'
+    body = (f'<div class="hero"><div class="eyebrow">Preguntas frecuentes</div><h1>Lo que te preguntás antes de construir</h1>'
             f'<p class="lede">Qué es, cuánto cuesta, qué IA usar, dónde queda tu código, cómo se publica la app y qué pasa con tus claves. Respuestas directas.</p></div>'
-            f'<div><input class="search" id="q" type="search" placeholder="Buscar entre {len(items)} preguntas…" autocomplete="off" aria-label="Buscar"></div></div><div class="faq" id="faq">'
+            f'<div class="search-row"><input class="search" id="q" type="search" placeholder="Buscar entre {len(items)} preguntas…" autocomplete="off" aria-label="Buscar"><span class="count" id="count">{len(items)} preguntas</span></div><div class="faq" id="faq">'
             + "".join(f'<details id="{esc(i.slug)}"><summary>{esc(i.question)}</summary><div class="a">{i.answer_html}</div></details>' for i in items) + "</div>"
-            '<script>const q=document.getElementById("q"),all=[...document.querySelectorAll("#faq details")];q.addEventListener("input",()=>{const v=q.value.trim().toLowerCase();all.forEach(d=>{const hit=!v||d.textContent.toLowerCase().includes(v);d.style.display=hit?"":"none";if(v&&hit)d.open=true})});'
+            '<script>const q=document.getElementById("q"),all=[...document.querySelectorAll("#faq details")];q.addEventListener("input",()=>{const v=q.value.trim().toLowerCase();let n=0;all.forEach(d=>{const hit=!v||d.textContent.toLowerCase().includes(v);d.style.display=hit?"":"none";if(hit)n++;if(v&&hit)d.open=true});document.getElementById("count").textContent=n+(n===1?" pregunta":" preguntas")});'
             'if(location.hash){const d=document.getElementById(location.hash.slice(1));if(d){d.open=true;d.scrollIntoView()}}</script>')
     ld = [_org_ld(), {"@type": "FAQPage", "@id": f"{SITE_URL}/faq#faq", "url": f"{SITE_URL}/faq", "inLanguage": "es",
                       "mainEntity": [{"@type": "Question", "name": i.question, "acceptedAnswer": {"@type": "Answer", "text": i.answer_text}} for i in items]},

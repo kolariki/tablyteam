@@ -11,7 +11,7 @@ export default defineConfig({
     proxy: {
       '/api': API,
       // public, server-rendered pages and files (blog, FAQ, sitemap, robots, llms.txt)
-      '^/(blog|faq|sitemap\\.xml|robots\\.txt|llms\\.txt|llms-full\\.txt)(/.*)?$': API,
+      '^/(blog|faq|sitemap\\.xml|robots\\.txt|llms\\.txt|llms-full\\.txt)([/?].*)?$': API,
       '/ws': { target: API.replace(/^http/, 'ws'), ws: true },
     },
   },
