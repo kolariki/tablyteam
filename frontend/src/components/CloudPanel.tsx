@@ -9,7 +9,6 @@ import ProviderLogo from './ProviderLogo'
 import { toast } from './Toast'
 import BlockedNotice, { BuilderBusyNotice } from './BlockedNotice'
 
-const LABEL = 'text-[11px] uppercase tracking-[0.25em] text-ink-3'
 const PILL = 'flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-[13px] text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent disabled:opacity-40 disabled:hover:border-line disabled:hover:bg-surface disabled:hover:text-ink-2'
 const PRIMARY = 'flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40'
 const CARD = 'rounded-2xl border border-line bg-surface p-5 shadow-[0_1px_2px_rgba(30,38,34,.04),0_8px_24px_-16px_rgba(30,38,34,.18)]'

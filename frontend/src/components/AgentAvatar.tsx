@@ -18,10 +18,10 @@ export function avatarUri(seed: string): string {
   return uri
 }
 
-export default function AgentAvatar({ agent, size = 40, className = '', ring = true }: { agent?: { name?: string; role?: string | null; provider?: string; wanted_provider?: string; color?: string | null } | null; size?: number; className?: string; ring?: boolean }) {
+export default function AgentAvatar({ agent, size = 40, className = '', ring = true }: { agent?: { name?: string; role?: string | null; provider?: string | null; wanted_provider?: string | null; color?: string | null } | null; size?: number; className?: string; ring?: boolean }) {
   const seed = `${agent?.role ?? ''}:${agent?.name ?? '?'}`
   const uri = useMemo(() => avatarUri(seed), [seed])
-  const provider = agent?.wanted_provider ?? agent?.provider
+  const provider = agent?.wanted_provider ?? agent?.provider ?? undefined
   const logo = Math.round(size * 0.24)
   return (
     <span className={`relative inline-block shrink-0 overflow-hidden rounded-full bg-[#F6F3EC] ${ring ? 'ring-1 ring-black/10' : ''} ${className}`} style={{ width: size, height: size }} aria-hidden>

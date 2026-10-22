@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ChevronDown, Download, Gavel, HardHat, Loader2, MonitorPlay, Pencil, Play, Search, Trash2, Users, Video } from 'lucide-react'
+import { ChevronDown, Download, Gavel, HardHat, Loader2, MonitorPlay, Pencil, Search, Trash2, Users, Video } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, getToken, type DashboardData } from '../lib/api'
 import { fmtDur } from '../lib/duration'

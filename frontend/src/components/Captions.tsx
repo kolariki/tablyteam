@@ -2,7 +2,6 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { useT } from '../lib/i18n'
 import { partialTags } from '../lib/parse'
-import ProviderLogo from './ProviderLogo'
 import AgentAvatar from './AgentAvatar'
 import { agentMap, useAgentColor, useArena } from '../store'
 
