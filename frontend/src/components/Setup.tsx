@@ -405,10 +405,10 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
         </div>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_1.3fr]">
-          <div className="panel relative flex flex-col rounded-2xl p-5" style={{ clipPath: 'inset(0 round 1rem)' }}>
-            {/* the companies in the team as vertical brand stripes behind the brief (one per AI, its colour); clip-path instead of overflow-hidden so the sticky logos below keep working */}
+          <div className="panel relative isolate flex flex-col rounded-2xl p-5">
+            {/* the companies in the team as vertical brand stripes behind the brief (one per AI, its colour); the stripes and the veil carry the card's radius themselves, so the border and shadow stay intact */}
             <BrandStripes providers={cfg.agents.map((a) => a.wanted_provider ?? a.provider)} logos={false} />
-            <div className="absolute inset-0 bg-surface/35" aria-hidden />
+            <div className="absolute inset-0 rounded-[inherit] bg-surface/35" aria-hidden />
             <div className="relative space-y-4">
             <label className="block">
               <span className="text-xs uppercase tracking-widest text-ink-3">{T('Nombre de la app', 'App name')}</span>
@@ -552,7 +552,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                 const p = providers.find((x) => x.id === a.provider)
                 const color = a.color || p?.color || '#8A9299'
                 return (
-                  <div key={i} className="relative isolate overflow-hidden rounded-xl border p-3" style={{ background: brandTheme(a.wanted_provider ?? a.provider).bg, borderColor: brandTheme(a.wanted_provider ?? a.provider).border, clipPath: 'inset(0 round 0.75rem)' }}>
+                  <div key={i} className="relative isolate overflow-hidden rounded-xl border p-3" style={{ background: brandTheme(a.wanted_provider ?? a.provider).bg, borderColor: brandTheme(a.wanted_provider ?? a.provider).border }}>
                     <LogoWatermark provider={a.wanted_provider ?? a.provider} opacity={0.1} />
                     <div className="relative">
                     <div className="grid grid-cols-[auto_auto_1fr_1fr_1.6fr_auto] gap-2 items-center">
