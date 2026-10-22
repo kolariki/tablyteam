@@ -1,26 +1,33 @@
 ---
-title: Claude (Anthropic): para qué sirve, qué modelos hay y en qué rol rinde mejor
-description: Guía completa de Claude, la familia de modelos de Anthropic. Opus, Sonnet y Haiku, su estilo de razonamiento, dónde brilla al escribir código y diseñar productos, y qué roles de tu equipo conviene darle.
+title: Claude (Anthropic): para qué sirve, qué modelos hay (Fable, Opus, Sonnet, Haiku) y en qué rol rinde mejor
+description: Guía completa de Claude, la familia de modelos de Anthropic. Fable, Opus, Sonnet y Haiku, su estilo de razonamiento, dónde brilla al escribir código y diseñar productos, y qué roles de tu equipo conviene darle.
 category: Inteligencias artificiales
 date: 2026-10-22
 tags: [Claude, Anthropic, modelos de IA]
-keywords: [Claude Anthropic, Claude Opus, Claude Sonnet, Claude Haiku, Claude Code, para qué sirve Claude, mejor IA para programar]
+keywords: [Claude Anthropic, Claude Fable, Claude Opus, Claude Sonnet, Claude Haiku, Claude Code, para qué sirve Claude, mejor IA para programar]
 provider: anthropic
 ---
 
 Claude es la familia de modelos de lenguaje de **Anthropic**. Es, hoy, el modelo que más usamos dentro de Tably Team cuando el trabajo es escribir código, redactar un brief preciso o diseñar un producto con criterio. Esta guía explica qué lo distingue, cómo elegir entre sus variantes y qué sillas del equipo le conviene ocupar.
 
-## Las variantes: Opus, Sonnet y Haiku
+## Las variantes: Fable, Opus, Sonnet y Haiku
 
-Anthropic publica cada generación en tres tamaños. La lógica es siempre la misma: más capacidad cuesta más y tarda más.
+Anthropic publica cada generación en varios tamaños. La lógica es siempre la misma: más capacidad cuesta más y tarda más.
 
 | Modelo | Para qué | Cuándo elegirlo en Tably |
 |---|---|---|
+| **Claude Fable** | El nivel más alto de la familia, por encima de Opus: razonamiento profundo, tareas largas y difíciles | Constructor y CTO en proyectos grandes, cuando tu cuenta tiene acceso |
 | **Claude Opus** | El más capaz: razonamiento largo, tareas con muchos pasos, código complejo, arquitectura | Constructor (vía Claude Code), CTO, Head of Engineering |
 | **Claude Sonnet** | Equilibrio entre calidad, velocidad y costo | Product, Diseño, CEO; el brief del constructor directo |
 | **Claude Haiku** | Rápido y barato, excelente para tareas acotadas | QA de consistencia, resúmenes, clasificación, descripciones de capturas |
 
-En Tably, cuando dejás el modelo en «default» con Claude Code como constructor, el motor corre con Opus, que es el que mejor sostiene una construcción de muchos turnos sin perder el hilo.
+En Tably, cuando dejás el modelo en «default» con Claude Code como constructor, el motor corre con Opus, que es el que mejor sostiene una construcción de muchos turnos sin perder el hilo. Si tu cuenta tiene acceso a Fable, aparece en el selector de modelos (Tably lee la lista en vivo desde tu API key) y podés elegirlo para cualquier rol o como constructor.
+
+### Fable, el escalón por encima de Opus
+
+Fable es el modelo más inteligente de Anthropic disponible al público, parte de la misma generación que Opus y Sonnet pero con más capacidad de razonamiento en problemas largos. Para Tably, tiene sentido en dos lugares: como **constructor** de proyectos grandes, donde cada turno coordina decenas de archivos, y como **CTO** cuando la arquitectura es la decisión que no querés rehacer. Para el resto de los roles, Opus y Sonnet rinden igual de bien a menor costo.
+
+Dos aclaraciones prácticas: el acceso depende de tu cuenta de Anthropic (no todas las cuentas lo tienen habilitado), y el costo por token es el más alto de la familia, así que Tably lo trata como el escalón premium en las estimaciones.
 
 ## Qué lo distingue
 

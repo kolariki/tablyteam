@@ -4,6 +4,7 @@ import os
 
 PRICES: dict[str, tuple[float, float]] = {
     # Anthropic
+    "claude-fable": (15.0, 75.0),  # placeholder: same tier as Opus until the list price is confirmed; override with ARENA_PRICE_CLAUDE_FABLE
     "claude-opus": (15.0, 75.0),
     "claude-sonnet": (3.0, 15.0),
     "claude-haiku": (1.0, 5.0),
