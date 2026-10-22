@@ -218,14 +218,14 @@ function Resources() {
         </div>
       )}
       {faq.length > 0 && (
-        <div data-scroll-reveal className="mt-16 grid gap-8 lg:grid-cols-[1fr_1.6fr]">
-          <div>
+        <div data-scroll-reveal className="mt-16 grid gap-8 lg:grid-cols-[1.6fr_1fr]">
+          <div className="lg:order-2 lg:pl-6">
             <div className="text-[11px] uppercase tracking-[0.3em] text-accent">{T('Preguntas frecuentes', 'FAQ')}</div>
             <h2 className="serif mt-1 text-[34px] leading-tight">{T('Lo que te preguntás antes de empezar', 'What you ask before you start')}</h2>
             <p className="mt-3 text-[14.5px] leading-relaxed text-ink-2">{T('Precio, modelos, privacidad, publicación. Respuestas directas.', 'Pricing, models, privacy, publishing. Straight answers.')}</p>
             <a href="/faq" className="mt-4 inline-block rounded-full border border-line bg-surface px-4 py-2 text-sm text-ink-2 transition hover:border-accent hover:text-accent">{T('Todas las preguntas', 'All questions')} →</a>
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 lg:order-1">
             {faq.slice(0, 7).map((f) => (
               <details key={f.slug} className="panel group rounded-2xl px-5 py-1">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-3 text-[15px] font-semibold [&::-webkit-details-marker]:hidden">
