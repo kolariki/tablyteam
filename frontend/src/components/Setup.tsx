@@ -453,7 +453,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
         )}
 
         {lane !== null && (
-        <div data-lane={lane} className={`mt-8 grid gap-6 ${lane === 'direct' ? 'max-w-3xl lg:grid-cols-1' : 'lg:grid-cols-[1fr_1.3fr]'}`}>
+        <div data-lane={lane} className={`mt-8 grid gap-6 ${lane === 'direct' ? 'lg:grid-cols-1' : 'lg:grid-cols-[1fr_1.3fr]'}`}>
           <div className="panel relative isolate flex flex-col rounded-2xl p-5">
             {/* the companies in the team as vertical brand stripes behind the brief (one per AI, its colour); the stripes and the veil carry the card's radius themselves, so the border and shadow stay intact */}
             <BrandStripes providers={cfg.agents.map((a) => a.wanted_provider ?? a.provider)} logos={false} />
