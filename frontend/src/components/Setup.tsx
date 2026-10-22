@@ -9,6 +9,7 @@ import { api, type User } from '../lib/api'
 import { fmtUsd } from '../lib/parse'
 import Dashboard from './Dashboard'
 import HomeLoader from './HomeLoader'
+import LaneCards from './LaneCards'
 import { readCache, writeCache } from '../lib/cache'
 import ModelSelect, { invalidateModels } from './ModelSelect'
 import ArenaIntro, { ICON_STEP, PLAY_OUT, iconExitAt, introTeam } from './ArenaIntro'
@@ -413,20 +414,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
 
         {/* the two ways in: the builder alone (one good prompt) or the whole team (council first) */}
         {lane === null ? (
-          <div className="mt-10 grid gap-5 md:grid-cols-2">
-            {([
-              { id: 'direct' as const, icon: <Zap size={22} />, title: T('Constructor directo', 'Direct builder'), text: T('Contás qué querés, el prompt engineering lo convierte en un brief completo y el constructor arranca ya. Lo más rápido y lo más barato. El equipo queda a un clic para revisar después.', 'Say what you want, prompt engineering turns it into a full brief and the builder starts right away. Fastest and cheapest. The team is one click away to review afterwards.'), tag: T('Un prompt → una app', 'One prompt → one app') },
-              { id: 'team' as const, icon: <Users size={22} />, title: T('Constructor con equipo de desarrollo', 'Builder with a development team'), text: T('CEO, CTO, Producto, Diseño y QA debaten tu idea en vivo, deciden producto, alcance y stack, y recién ahí construyen. Para cuando querés decisiones justificadas y revisión por roles.', 'CEO, CTO, Product, Design and QA debate your idea live, decide product, scope and stack, and only then build. For when you want justified decisions and role-by-role review.'), tag: T('Debate → brief → construcción', 'Debate → brief → build') },
-            ]).map((o) => (
-              <button key={o.id} type="button" onClick={() => setLane(o.id)} className="group panel relative flex flex-col items-start gap-3 rounded-3xl p-7 text-left transition hover:border-accent hover:bg-accent-soft/40">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-white shadow-sm transition group-hover:scale-105">{o.icon}</span>
-                <span className="rounded-full border border-line bg-surface px-2.5 py-0.5 text-[11px] uppercase tracking-[0.2em] text-ink-3">{o.tag}</span>
-                <span className="text-[24px] leading-tight">{o.title}</span>
-                <span className="text-[14px] leading-relaxed text-ink-2">{o.text}</span>
-                <span className="mt-1 inline-flex items-center gap-1.5 text-[13px] font-semibold text-accent">{T('Elegir', 'Choose')} <Play size={13} /></span>
-              </button>
-            ))}
-          </div>
+          <LaneCards onPick={setLane} />
         ) : (
           <div className="mt-8 flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-white">{lane === 'direct' ? <Zap size={16} /> : <Users size={16} />}</span>
