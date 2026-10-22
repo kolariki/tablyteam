@@ -2151,8 +2151,8 @@ def content_faq():
 
 
 @app.get("/blog", response_class=HTMLResponse, include_in_schema=False)
-def page_blog():
-    return HTMLResponse(contentmod.blog_index_html())
+def page_blog(tag: str | None = None):
+    return HTMLResponse(contentmod.blog_index_html(tag))
 
 
 @app.get("/blog/feed.xml", include_in_schema=False)

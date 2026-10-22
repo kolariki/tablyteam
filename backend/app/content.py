@@ -147,55 +147,98 @@ def faq() -> list[Faq]:
 # ------------------------------------------------------------------ server-rendered pages
 
 _CSS = """
-:root{--paper:#EEF1EF;--surface:#fff;--surface-2:#F5F7F5;--line:#DCE2DE;--ink:#1E2622;--ink-2:#46514B;--ink-3:#717C76;--accent:#2F6B5D;--accent-soft:#E2EDE8;--gold:#9C7622}
-*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--paper);color:var(--ink);font-family:"Instrument Sans",ui-sans-serif,system-ui,sans-serif;line-height:1.6;font-size:16px}
-a{color:var(--accent)}a:hover{text-decoration-thickness:2px}
+:root{--paper:#EEF1EF;--surface:#fff;--surface-2:#F5F7F5;--line:#DCE2DE;--ink:#1E2622;--ink-2:#46514B;--ink-3:#717C76;--ink-4:#A2ACA6;--accent:#2F6B5D;--accent-soft:#E2EDE8;--gold:#9C7622}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"Instrument Sans",ui-sans-serif,system-ui,sans-serif;line-height:1.6;font-size:16px;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:22px 22px;opacity:.55}
+a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 .serif{font-family:"Newsreader",ui-serif,Georgia,serif}
-header.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:0 24px;height:56px;border-bottom:1px solid var(--line);background:rgba(238,241,239,.85);backdrop-filter:blur(8px)}
-header.top img{width:28px;height:28px;border-radius:8px}
-header.top .brand{font-family:"Newsreader",serif;font-size:19px;color:var(--ink);text-decoration:none}header.top .brand em{color:var(--accent)}
-header.top nav{margin-left:auto;display:flex;gap:4px;align-items:center}
-header.top nav a{text-decoration:none;color:var(--ink-2);padding:6px 12px;border-radius:10px;font-size:14px}header.top nav a:hover{color:var(--ink);background:var(--surface-2)}
-header.top nav a.cta{background:var(--accent);color:#fff;font-weight:500}header.top nav a.cta:hover{filter:brightness(1.1)}
-main{max-width:1100px;margin:0 auto;padding:40px 24px 80px}
-.eyebrow{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent)}
-h1{font-family:"Newsreader",serif;font-weight:400;font-size:clamp(34px,5vw,52px);line-height:1.08;margin:8px 0 12px;letter-spacing:-.01em}
-.lede{font-size:18px;color:var(--ink-2);max-width:760px}
-.meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px;color:var(--ink-3);margin:16px 0 28px}
-.tag{display:inline-block;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:2px 10px;font-size:12px;color:var(--ink-2)}
-.grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
-.card{display:block;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:22px;text-decoration:none;color:inherit;transition:border-color .2s,transform .2s}
-.card:hover{border-color:var(--accent);transform:translateY(-2px)}
-.card h2{font-family:"Newsreader",serif;font-weight:400;font-size:24px;line-height:1.15;margin:8px 0 8px}
-.card p{margin:0;color:var(--ink-2);font-size:14.5px}
-.card .row{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--ink-3)}
-.card .row img{width:22px;height:22px}
-.article{display:grid;grid-template-columns:minmax(0,1fr);gap:40px}
-@media(min-width:960px){.article{grid-template-columns:minmax(0,1fr) 260px}}
-.toc{position:sticky;top:76px;align-self:start;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 18px;font-size:13.5px}
-.toc .t{font-size:11px;letter-spacing:.25em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px}
-.toc ul{list-style:none;margin:0;padding:0}.toc li{margin:4px 0}.toc ul ul{padding-left:12px}.toc a{color:var(--ink-2);text-decoration:none}.toc a:hover{color:var(--accent)}
-.prose{max-width:760px;font-size:17px}
-.prose h2{font-family:"Newsreader",serif;font-weight:400;font-size:32px;line-height:1.15;margin:44px 0 12px}
-.prose h3{font-size:20px;font-weight:600;margin:30px 0 8px}
-.prose p{margin:0 0 16px}.prose ul,.prose ol{padding-left:22px;margin:0 0 16px}.prose li{margin:4px 0}
-.prose blockquote{margin:20px 0;padding:12px 18px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 12px 12px 0;color:var(--ink-2)}
-.prose code{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.88em;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1px 5px}
-.prose pre{background:#1E2622;color:#EEF1EF;border-radius:12px;padding:16px 18px;overflow:auto;font-size:14px}.prose pre code{background:none;border:0;padding:0;color:inherit}
-.prose table{border-collapse:collapse;width:100%;margin:0 0 20px;font-size:15px}.prose th,.prose td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}.prose th{background:var(--surface-2)}
-.prose img{max-width:100%;border-radius:12px}
-.faq details{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px 18px;margin:0 0 10px}
-.faq summary{cursor:pointer;font-weight:600;padding:12px 0;list-style:none;display:flex;justify-content:space-between;gap:12px}
-.faq summary::-webkit-details-marker{display:none}.faq summary::after{content:"+";color:var(--accent);font-weight:400;font-size:20px;line-height:1}
+header.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:0 28px;height:60px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.92);backdrop-filter:saturate(1.3) blur(10px)}
+header.top img{width:30px;height:30px;border-radius:9px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+header.top .brand{font-family:"Newsreader",serif;font-size:21px;color:var(--ink);text-decoration:none;letter-spacing:-.01em}header.top .brand em{color:var(--accent)}
+header.top nav{margin-left:auto;display:flex;gap:2px;align-items:center}
+header.top nav a{text-decoration:none;color:var(--ink-2);padding:7px 12px;border-radius:999px;font-size:14px;font-weight:500}header.top nav a:hover{color:var(--ink);background:var(--surface-2)}
+header.top nav a.on{color:var(--accent);background:var(--accent-soft)}
+header.top nav a.cta{background:var(--accent);color:#fff;margin-left:6px;padding:8px 16px}header.top nav a.cta:hover{filter:brightness(1.08);background:var(--accent)}
+@media(max-width:640px){header.top nav a.hide-sm{display:none}}
+main{max-width:1120px;margin:0 auto;padding:48px 28px 72px}
+.hero{max-width:820px;margin-bottom:36px}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.eyebrow::before{content:"";width:18px;height:1px;background:var(--accent)}
+h1{font-family:"Newsreader",serif;font-weight:400;font-size:clamp(36px,5vw,56px);line-height:1.04;margin:14px 0 16px;letter-spacing:-.015em}
+.lede{font-size:19px;line-height:1.55;color:var(--ink-2);max-width:720px;margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:13px;color:var(--ink-3);margin:22px 0 0}
+.meta .logo{width:22px;height:22px;border-radius:6px;vertical-align:middle;margin-right:4px}
+.tag{display:inline-block;white-space:nowrap;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;font-size:11.5px;color:var(--ink-2);text-decoration:none;letter-spacing:.01em}
+a.tag:hover{border-color:var(--accent);color:var(--accent)}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.filters{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 28px}
+.filters .tag.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.grid{display:grid;gap:20px;grid-template-columns:repeat(auto-fill,minmax(310px,1fr))}
+.card{position:relative;display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:24px;text-decoration:none;color:inherit;transition:border-color .2s,transform .2s,box-shadow .2s;overflow:hidden}
+.card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 14px 30px -18px rgba(30,38,34,.35)}
+.card .top{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;color:var(--ink-3)}
+.card .top img{width:26px;height:26px;border-radius:7px}
+.card .top .kind{display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.card h2{font-family:"Newsreader",serif;font-weight:400;font-size:23px;line-height:1.18;margin:4px 0 0;letter-spacing:-.01em}
+.card p{margin:0;color:var(--ink-2);font-size:14.5px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.card .foot{margin-top:auto;padding-top:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;color:var(--ink-3);border-top:1px solid var(--surface-2)}
+.card .foot .read{color:var(--accent);font-weight:600;white-space:nowrap}
+.card.feature{grid-column:1/-1;padding:32px;background:linear-gradient(135deg,var(--surface) 55%,var(--accent-soft))}
+.card.feature h2{font-size:34px;max-width:720px}.card.feature p{-webkit-line-clamp:2;max-width:720px;font-size:16px}
+.article{display:grid;grid-template-columns:minmax(0,1fr);gap:48px;margin-top:40px;padding-top:40px;border-top:1px solid var(--line)}
+@media(min-width:980px){.article{grid-template-columns:minmax(0,1fr) 280px}}
+.toc-box{position:sticky;top:84px;align-self:start;font-size:13.5px}
+.toc-box .t{font-size:11px;letter-spacing:.25em;text-transform:uppercase;color:var(--ink-3);margin-bottom:10px;font-weight:600}
+.toc-box .toc{border-left:2px solid var(--line);padding-left:14px}
+.toc-box ul{list-style:none;margin:0;padding:0}.toc-box li{margin:6px 0}.toc-box ul ul{padding-left:12px;font-size:12.5px}
+.toc-box a{color:var(--ink-2);text-decoration:none;display:block;line-height:1.35}.toc-box a:hover{color:var(--accent)}
+.toc-box .share{margin-top:22px;padding-top:16px;border-top:1px solid var(--line);color:var(--ink-3);font-size:12.5px}
+.toc-box .share a{display:inline-block;margin:6px 10px 0 0;color:var(--accent)}
+.prose{max-width:720px;font-size:17.5px;line-height:1.72}
+.prose>p:first-child{font-size:19px;color:var(--ink-2)}
+.prose h2{font-family:"Newsreader",serif;font-weight:400;font-size:31px;line-height:1.15;margin:52px 0 14px;letter-spacing:-.01em}
+.prose h2+h3{margin-top:18px}
+.prose h3{font-size:19px;font-weight:600;margin:34px 0 10px}
+.prose p{margin:0 0 18px}.prose ul,.prose ol{padding-left:22px;margin:0 0 18px}.prose li{margin:6px 0}.prose li::marker{color:var(--accent)}
+.prose strong{font-weight:600;color:var(--ink)}
+.prose blockquote{margin:24px 0;padding:16px 22px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 14px 14px 0;color:var(--ink-2);font-size:17px}
+.prose blockquote p{margin:0}
+.prose code{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.86em;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+.prose pre{background:#1E2622;color:#EEF1EF;border-radius:14px;padding:18px 20px;overflow:auto;font-size:13.5px;line-height:1.6;margin:0 0 22px}.prose pre code{background:none;border:0;padding:0;color:inherit}
+.prose table{border-collapse:separate;border-spacing:0;width:100%;margin:0 0 24px;font-size:14.5px;line-height:1.45;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.prose th,.prose td{padding:11px 14px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}.prose th{background:var(--surface-2);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.prose tr:last-child td{border-bottom:0}
+.prose img{max-width:100%;border-radius:14px}
+.prose hr{border:0;border-top:1px solid var(--line);margin:40px 0}
+.faq{max-width:820px}
+.faq details{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:6px 22px;margin:0 0 10px;transition:border-color .2s}
+.faq details[open]{border-color:var(--accent)}
+.faq summary{cursor:pointer;font-weight:600;font-size:16px;padding:14px 0;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:16px;line-height:1.35}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";flex:0 0 28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-weight:400;font-size:20px;line-height:1}
 .faq details[open] summary::after{content:"–"}
-.faq .a{padding:0 0 14px;color:var(--ink-2);max-width:760px}
-.cta-box{margin:56px 0 0;background:var(--accent);color:#fff;border-radius:20px;padding:32px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between}
-.cta-box h3{font-family:"Newsreader",serif;font-weight:400;font-size:28px;margin:0 0 4px}.cta-box p{margin:0;opacity:.9}
-.cta-box a{background:#fff;color:var(--accent);text-decoration:none;font-weight:600;border-radius:999px;padding:12px 22px}
-footer{border-top:1px solid var(--line);padding:28px 24px;font-size:13px;color:var(--ink-3);display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;max-width:1100px;margin:0 auto}
-footer a{color:var(--ink-2);text-decoration:none;margin-right:14px}
-.more{margin-top:56px}.more h2{font-family:"Newsreader",serif;font-weight:400;font-size:28px;margin:0 0 16px}
+.faq .a{padding:0 0 18px;color:var(--ink-2);line-height:1.65}.faq .a p{margin:0 0 10px}.faq .a p:last-child{margin:0}
+.faq-head{display:grid;gap:24px;grid-template-columns:1fr;align-items:end;margin-bottom:28px}
+@media(min-width:900px){.faq-head{grid-template-columns:1fr 320px}}
+.search{width:100%;height:46px;border:1px solid var(--line);border-radius:999px;background:var(--surface);padding:0 18px;font:inherit;font-size:15px;color:var(--ink);outline:none}
+.search:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.cta-box{margin:64px 0 0;background:var(--ink);color:#fff;border-radius:24px;padding:36px 40px;display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;position:relative;overflow:hidden}
+.cta-box::after{content:"";position:absolute;right:-80px;top:-80px;width:280px;height:280px;border-radius:999px;background:radial-gradient(closest-side,rgba(47,107,93,.7),transparent)}
+.cta-box h3{font-family:"Newsreader",serif;font-weight:400;font-size:30px;margin:0 0 6px;letter-spacing:-.01em}.cta-box p{margin:0;opacity:.8;max-width:520px}
+.cta-box a{position:relative;background:#fff;color:var(--ink);text-decoration:none;font-weight:600;border-radius:999px;padding:13px 24px;white-space:nowrap}
+.cta-box a:hover{background:var(--accent-soft)}
+footer{border-top:1px solid var(--line);background:var(--surface)}
+footer .in{max-width:1120px;margin:0 auto;padding:36px 28px;display:grid;gap:24px;grid-template-columns:1fr;font-size:13.5px;color:var(--ink-3)}
+@media(min-width:760px){footer .in{grid-template-columns:1.4fr 1fr 1fr}}
+footer .brand{font-family:"Newsreader",serif;font-size:20px;color:var(--ink)}footer .brand em{color:var(--accent)}
+footer p{margin:8px 0 0;max-width:380px;line-height:1.55}
+footer h4{margin:0 0 10px;font-size:11px;letter-spacing:.25em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+footer a{display:block;color:var(--ink-2);text-decoration:none;margin:0 0 8px}footer a:hover{color:var(--accent)}
+footer .legal{grid-column:1/-1;padding-top:18px;border-top:1px solid var(--line);font-size:12.5px}
+.more{margin-top:64px;padding-top:40px;border-top:1px solid var(--line)}.more h2{font-family:"Newsreader",serif;font-weight:400;font-size:30px;margin:0 0 18px;letter-spacing:-.01em}
+.crumbs{font-size:12.5px;color:var(--ink-3);margin-bottom:8px}.crumbs a{color:var(--ink-3);text-decoration:none}.crumbs a:hover{color:var(--accent)}
+.progress{position:fixed;left:0;top:0;height:3px;width:0;background:var(--accent);z-index:6;transition:width .1s linear}
 """
 
 _FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
@@ -208,7 +251,7 @@ def _org_ld() -> dict:
 
 
 def _page(*, title: str, description: str, path: str, body: str, ld: list[dict], og_type: str = "website", published: str | None = None, modified: str | None = None,
-          keywords: list[str] | None = None) -> str:
+          keywords: list[str] | None = None, current: str = "") -> str:
     canonical = f"{SITE_URL}{path}"
     esc = html.escape
     meta_extra = ""
@@ -252,12 +295,13 @@ def _page(*, title: str, description: str, path: str, body: str, ld: list[dict],
   <img src="/icon.svg" alt="" aria-hidden="true">
   <a class="brand" href="/">Tably <em>Team</em></a>
   <nav aria-label="Principal">
-    <a href="/blog">Blog</a>
-    <a href="/faq">Preguntas frecuentes</a>
-    <a href="/#login">Iniciar sesión</a>
+    <a href="/blog"{" class=on" if current == "blog" else ""}>Blog</a>
+    <a href="/faq"{" class=on" if current == "faq" else ""}>Preguntas frecuentes</a>
+    <a class="hide-sm" href="/#login">Iniciar sesión</a>
     <a class="cta" href="/#signup">Crear cuenta</a>
   </nav>
 </header>
+{'<div class="progress" id="progress"></div><script>addEventListener("scroll",()=>{const d=document.documentElement;const p=d.scrollTop/(d.scrollHeight-d.clientHeight||1);document.getElementById("progress").style.width=(p*100)+"%"},{passive:true})</script>' if og_type == "article" else ""}
 <main>
 {body}
 <section class="cta-box">
@@ -266,19 +310,23 @@ def _page(*, title: str, description: str, path: str, body: str, ld: list[dict],
 </section>
 </main>
 <footer>
-  <div>© {date.today().year} {SITE_NAME} · {SITE_TAGLINE}</div>
-  <div><a href="/">Inicio</a><a href="/blog">Blog</a><a href="/faq">Preguntas frecuentes</a><a href="/llms.txt">llms.txt</a><a href="/sitemap.xml">Sitemap</a></div>
+  <div class="in">
+    <div><div class="brand">Tably <em>Team</em></div><p>{SITE_TAGLINE}. Un equipo de IA con roles que debate tu idea, la diseña, la construye y la revisa. Vos aprobás cada paso.</p></div>
+    <div><h4>Producto</h4><a href="/">Inicio</a><a href="/#signup">Crear cuenta</a><a href="/#login">Iniciar sesión</a></div>
+    <div><h4>Recursos</h4><a href="/blog">Blog</a><a href="/faq">Preguntas frecuentes</a><a href="/blog/feed.xml">RSS</a><a href="/llms.txt">llms.txt</a><a href="/sitemap.xml">Sitemap</a></div>
+    <div class="legal">© {date.today().year} {SITE_NAME}. Las marcas de los proveedores de IA pertenecen a sus dueños.</div>
+  </div>
 </footer>
 </body>
 </html>"""
 
 
-def _card(p: Post) -> str:
+def _card(p: Post, feature: bool = False) -> str:
     esc = html.escape
-    logo = f'<img src="/logos/{esc(p.provider)}.png" alt="" aria-hidden="true">' if p.provider else ""
-    tags = " ".join(f'<span class="tag">{esc(t)}</span>' for t in p.tags[:3])
-    return (f'<a class="card" href="/blog/{esc(p.slug)}"><div class="row">{logo}<time datetime="{esc(p.date)}">{_fmt_date(p.date)}</time> · {p.reading_min} min de lectura</div>'
-            f'<h2>{esc(p.title)}</h2><p>{esc(p.description)}</p><div class="row" style="margin-top:12px">{tags}</div></a>')
+    logo = f'<img src="/logos/{esc(p.provider)}.png" alt="" aria-hidden="true">' if p.provider else f'<span class="kind">{esc(p.tags[0]) if p.tags else "Guía"}</span>'
+    return (f'<a class="card{" feature" if feature else ""}" href="/blog/{esc(p.slug)}"><div class="top">{logo}<time datetime="{esc(p.date)}">{_fmt_date(p.date)}</time></div>'
+            f'<h2>{esc(p.title)}</h2><p>{esc(p.description)}</p>'
+            f'<div class="foot"><span>{p.reading_min} min de lectura</span><span class="read">Leer →</span></div></a>')
 
 
 _MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
@@ -292,28 +340,43 @@ def _fmt_date(iso: str) -> str:
         return iso
 
 
-def blog_index_html() -> str:
-    ps = posts()
-    body = (f'<div class="eyebrow">Blog</div><h1>Guías sobre construir apps con un equipo de IA</h1>'
+def all_tags() -> list[tuple[str, int]]:
+    counts: dict[str, int] = {}
+    for p in posts():
+        for t in p.tags:
+            counts[t] = counts.get(t, 0) + 1
+    return sorted(((t, n) for t, n in counts.items() if n >= 2), key=lambda kv: (-kv[1], kv[0]))[:12]
+
+
+def blog_index_html(tag: str | None = None) -> str:
+    esc = html.escape
+    ps = [p for p in posts() if not tag or tag in p.tags]
+    chips = '<a class="tag%s" href="/blog">Todos</a>' % ("" if tag else " on") + "".join(f'<a class="tag{" on" if t == tag else ""}" href="/blog?tag={esc(t)}">{esc(t)} · {n}</a>' for t, n in all_tags())
+    cards = "".join(_card(p, feature=(i == 0 and not tag)) for i, p in enumerate(ps))
+    body = (f'<div class="hero"><div class="eyebrow">Blog</div><h1>Guías para construir apps con un equipo de IA</h1>'
             f'<p class="lede">Qué hace bien cada inteligencia artificial, cómo elegir una para cada rol, qué cuesta construir una app y cómo funciona Tably Team por dentro. '
-            f'Escrito por el equipo que lo construye.</p><div class="meta">{len(ps)} artículos</div><div class="grid">{"".join(_card(p) for p in ps)}</div>')
+            f'Escrito por el equipo que lo construye.</p></div><div class="filters">{chips}</div><div class="grid">{cards}</div>')
     ld = [_org_ld(), {"@type": "Blog", "@id": f"{SITE_URL}/blog#blog", "name": f"{SITE_NAME} · Blog", "url": f"{SITE_URL}/blog", "publisher": {"@id": f"{SITE_URL}/#organization"},
-                      "blogPost": [{"@type": "BlogPosting", "headline": p.title, "url": p.url(), "datePublished": p.date, "dateModified": p.updated} for p in ps]},
+                      "blogPost": [{"@type": "BlogPosting", "headline": p.title, "url": p.url(), "datePublished": p.date, "dateModified": p.updated} for p in posts()]},
           {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Inicio", "item": SITE_URL}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": f"{SITE_URL}/blog"}]}]
     return _page(title="Blog: guías sobre IA para construir apps", description="Guías detalladas sobre Claude, GPT, Gemini, DeepSeek, Grok, Llama, Kimi, Mistral y más: para qué sirve cada una, cómo elegirlas por rol y cómo Tably Team construye apps con ellas.",
-                 path="/blog", body=body, ld=ld)
+                 path="/blog", body=body, ld=ld, current="blog")
 
 
 def post_html(p: Post) -> str:
     esc = html.escape
     others = [o for o in posts() if o.slug != p.slug]
     related = [o for o in others if set(o.tags) & set(p.tags)][:3] or others[:3]
-    toc = f'<aside class="toc"><div class="t">En este artículo</div>{p.toc_html}</aside>' if p.toc_html.strip() else ""
-    logo = f'<img src="/logos/{esc(p.provider)}.png" alt="" width="20" height="20" style="vertical-align:middle">' if p.provider else ""
-    body = (f'<div class="eyebrow">Blog</div><h1>{esc(p.title)}</h1><p class="lede">{esc(p.description)}</p>'
-            f'<div class="meta">{logo}<time datetime="{esc(p.date)}">Publicado el {_fmt_date(p.date)}</time>'
-            + (f' · actualizado el {_fmt_date(p.updated)}' if p.updated != p.date else "")
-            + f' · {p.reading_min} min de lectura · por el equipo de {SITE_NAME}' + "".join(f' <span class="tag">{esc(t)}</span>' for t in p.tags) + '</div>'
+    share = (f'<div class="share">Compartir<br><a href="https://twitter.com/intent/tweet?url={esc(p.url())}&text={esc(p.title)}" rel="noopener" target="_blank">X</a>'
+             f'<a href="https://www.linkedin.com/sharing/share-offsite/?url={esc(p.url())}" rel="noopener" target="_blank">LinkedIn</a>'
+             f'<a href="https://wa.me/?text={esc(p.title)}%20{esc(p.url())}" rel="noopener" target="_blank">WhatsApp</a></div>')
+    toc = f'<aside class="toc-box"><div class="t">En este artículo</div>{p.toc_html}{share}</aside>' if p.toc_html.strip() else f'<aside class="toc-box">{share}</aside>'
+    logo = f'<img class="logo" src="/logos/{esc(p.provider)}.png" alt="">' if p.provider else ""
+    tags = "".join(f'<a class="tag" href="/blog?tag={esc(t)}">{esc(t)}</a>' for t in p.tags)
+    body = (f'<div class="hero"><div class="crumbs"><a href="/">Inicio</a> › <a href="/blog">Blog</a></div><div class="eyebrow">{esc(p.tags[0]) if p.tags else "Guía"}</div><h1>{esc(p.title)}</h1><p class="lede">{esc(p.description)}</p>'
+            f'<div class="meta">{logo}<time datetime="{esc(p.date)}">{_fmt_date(p.date)}</time>'
+            + (f'<span>actualizado el {_fmt_date(p.updated)}</span>' if p.updated != p.date else "")
+            + f'<span>{p.reading_min} min de lectura</span><span>por el equipo de {SITE_NAME}</span><span class="tags">{tags}</span></div></div>'
             f'<div class="article"><article class="prose">{p.body_html}</article>{toc}</div>'
             f'<section class="more"><h2>Seguir leyendo</h2><div class="grid">{"".join(_card(o) for o in related)}</div></section>')
     ld = [_org_ld(),
@@ -322,21 +385,23 @@ def post_html(p: Post) -> str:
            "author": {"@type": "Organization", "name": SITE_NAME, "url": SITE_URL}, "publisher": {"@id": f"{SITE_URL}/#organization"}, "image": f"{SITE_URL}/icon-512.png"},
           {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Inicio", "item": SITE_URL}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": f"{SITE_URL}/blog"},
                                                           {"@type": "ListItem", "position": 3, "name": p.title, "item": p.url()}]}]
-    return _page(title=p.title, description=p.description, path=f"/blog/{p.slug}", body=body, ld=ld, og_type="article", published=p.date, modified=p.updated, keywords=p.keywords or p.tags)
+    return _page(title=p.title, description=p.description, path=f"/blog/{p.slug}", body=body, ld=ld, og_type="article", published=p.date, modified=p.updated, keywords=p.keywords or p.tags, current="blog")
 
 
 def faq_html() -> str:
     esc = html.escape
     items = faq()
-    body = (f'<div class="eyebrow">Preguntas frecuentes</div><h1>Todo lo que te preguntás antes de construir con Tably Team</h1>'
-            f'<p class="lede">Qué es, cuánto cuesta, qué IA usar, dónde queda tu código, cómo se publica la app y qué pasa con tus claves. Respuestas directas, sin vueltas.</p>'
-            f'<div class="meta">{len(items)} preguntas</div><div class="faq">'
-            + "".join(f'<details id="{esc(i.slug)}"><summary>{esc(i.question)}</summary><div class="a">{i.answer_html}</div></details>' for i in items) + "</div>")
+    body = (f'<div class="faq-head"><div class="hero" style="margin:0"><div class="eyebrow">Preguntas frecuentes</div><h1>Lo que te preguntás antes de construir</h1>'
+            f'<p class="lede">Qué es, cuánto cuesta, qué IA usar, dónde queda tu código, cómo se publica la app y qué pasa con tus claves. Respuestas directas.</p></div>'
+            f'<div><input class="search" id="q" type="search" placeholder="Buscar entre {len(items)} preguntas…" autocomplete="off" aria-label="Buscar"></div></div><div class="faq" id="faq">'
+            + "".join(f'<details id="{esc(i.slug)}"><summary>{esc(i.question)}</summary><div class="a">{i.answer_html}</div></details>' for i in items) + "</div>"
+            '<script>const q=document.getElementById("q"),all=[...document.querySelectorAll("#faq details")];q.addEventListener("input",()=>{const v=q.value.trim().toLowerCase();all.forEach(d=>{const hit=!v||d.textContent.toLowerCase().includes(v);d.style.display=hit?"":"none";if(v&&hit)d.open=true})});'
+            'if(location.hash){const d=document.getElementById(location.hash.slice(1));if(d){d.open=true;d.scrollIntoView()}}</script>')
     ld = [_org_ld(), {"@type": "FAQPage", "@id": f"{SITE_URL}/faq#faq", "url": f"{SITE_URL}/faq", "inLanguage": "es",
                       "mainEntity": [{"@type": "Question", "name": i.question, "acceptedAnswer": {"@type": "Answer", "text": i.answer_text}} for i in items]},
           {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Inicio", "item": SITE_URL}, {"@type": "ListItem", "position": 2, "name": "Preguntas frecuentes", "item": f"{SITE_URL}/faq"}]}]
     return _page(title="Preguntas frecuentes", description="Respuestas directas sobre Tably Team: qué es, cuánto cuesta, qué IA conviene para cada rol, cómo se publica la app, dónde queda tu código y cómo se cuidan tus API keys.",
-                 path="/faq", body=body, ld=ld)
+                 path="/faq", body=body, ld=ld, current="faq")
 
 
 # ------------------------------------------------------------------ machine-readable files
