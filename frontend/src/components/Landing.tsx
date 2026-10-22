@@ -709,6 +709,101 @@ function SceneArena({ t }: { t: number }) {
   )
 }
 
+/** A believable phone: titanium frame, side keys, dynamic island, status bar, the weather app's home screen and the home indicator. */
+function PhoneMock() {
+  const T = useT()
+  const hours = [
+    { h: '12', t: 17, r: 20 }, { h: '13', t: 18, r: 30 }, { h: '14', t: 18, r: 45 }, { h: '15', t: 17, r: 70 }, { h: '16', t: 16, r: 65 }, { h: '17', t: 15, r: 40 }, { h: '18', t: 15, r: 25 },
+  ]
+  const days = [
+    { d: T('Mañana', 'Tomorrow'), lo: 11, hi: 19, r: 20 }, { d: T('Sáb', 'Sat'), lo: 12, hi: 22, r: 5 }, { d: T('Dom', 'Sun'), lo: 13, hi: 24, r: 0 },
+  ]
+  const Drop = ({ size = 10, on = true }: { size?: number; on?: boolean }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={on ? '#3D5CC4' : '#B8C7D6'}><path d="M12 2.5c3.5 5 7 8.6 7 12.6A7 7 0 0 1 5 15.1c0-4 3.5-7.6 7-12.6z" /></svg>
+  )
+  return (
+    <div className="relative" style={{ width: 206 }}>
+      {/* side keys */}
+      <span className="absolute -left-[3px] top-[74px] h-6 w-[3px] rounded-l bg-[#3a3f3c]" />
+      <span className="absolute -left-[3px] top-[108px] h-10 w-[3px] rounded-l bg-[#3a3f3c]" />
+      <span className="absolute -left-[3px] top-[154px] h-10 w-[3px] rounded-l bg-[#3a3f3c]" />
+      <span className="absolute -right-[3px] top-[118px] h-14 w-[3px] rounded-r bg-[#3a3f3c]" />
+      {/* frame */}
+      <div className="rounded-[34px] p-[3px] shadow-[0_30px_60px_-24px_rgba(30,38,34,.55),0_2px_6px_rgba(0,0,0,.25)]" style={{ background: 'linear-gradient(160deg,#5d6360 0%,#2b302d 35%,#1a1e1c 70%,#4a504d 100%)' }}>
+        <div className="rounded-[31px] bg-black p-[7px]">
+          <div className="relative overflow-hidden rounded-[24px] bg-[#F3F7FB] text-ink" style={{ height: 396 }}>
+            {/* status bar + dynamic island */}
+            <div className="relative flex items-center justify-between px-5 pt-2.5 text-[10.5px] font-semibold">
+              <span>9:41</span>
+              <span className="absolute left-1/2 top-2 h-[18px] w-[62px] -translate-x-1/2 rounded-full bg-black" />
+              <span className="flex items-center gap-1">
+                <svg width="13" height="9" viewBox="0 0 13 9" fill="#1E2622"><rect x="0" y="6" width="2" height="3" rx=".5" /><rect x="3.5" y="4" width="2" height="5" rx=".5" /><rect x="7" y="2" width="2" height="7" rx=".5" /><rect x="10.5" y="0" width="2" height="9" rx=".5" /></svg>
+                <svg width="12" height="9" viewBox="0 0 12 9" fill="#1E2622"><path d="M6 8.5 3.8 6.3a3.1 3.1 0 0 1 4.4 0zM1.5 4 .2 2.7a8.2 8.2 0 0 1 11.6 0L10.5 4a6.4 6.4 0 0 0-9 0z" /></svg>
+                <svg width="20" height="10" viewBox="0 0 20 10"><rect x=".5" y=".5" width="16" height="9" rx="2.5" fill="none" stroke="#1E2622" strokeOpacity=".5" /><rect x="2" y="2" width="12" height="6" rx="1.5" fill="#1E2622" /><rect x="17.5" y="3" width="1.5" height="4" rx=".75" fill="#1E2622" fillOpacity=".5" /></svg>
+              </span>
+            </div>
+            {/* header */}
+            <div className="mt-3 px-4">
+              <div className="flex items-center gap-1 text-[11px] text-ink-2"><svg width="10" height="12" viewBox="0 0 10 12" fill="#2F6B5D"><path d="M5 0a5 5 0 0 0-5 5c0 3.5 5 7 5 7s5-3.5 5-7a5 5 0 0 0-5-5zm0 7a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" /></svg> Buenos Aires</div>
+              <div className="mt-1 flex items-start justify-between">
+                <div>
+                  <div className="font-mono text-[44px] font-bold leading-none tracking-tight">17°</div>
+                  <div className="mt-1 text-[10.5px] text-ink-2">{T('Nublado · máx 19° · mín 11°', 'Cloudy · high 19° · low 11°')}</div>
+                </div>
+                <svg width="46" height="40" viewBox="0 0 46 40"><ellipse cx="27" cy="18" rx="16" ry="11" fill="#CBD6E0" /><ellipse cx="15" cy="21" rx="11" ry="9" fill="#DCE4EC" /><g fill="#3D5CC4"><path d="M14 30c1.5 2 1.5 3.5 0 5-1.5-1.5-1.5-3 0-5z" /><path d="M23 31c1.5 2 1.5 3.5 0 5-1.5-1.5-1.5-3 0-5z" /><path d="M32 30c1.5 2 1.5 3.5 0 5-1.5-1.5-1.5-3 0-5z" /></g></svg>
+              </div>
+            </div>
+            {/* the verdict */}
+            <div className="mx-3 mt-3 rounded-2xl bg-[#2F6B5D] px-3 py-2.5 text-white shadow-[0_8px_18px_-10px_rgba(47,107,93,.8)]">
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15 text-[15px]">☔</span>
+                <div className="min-w-0">
+                  <div className="text-[12.5px] font-semibold leading-tight">{T('Llevá paraguas', 'Take an umbrella')}</div>
+                  <div className="text-[9.5px] opacity-80">{T('70 % de lluvia entre 15 y 18 h', '70% chance of rain, 3 to 6 pm')}</div>
+                </div>
+              </div>
+            </div>
+            {/* hourly */}
+            <div className="mt-3 px-3 text-[9.5px] font-semibold uppercase tracking-wider text-ink-3">{T('Por horas', 'Hourly')}</div>
+            <div className="mt-1 flex gap-1 px-3">
+              {hours.map((x) => (
+                <div key={x.h} className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg py-1 ${x.r >= 60 ? 'bg-[#E4ECF7]' : 'bg-white'} ring-1 ring-black/[.04]`}>
+                  <span className="font-mono text-[8px] text-ink-3">{x.h}</span>
+                  <Drop size={9} on={x.r >= 40} />
+                  <span className="text-[9px] font-semibold">{x.t}°</span>
+                </div>
+              ))}
+            </div>
+            {/* days */}
+            <div className="mx-3 mt-2.5 divide-y divide-black/[.05] rounded-xl bg-white ring-1 ring-black/[.04]">
+              {days.map((d) => (
+                <div key={d.d} className="flex items-center gap-2 px-2.5 py-1.5 text-[10px]">
+                  <span className="w-12 font-medium">{d.d}</span>
+                  <span className="flex w-7 items-center gap-0.5 text-[8.5px] text-[#3D5CC4]"><Drop size={8} on={d.r > 0} />{d.r}%</span>
+                  <span className="text-ink-3">{d.lo}°</span>
+                  <span className="relative mx-1 h-1 flex-1 rounded-full bg-black/[.06]"><span className="absolute inset-y-0 rounded-full bg-gradient-to-r from-[#8FB7D3] to-[#E9B35C]" style={{ left: `${(d.lo - 8) * 5}%`, right: `${100 - (d.hi - 8) * 5}%` }} /></span>
+                  <span className="font-semibold">{d.hi}°</span>
+                </div>
+              ))}
+            </div>
+            {/* alert */}
+            <div className="mx-3 mt-2.5 flex items-center gap-1.5 rounded-lg border border-[#E9C97A] bg-[#FFF6DF] px-2 py-1 text-[9px] text-[#8A5A00]"><span>⚠</span>{T('Alerta amarilla por tormentas · SMN', 'Yellow storm alert · SMN')}</div>
+            {/* tab bar */}
+            <div className="absolute inset-x-0 bottom-0 border-t border-black/[.06] bg-white/90 px-4 pb-3 pt-1.5 backdrop-blur">
+              <div className="flex justify-between text-[8.5px]">
+                {[[T('Hoy', 'Today'), true], [T('Mapa', 'Map'), false], [T('Alertas', 'Alerts'), false]].map(([l, on]) => (
+                  <span key={String(l)} className={`flex flex-col items-center gap-0.5 ${on ? 'text-[#2F6B5D]' : 'text-ink-3'}`}><span className={`h-3.5 w-3.5 rounded-md ${on ? 'bg-[#2F6B5D]' : 'bg-ink-4/60'}`} />{l}</span>
+                ))}
+              </div>
+              <span className="mx-auto mt-2 block h-[4px] w-[64px] rounded-full bg-black/80" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* 6 · the team at work: research → reverse engineering → design (approved by you) → build → polish → council review; the product appears on the right */
 function SceneBuild({ t }: { t: number }) {
   const T = useT()
@@ -747,15 +842,8 @@ function SceneBuild({ t }: { t: number }) {
           </ol>
         </div>
         <div className="relative flex items-center justify-center">
-          <motion.div data-r animate={{ opacity: appOn ? 1 : 0.25, scale: appOn ? 1 : 0.96, filter: appOn ? 'blur(0px)' : 'blur(2px)' }} className="w-[190px] overflow-hidden rounded-[26px] border-[6px] border-ink/85 bg-[#EAF3FB] shadow-xl">
-            <div className="px-4 pt-4 text-[10px] text-ink-3">{T('Buenos Aires · hoy', 'Buenos Aires · today')}</div>
-            <div className="px-4 font-mono text-[40px] font-bold leading-none text-ink">17°</div>
-            <div className="mx-3 mt-2 rounded-xl bg-[#2F6B5D] px-3 py-2 text-[12px] font-semibold text-white">☔ {T('Llevá paraguas', 'Take an umbrella')} <span className="font-normal opacity-80">· 70 % 15–18 h</span></div>
-            <div className="mt-3 flex items-end gap-1 px-4">
-              {[20, 30, 45, 70, 65, 40, 25, 15].map((h, i) => <div key={i} className="flex-1 rounded-t" style={{ height: 8 + h * 0.5, background: h > 50 ? '#3D5CC4' : '#8FB7D3' }} />)}
-            </div>
-            <div className="flex justify-between px-4 pb-3 pt-1 font-mono text-[8px] text-ink-3"><span>12 h</span><span>15 h</span><span>18 h</span><span>21 h</span></div>
-            <div className="mx-3 mb-3 rounded-lg border border-[#E6A19A] bg-[#FDECEA] px-2 py-1 text-[9px] text-[#B0473B]">⚠ {T('Alerta amarilla · tormentas', 'Yellow alert · storms')}</div>
+          <motion.div data-r animate={{ opacity: appOn ? 1 : 0.3, scale: appOn ? 1 : 0.96, filter: appOn ? 'blur(0px)' : 'blur(2px)' }} className="relative">
+            <PhoneMock />
           </motion.div>
           <AnimatePresence>
             {finished && (
