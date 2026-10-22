@@ -65,6 +65,7 @@ contenido COMPLETO del archivo (nunca fragmentos, nunca "..." ni "resto igual")
 (repetí <file> por cada archivo; podés reescribir un archivo existente entregándolo entero)
 <stage n="N">qué quedó entregado en esta etapa y cómo verificarlo (comandos)</stage>   ← al cerrar una etapa
 <done>cómo instalar, configurar (.env) y correr el producto terminado</done>            ← SOLO cuando TODO el brief está construido
+<read path="ruta/relativa"/>  ← si necesitás ver el contenido actual de un archivo ya escrito antes de modificarlo: pedilo así (hasta 8 por turno) y lo recibís en el turno siguiente. Nunca pidas que una persona te pegue archivos.
 
 ESTÁNDAR DE CALIDAD (el equipo que diseñó el producto lo va a revisar con esta vara; construí para aprobarla a la primera):
 {quality_bar}
@@ -547,7 +548,10 @@ class Build:
                                 "La construcción se interrumpió. RETOMÁ desde donde quedó: revisá qué falta del plan del brief (y qué archivos del árbol están incompletos), "
                                 "entregá lo pendiente en turnos de máximo 3 archivos completos, cerrá las etapas restantes y emití <done> al terminar.")
             else:
-                pending_user = f"(Estado actual del proyecto: {len(self.files)} archivos ya escritos:\n{files})\n\nPedido del usuario: {resume_with}\nAplicá los cambios entregando los archivos completos afectados."
+                # the files the request names come with their current content, so the model edits instead of guessing
+                named = self._files_named_in(resume_with)
+                pending_user = f"(Estado actual del proyecto: {len(self.files)} archivos ya escritos:\n{files})\n\n{self._contents_block(named)}Pedido del usuario: {resume_with}\nAplicá los cambios entregando los archivos completos (los que modificás, enteros; los nuevos, enteros). Si necesitás ver otro archivo antes de tocarlo, pedilo con <read path=\"…\"/>."
+        idle = 0
         try:
             with obs.session_trace(self.req.session_id, self.user.email, f"build · {self.title}"[:200], ["tablyteam", "build", self.req.provider], {"model": self.req.model}, {"session": self.req.session_id}):
                 while self.turns < MAX_TURNS and not self._stop.is_set():
@@ -556,6 +560,8 @@ class Build:
                     if text is None:
                         break
                     parsed = self._apply(text)
+                    reads = [p for p in re.findall(r'<read path="([^"\n]+)"\s*/>', text)][:8]
+                    idle = idle + 1 if not parsed["files"] and not parsed["stage"] and not parsed["done"] and not reads else 0
                     # compact: keep decisions + file list, drop file bodies from the context
                     compact = parsed["say"] + "\n" + "\n".join(f'<file path="{p}"/> (escrito, {self.files[p].count(chr(10)) + 1} líneas)' for p in parsed["files"])
                     if parsed["stage"]:
@@ -580,7 +586,16 @@ class Build:
                     steer = await self._drain_inbox()
                     if self._stop.is_set():
                         break
-                    pending_user = steer or "Continuá con la siguiente etapa del plan. Si el producto ya está completo según el brief y corre, emití <done>."
+                    if reads:
+                        pending_user = (steer + "\n\n" if steer else "") + self._contents_block(reads) + "Seguí con los cambios: entregá los archivos completos."
+                        continue
+                    if idle >= 3:
+                        # three turns without files, stage, done or a read: the model is stuck asking for something the pipeline cannot give
+                        self.chat.append({"role": "system", "text": "El constructor se trabó: tres turnos seguidos sin entregar archivos. Se detiene para no gastar tokens. Podés pedirle lo mismo con más precisión, o pedirle que use <read path=\"…\"/> para leer lo que necesite.", "ts": time.time()})
+                        self.emit("notice", text="Constructor detenido: tres turnos seguidos sin entregar archivos.")
+                        self.status = "stopped"
+                        break
+                    pending_user = steer or "Continuá con la siguiente etapa del plan. Si el producto ya está completo según el brief y corre, emití <done>. Si te falta ver un archivo, pedilo con <read path=\"…\"/>."
         except Exception as e:  # pragma: no cover
             log.exception("build crashed")
             self.status = "error"
@@ -590,6 +605,34 @@ class Build:
                 self.status = "stopped" if self._stop.is_set() else "completed"
             self._save()
             self.emit("pass.completed", status=self.status, build=self.snapshot())
+
+    def _files_named_in(self, text: str) -> list[str]:
+        """Existing project files mentioned in a request (paths like src/x/y.ts or `y.ts` when unique), most relevant first."""
+        found: list[str] = []
+        for m in re.finditer(r"[\w./-]+\.(?:tsx?|jsx?|mjs|cjs|json|md|css|scss|html|py|toml|ya?ml|sql|txt|env|sh)", text or ""):
+            cand = m.group(0).lstrip("./")
+            if cand in self.files and cand not in found:
+                found.append(cand)
+            elif "/" not in cand:
+                hits = [p for p in self.files if p.endswith("/" + cand) or p == cand]
+                if len(hits) == 1 and hits[0] not in found:
+                    found.append(hits[0])
+        return found[:12]
+
+    def _contents_block(self, paths: list[str], budget: int = 90000) -> str:
+        """The current content of those files, as context for a turn that must edit them (bounded)."""
+        out, used = [], 0
+        for p in paths:
+            c = self.files.get(p)
+            if c is None:
+                out.append(f'<current path="{p}">(no existe)</current>')
+                continue
+            take = c[: max(0, budget - used)]
+            used += len(take)
+            out.append(f'<current path="{p}">\n{take}{"" if take == c else "\n… (recortado)"}\n</current>')
+            if used >= budget:
+                break
+        return ("CONTENIDO ACTUAL DE LOS ARCHIVOS A MODIFICAR (entregalos enteros con los cambios):\n" + "\n".join(out) + "\n\n") if out else ""
 
     def _push_history(self, user: str, assistant: str) -> None:
         """Providers reject empty/whitespace-only messages: never let one into the context."""

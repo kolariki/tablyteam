@@ -311,6 +311,13 @@ class AppRun:
             while time.time() - t0 < READY_TIMEOUT:
                 if server.done():
                     code = server.result()
+                    tail = "\n".join(self.logs[-80:])
+                    if "SQLITE_CORRUPT" in tail and (cwd / ".wrangler" / "state").exists():
+                        # wrangler's local KV/DO cache (shipped inside an uploaded zip) is corrupt: it is a throwaway cache
+                        shutil.rmtree(cwd / ".wrangler" / "state", ignore_errors=True)
+                        self._log("· el estado local de wrangler (.wrangler/state) estaba corrupto: se borró. Volvé a correr la app.")
+                        self._set("error", error="El worker de Cloudflare no arrancó por un caché local corrupto (.wrangler/state). Ya se limpió: tocá «Reintentar».")
+                        return
                     self._set("error", error=f"El servidor terminó antes de arrancar (código {code}). Revisá los logs." if code else "El servidor terminó sin levantar un puerto.")
                     return
                 # servers that picked their own port say so in the logs; a dev script may start several (vite + an

@@ -902,7 +902,7 @@ async def create_build(req: BuildRequest, user: User = CurrentUser):
 
 
 # ---------------------------------------------------------------------------- project audit (upload → team review → report → improvements)
-AUDIT_SKIP = {"node_modules", ".git", ".next", "dist", "build", ".venv", "__pycache__", ".turbo", ".cache", "coverage", "vendor", ".idea", ".vscode"}
+AUDIT_SKIP = {"node_modules", ".git", ".next", "dist", "dist-lhci", "dist-preview", "build", "out", ".venv", "venv", "__pycache__", ".pytest_cache", ".turbo", ".cache", ".wrangler", "coverage", "test-results", "playwright-report", ".lighthouseci", ".perf", "tmp", ".idea", ".vscode", "target", ".expo", "vendor"}
 AUDIT_MAX_FILES, AUDIT_MAX_TOTAL, AUDIT_MAX_FILE = 2500, 25_000_000, 400_000
 
 
