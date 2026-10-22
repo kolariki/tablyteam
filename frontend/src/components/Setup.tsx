@@ -213,6 +213,12 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   const [directBusy, setDirectBusy] = useState(false)
   // how the user wants to build: alone with the builder (direct) or with the whole team (council first)
   const [lane, setLaneState] = useState<'direct' | 'team' | null>(() => { try { const v = localStorage.getItem('tably.lane'); return v === 'direct' || v === 'team' ? v : null } catch { return null } })
+  const [laneAsk, setLaneAsk] = useState(false)  // «crear el primer proyecto»: direct or team, then the form scrolls into view
+  const pickLaneAndGo = (l: 'direct' | 'team') => {
+    setLaneAsk(false)
+    setLane(l)
+    setTimeout(() => document.querySelector('[data-lane]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
+  }
   const setLane = (l: 'direct' | 'team' | null) => { setLaneState(l); try { if (l) localStorage.setItem('tably.lane', l); else localStorage.removeItem('tably.lane') } catch { /* private mode */ } }
   const research = async (direct = false) => {
     if (!validate()) return
@@ -310,6 +316,27 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   return (
     <div className="h-full overflow-y-auto scroll-thin arena-bg">
       <AnimatePresence>{booting ? <HomeLoader key="loader" /> : opening ? <HomeLoader key="opening" caption={opening} /> : null}</AnimatePresence>
+      {laneAsk && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm" onClick={() => setLaneAsk(false)}>
+          <div className="w-full max-w-[720px] rounded-3xl border border-line bg-surface p-7 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="text-[11px] uppercase tracking-[0.3em] text-accent">{T('Primer proyecto', 'First project')}</div>
+            <h3 className="serif mt-1 text-[28px] leading-tight">{T('¿Cómo querés construirlo?', 'How do you want to build it?')}</h3>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <button type="button" onClick={() => pickLaneAndGo('direct')} className="group rounded-2xl border border-line p-5 text-left transition hover:border-accent hover:bg-accent-soft/50">
+                <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-ink-3"><Zap size={13} className="text-accent" /> {T('Un prompt → una app', 'One prompt → one app')}</div>
+                <div className="mt-2 text-[19px] leading-tight">{T('Constructor directo', 'Direct builder')}</div>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2">{T('Tu pedido pasa por prompt engineering y el constructor arranca ya. Lo más rápido y lo más barato.', 'Your request goes through prompt engineering and the builder starts right away. Fastest and cheapest.')}</p>
+              </button>
+              <button type="button" onClick={() => pickLaneAndGo('team')} className="group rounded-2xl border border-line p-5 text-left transition hover:border-accent hover:bg-accent-soft/50">
+                <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-ink-3"><Users size={13} className="text-accent" /> {T('Debate → brief → construcción', 'Debate → brief → build')}</div>
+                <div className="mt-2 text-[19px] leading-tight">{T('Constructor con equipo de desarrollo', 'Builder with a development team')}</div>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2">{T('CEO, CTO, Producto, Diseño y QA debaten tu idea, acuerdan el brief y recién entonces construyen.', 'CEO, CTO, Product, Design and QA debate your idea, agree on the brief and only then build.')}</p>
+              </button>
+            </div>
+            <div className="mt-4 text-right"><button type="button" onClick={() => setLaneAsk(false)} className="rounded-full px-3 py-1.5 text-[13px] text-ink-3 hover:text-ink">{T('Cancelar', 'Cancel')}</button></div>
+          </div>
+        </div>
+      )}
       {nameDialog}
       {deleteDialog}
       {chooser && (() => {
@@ -799,7 +826,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
         </div>
         )}
 
-        <Dashboard onOpen={(id, mode) => { if (mode !== 'run') setOpening(mode === 'arena' ? T('Convocando al equipo…', 'Gathering the team…') : T('Abriendo el constructor…', 'Opening the builder…')); return onOpen(id, mode) }} onCouncil={(id) => { setOpening(T('Abriendo el consejo…', 'Opening the council…')); useArena.getState().set({ pendingLive: id }) }} onReplay={onReplay} onSettings={onSettings} onAudit={onAudit} onLoaded={() => mark('dashboard')} />
+        <Dashboard onCreate={() => setLaneAsk(true)} onOpen={(id, mode) => { if (mode !== 'run') setOpening(mode === 'arena' ? T('Convocando al equipo…', 'Gathering the team…') : T('Abriendo el constructor…', 'Opening the builder…')); return onOpen(id, mode) }} onCouncil={(id) => { setOpening(T('Abriendo el consejo…', 'Opening the council…')); useArena.getState().set({ pendingLive: id }) }} onReplay={onReplay} onSettings={onSettings} onAudit={onAudit} onLoaded={() => mark('dashboard')} />
       </div>
     </div>
   )

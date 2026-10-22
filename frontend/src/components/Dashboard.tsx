@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ChevronDown, Download, Gavel, HardHat, Loader2, MonitorPlay, Pencil, Search, Trash2, Users, Video } from 'lucide-react'
+import { ChevronDown, Download, Gavel, HardHat, Loader2, MonitorPlay, Pencil, Plus, Search, Trash2, Users, Video } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, getToken, type DashboardData } from '../lib/api'
 import { fmtDur } from '../lib/duration'
@@ -19,6 +19,7 @@ interface Props {
   onAudit: () => void
   refreshKey?: number
   onLoaded?: () => void  // first data in: the home can drop its loader
+  onCreate?: () => void  // empty state: «crear el primer proyecto» (the home asks direct or team)
 }
 
 const STATUS: Record<string, { es: string; en: string; cls: string }> = {
@@ -64,7 +65,7 @@ function SceneThumb({ sessionId }: { sessionId: string }) {
   )
 }
 
-export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refreshKey, onLoaded }: Props) {
+export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refreshKey, onLoaded, onCreate }: Props) {
   const T = useT()
   const statusLabel = (code: string) => (STATUS[code] ? T(STATUS[code].es, STATUS[code].en) : code)
   const [data, setData] = useState<DashboardData | null>(() => readCache<DashboardData>('dashboard'))
@@ -136,7 +137,14 @@ export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refres
         </div>
         <button onClick={onAudit} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm hover:bg-surface-2"><Gavel size={14} />{T(' Auditar proyecto', ' Audit project')}</button>
       </div>
-      {rows.length === 0 && <div className="mt-3 rounded-2xl border border-dashed border-line p-8 text-center text-sm text-ink-3">{q ? tr('Nada coincide con la búsqueda.', 'Nothing matches the search.') : tr('Todavía no hay proyectos. Elegí un experimento arriba y lanzalo.', 'No projects yet. Pick an experiment above and launch it.')}</div>}
+      {rows.length === 0 && (
+        <div className="mt-3 flex flex-col items-center gap-4 rounded-2xl border border-dashed border-line p-10 text-center">
+          <div className="text-[15px] text-ink-2">{q ? tr('Nada coincide con la búsqueda.', 'Nothing matches the search.') : tr('Todavía no hay proyectos.', 'No projects yet.')}</div>
+          {!q && onCreate && (
+            <button type="button" onClick={onCreate} className="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-[14px] font-semibold text-white shadow-sm transition hover:brightness-110"><Plus size={15} /> {tr('Crear el primer proyecto', 'Create your first project')}</button>
+          )}
+        </div>
+      )}
       <div className="mt-3 grid gap-2">
         {rows.map((s, i) => {
           const st = { label: statusLabel(s.status), cls: STATUS[s.status]?.cls ?? 'bg-surface-2 text-ink-3' }
