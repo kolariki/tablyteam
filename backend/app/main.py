@@ -2133,44 +2133,60 @@ from fastapi.responses import HTMLResponse
 
 
 @app.get("/api/content/blog")
-def content_blog_list():
-    return [p.meta() for p in contentmod.posts()]
+def content_blog_list(lang: str = "es"):
+    return [p.meta() for p in contentmod.posts("en" if lang == "en" else "es")]
 
 
 @app.get("/api/content/blog/{slug}")
-def content_blog_post(slug: str):
-    p = contentmod.post(slug)
+def content_blog_post(slug: str, lang: str = "es"):
+    p = contentmod.post(slug, "en" if lang == "en" else "es")
     if not p:
         raise HTTPException(404, "No existe ese artículo")
     return {**p.meta(), "html": p.body_html, "toc": p.toc_html, "keywords": p.keywords}
 
 
 @app.get("/api/content/faq")
-def content_faq():
-    return [{"question": i.question, "html": i.answer_html, "text": i.answer_text, "slug": i.slug} for i in contentmod.faq()]
+def content_faq(lang: str = "es"):
+    return [{"question": i.question, "html": i.answer_html, "text": i.answer_text, "slug": i.slug} for i in contentmod.faq("en" if lang == "en" else "es")]
+
+
+def _lang_of(prefix: str) -> str:
+    return "en" if prefix == "en" else "es"
 
 
 @app.get("/blog", response_class=HTMLResponse, include_in_schema=False)
-def page_blog(tag: str | None = None):
-    return HTMLResponse(contentmod.blog_index_html(tag))
+@app.get("/{prefix}/blog", response_class=HTMLResponse, include_in_schema=False)
+def page_blog(tag: str | None = None, prefix: str = ""):
+    if prefix not in ("", "en"):
+        raise HTTPException(404)
+    return HTMLResponse(contentmod.blog_index_html(tag, _lang_of(prefix)))
 
 
 @app.get("/blog/feed.xml", include_in_schema=False)
-def page_blog_feed():
-    return Response(contentmod.rss_xml(), media_type="application/rss+xml")
+@app.get("/{prefix}/blog/feed.xml", include_in_schema=False)
+def page_blog_feed(prefix: str = ""):
+    if prefix not in ("", "en"):
+        raise HTTPException(404)
+    return Response(contentmod.rss_xml(_lang_of(prefix)), media_type="application/rss+xml")
 
 
 @app.get("/blog/{slug}", response_class=HTMLResponse, include_in_schema=False)
-def page_blog_post(slug: str):
-    p = contentmod.post(slug)
+@app.get("/{prefix}/blog/{slug}", response_class=HTMLResponse, include_in_schema=False)
+def page_blog_post(slug: str, prefix: str = ""):
+    if prefix not in ("", "en"):
+        raise HTTPException(404)
+    p = contentmod.post(slug, _lang_of(prefix))
     if not p:
         raise HTTPException(404, "No existe ese artículo")
     return HTMLResponse(contentmod.post_html(p))
 
 
 @app.get("/faq", response_class=HTMLResponse, include_in_schema=False)
-def page_faq():
-    return HTMLResponse(contentmod.faq_html())
+@app.get("/{prefix}/faq", response_class=HTMLResponse, include_in_schema=False)
+def page_faq(prefix: str = ""):
+    if prefix not in ("", "en"):
+        raise HTTPException(404)
+    return HTMLResponse(contentmod.faq_html(_lang_of(prefix)))
 
 
 @app.get("/sitemap.xml", include_in_schema=False)

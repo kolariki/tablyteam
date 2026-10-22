@@ -51,13 +51,17 @@ class Post:
     provider: str | None = None  # the AI the article is about (for the logo)
     category: str = "Guías"
     keywords: list[str] = field(default_factory=list)
+    lang: str = "es"
+
+    def path(self) -> str:
+        return f"{_prefix(self.lang)}/blog/{self.slug}"
 
     def url(self) -> str:
-        return f"{SITE_URL}/blog/{self.slug}"
+        return f"{SITE_URL}{self.path()}"
 
     def meta(self) -> dict:
         return {"slug": self.slug, "title": self.title, "description": self.description, "date": self.date, "updated": self.updated, "tags": self.tags,
-                "reading_min": self.reading_min, "provider": self.provider, "category": self.category, "url": f"/blog/{self.slug}"}
+                "reading_min": self.reading_min, "provider": self.provider, "category": self.category, "lang": self.lang, "url": self.path()}
 
 
 @dataclass
@@ -69,7 +73,16 @@ class Faq:
     slug: str
 
 
-_cache: dict = {"stamp": None, "posts": [], "faq": []}
+_caches: dict[str, dict] = {"es": {"stamp": None, "posts": [], "faq": []}, "en": {"stamp": None, "posts": [], "faq": []}}
+LANGS = ("es", "en")
+
+
+def _dir(lang: str) -> Path:
+    return CONTENT_DIR / "en" if lang == "en" else CONTENT_DIR
+
+
+def _prefix(lang: str) -> str:
+    return "/en" if lang == "en" else ""
 
 
 def _front_matter(text: str) -> tuple[dict, str]:
@@ -100,17 +113,19 @@ def _strip_html(s: str) -> str:
     return html.unescape(re.sub(r"<[^>]+>", "", s)).strip()
 
 
-def _stamp() -> tuple:
-    files = sorted(CONTENT_DIR.glob("blog/*.md")) + [CONTENT_DIR / "faq.md"]
+def _stamp(lang: str) -> tuple:
+    d = _dir(lang)
+    files = sorted(d.glob("blog/*.md")) + [d / "faq.md"]
     return tuple((str(f), f.stat().st_mtime) for f in files if f.exists())
 
 
-def _load() -> None:
-    st = _stamp()
+def _load(lang: str = "es") -> None:
+    _cache = _caches[lang]
+    st = _stamp(lang)
     if _cache["stamp"] == st:
         return
     posts: list[Post] = []
-    for f in sorted(CONTENT_DIR.glob("blog/*.md")):
+    for f in sorted(_dir(lang).glob("blog/*.md")):
         meta, body = _front_matter(f.read_text(encoding="utf-8"))
         if meta.get("draft") in ("true", "yes", "1"):
             continue
@@ -121,10 +136,10 @@ def _load() -> None:
         kws = meta.get("keywords") if isinstance(meta.get("keywords"), list) else [t.strip() for t in str(meta.get("keywords") or "").split(",") if t.strip()]
         posts.append(Post(slug=meta.get("slug") or f.stem, title=str(meta.get("title") or f.stem), description=str(meta.get("description") or ""), date=d,
                           updated=str(meta.get("updated") or d), tags=tags, body_md=body, body_html=body_html, toc_html=toc, reading_min=max(1, round(words / _WORDS_PER_MIN)),
-                          provider=meta.get("provider") or None, keywords=kws, category=str(meta.get("category") or "Guías")))
+                          provider=meta.get("provider") or None, keywords=kws, category=str(meta.get("category") or ("Guides" if lang == "en" else "Guías")), lang=lang))
     posts.sort(key=lambda p: (p.date, p.slug), reverse=True)
     faq: list[Faq] = []
-    fp = CONTENT_DIR / "faq.md"
+    fp = _dir(lang) / "faq.md"
     if fp.exists():
         _, text = _front_matter(fp.read_text(encoding="utf-8"))
         for block in re.split(r"^## +", text, flags=re.M)[1:]:
@@ -137,19 +152,19 @@ def _load() -> None:
     _cache.update(stamp=st, posts=posts, faq=faq)
 
 
-def posts() -> list[Post]:
-    _load()
-    return list(_cache["posts"])
+def posts(lang: str = "es") -> list[Post]:
+    _load(lang)
+    return list(_caches[lang]["posts"])
 
 
-def post(slug: str) -> Post | None:
-    _load()
-    return next((p for p in _cache["posts"] if p.slug == slug), None)
+def post(slug: str, lang: str = "es") -> Post | None:
+    _load(lang)
+    return next((p for p in _caches[lang]["posts"] if p.slug == slug), None)
 
 
-def faq() -> list[Faq]:
-    _load()
-    return list(_cache["faq"])
+def faq(lang: str = "es") -> list[Faq]:
+    _load(lang)
+    return list(_caches[lang]["faq"])
 
 
 # ------------------------------------------------------------------ server-rendered pages
@@ -271,14 +286,73 @@ _FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com"><link rel=
           '<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">')
 
 
+CATEGORY_ORDER = ["Inteligencias artificiales", "Prompt engineering y referencias", "Cómo funciona Tably", "Publicar y móvil", "Costos y seguridad"]
+CATEGORY_LEDE = {
+    "Inteligencias artificiales": "Una guía por modelo: qué lo distingue, dónde no usarlo, qué rol darle y cuánto cuesta. Y la comparativa por rol.",
+    "Prompt engineering y referencias": "Cómo escribir el pedido para que salga bien y cómo Tably estudia las apps que te gustan antes de construir.",
+    "Cómo funciona Tably": "El equipo, las dos vías de construcción y quién escribe el código.",
+    "Publicar y móvil": "Salir a internet con base de datos y usuarios, y construir para iOS y Android.",
+    "Costos y seguridad": "Qué se paga, a quién, cómo bajarlo, y qué pasa con tus claves, tu código y tus datos.",
+}
+CATEGORY_ORDER_EN = ["AI models", "Prompt engineering and references", "How Tably works", "Publishing and mobile", "Costs and security"]
+CATEGORY_LEDE_EN = {
+    "AI models": "One guide per model: what sets it apart, where not to use it, which role to give it and what it costs. Plus the role-by-role comparison.",
+    "Prompt engineering and references": "How to write the request so it comes out right, and how Tably studies the apps you like before building.",
+    "How Tably works": "The team, the two ways to build and who writes the code.",
+    "Publishing and mobile": "Going live with a database and users, and building for iOS and Android.",
+    "Costs and security": "What you pay, to whom, how to lower it, and what happens to your keys, your code and your data.",
+}
+UI = {
+    "es": {"blog": "Blog", "faq": "Preguntas frecuentes", "login": "Iniciar sesión", "signup": "Crear cuenta", "open": "Abrir la app", "home": "Inicio", "read": "Leer →",
+           "min": "min de lectura", "by": "por el equipo de", "updated": "actualizado el", "all_sections": "← Todas las secciones", "topic": "Tema", "in_article": "En este artículo",
+           "share": "Compartir", "more": "Seguir leyendo", "cta_title": "Probá Tably Team con tu idea", "cta_text": "Escribí lo que querés construir y mirá cómo el equipo lo debate, lo diseña y lo construye.",
+           "cta_btn": "Crear cuenta gratis", "product": "Producto", "resources": "Recursos", "legal": "Las marcas de los proveedores de IA pertenecen a sus dueños.",
+           "footer_text": "Un equipo de IA con roles que debate tu idea, la diseña, la construye y la revisa. Vos aprobás cada paso.", "tagline": SITE_TAGLINE,
+           "blog_title": "Blog: guías sobre IA para construir apps", "blog_desc": "Guías detalladas sobre Claude, GPT, Gemini, DeepSeek, Grok, Llama, Kimi, Mistral y más: para qué sirve cada una, cómo elegirlas por rol y cómo Tably Team construye apps con ellas.",
+           "blog_h1": "Guías para construir apps con un equipo de IA", "blog_lede": "Qué hace bien cada inteligencia artificial, cómo elegir una para cada rol, qué cuesta construir una app y cómo funciona Tably Team por dentro. Escrito por el equipo que lo construye.",
+           "faq_title": "Preguntas frecuentes", "faq_desc": "Respuestas directas sobre Tably Team: qué es, cuánto cuesta, qué IA conviene para cada rol, cómo se publica la app, dónde queda tu código y cómo se cuidan tus API keys.",
+           "faq_h1": "Lo que te preguntás antes de construir", "faq_lede": "Qué es, cuánto cuesta, qué IA usar, dónde queda tu código, cómo se publica la app y qué pasa con tus claves. Respuestas directas.",
+           "search": "Buscar entre {n} preguntas…", "q1": "pregunta", "qn": "preguntas", "guide": "Guía", "locale": "es_AR", "lang": "es", "other": "EN", "other_lang": "en", "other_title": "English"},
+    "en": {"blog": "Blog", "faq": "FAQ", "login": "Sign in", "signup": "Create account", "open": "Open the app", "home": "Home", "read": "Read →",
+           "min": "min read", "by": "by the team at", "updated": "updated", "all_sections": "← All sections", "topic": "Topic", "in_article": "In this article",
+           "share": "Share", "more": "Keep reading", "cta_title": "Try Tably Team with your idea", "cta_text": "Describe what you want to build and watch the team debate it, design it and build it.",
+           "cta_btn": "Create a free account", "product": "Product", "resources": "Resources", "legal": "AI provider trademarks belong to their owners.",
+           "footer_text": "An AI team with roles that debates your idea, designs it, builds it and reviews it. You approve every step.", "tagline": "Your AI team that designs and builds apps",
+           "blog_title": "Blog: guides on AI for building apps", "blog_desc": "In-depth guides on Claude, GPT, Gemini, DeepSeek, Grok, Llama, Kimi, Mistral and more: what each one is good for, how to pick one per role and how Tably Team builds apps with them.",
+           "blog_h1": "Guides to building apps with an AI team", "blog_lede": "What each AI does well, how to pick one for each role, what building an app costs and how Tably Team works inside. Written by the team that builds it.",
+           "faq_title": "Frequently asked questions", "faq_desc": "Straight answers about Tably Team: what it is, what it costs, which AI fits each role, how the app gets published, where your code lives and how your API keys are protected.",
+           "faq_h1": "What you ask before you build", "faq_lede": "What it is, what it costs, which AI to use, where your code lives, how the app gets published and what happens to your keys. Straight answers.",
+           "search": "Search {n} questions…", "q1": "question", "qn": "questions", "guide": "Guide", "locale": "en_US", "lang": "en", "other": "ES", "other_lang": "es", "other_title": "Español"},
+}
+_MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+_MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+
+
+def _fmt_date(iso: str, lang: str = "es") -> str:
+    try:
+        d = date.fromisoformat(iso)
+        return f"{_MONTHS_EN[d.month - 1]} {d.day}, {d.year}" if lang == "en" else f"{d.day} de {_MONTHS[d.month - 1]} de {d.year}"
+    except ValueError:
+        return iso
+
+
 def _org_ld() -> dict:
     return {"@type": "Organization", "@id": f"{SITE_URL}/#organization", "name": SITE_NAME, "url": SITE_URL, "logo": f"{SITE_URL}/icon-512.png",
             "description": SITE_DESCRIPTION, "sameAs": []}
 
 
-def _page(*, title: str, description: str, path: str, body: str, ld: list[dict], og_type: str = "website", published: str | None = None, modified: str | None = None,
-          keywords: list[str] | None = None, current: str = "") -> str:
+def _alt_path(path: str, lang: str) -> str:
+    """The same page in the other language: /blog/x ↔ /en/blog/x."""
+    bare = path[3:] if path.startswith("/en") else path
+    bare = bare or "/"
+    return (f"/en{bare}" if lang == "es" else bare)
+
+
+def _page(*, lang: str, title: str, description: str, path: str, body: str, ld: list[dict], og_type: str = "website", published: str | None = None, modified: str | None = None,
+          keywords: list[str] | None = None, current: str = "", has_alt: bool = True) -> str:
+    u = UI[lang]
     canonical = f"{SITE_URL}{path}"
+    alt = _alt_path(path, lang)
     esc = html.escape
     meta_extra = ""
     if published:
@@ -287,9 +361,17 @@ def _page(*, title: str, description: str, path: str, body: str, ld: list[dict],
         meta_extra += f'<meta property="article:modified_time" content="{esc(modified)}">'
     if keywords:
         meta_extra += f'<meta name="keywords" content="{esc(", ".join(keywords))}">'
+    if has_alt:
+        es_path, en_path = (path, alt) if lang == "es" else (alt, path)
+        meta_extra += (f'<link rel="alternate" hreflang="es" href="{SITE_URL}{esc(es_path)}"><link rel="alternate" hreflang="en" href="{SITE_URL}{esc(en_path)}">'
+                       f'<link rel="alternate" hreflang="x-default" href="{SITE_URL}{esc(es_path)}">')
     ld_json = json.dumps({"@context": "https://schema.org", "@graph": ld}, ensure_ascii=False)
+    app_home = "/" if lang == "es" else "/?lang=en"
+    progress = ('<div class="progress" id="progress"></div><script>addEventListener("scroll",()=>{const d=document.documentElement;const p=d.scrollTop/(d.scrollHeight-d.clientHeight||1);document.getElementById("progress").style.width=(p*100)+"%"},{passive:true})</script>'
+                if og_type == "article" else "")
+    switch = (f'<a class="lang" href="{esc(alt)}" hreflang="{u["other_lang"]}" title="{u["other_title"]}" onclick="try{{localStorage.setItem(\'arena.lang\',\'{u["other_lang"]}\')}}catch(e){{}}">{u["other"]}</a>' if has_alt else "")
     return f"""<!doctype html>
-<html lang="es">
+<html lang="{u["lang"]}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -303,7 +385,7 @@ def _page(*, title: str, description: str, path: str, body: str, ld: list[dict],
 <meta property="og:description" content="{esc(description)}">
 <meta property="og:url" content="{esc(canonical)}">
 <meta property="og:image" content="{SITE_URL}/icon-512.png">
-<meta property="og:locale" content="es_AR">
+<meta property="og:locale" content="{u["locale"]}">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="{esc(title)}">
 <meta name="twitter:description" content="{esc(description)}">
@@ -311,7 +393,7 @@ def _page(*, title: str, description: str, path: str, body: str, ld: list[dict],
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#2F6B5D">
-<link rel="alternate" type="application/rss+xml" title="{SITE_NAME} · Blog" href="{SITE_URL}/blog/feed.xml">
+<link rel="alternate" type="application/rss+xml" title="{SITE_NAME} · Blog" href="{SITE_URL}{_prefix(lang)}/blog/feed.xml">
 {_FONTS}
 <style>{_CSS}</style>
 <script type="application/ld+json">{ld_json}</script>
@@ -319,29 +401,30 @@ def _page(*, title: str, description: str, path: str, body: str, ld: list[dict],
 <body>
 <header class="top">
   <img src="/icon.svg" alt="" aria-hidden="true">
-  <a class="brand" href="/">Tably <em>Team</em></a>
-  <nav aria-label="Principal">
-    <a href="/blog"{" class=on" if current == "blog" else ""}>Blog</a>
-    <a href="/faq"{" class=on" if current == "faq" else ""}>Preguntas frecuentes</a>
-    <a class="hide-sm" id="nav-login" href="/#login">Iniciar sesión</a>
-    <a class="cta" id="nav-signup" href="/#signup">Crear cuenta</a>
+  <a class="brand" href="{app_home}">Tably <em>Team</em></a>
+  <nav aria-label="Main">
+    {switch}
+    <a href="{_prefix(lang)}/blog"{" class=on" if current == "blog" else ""}>{u["blog"]}</a>
+    <a href="{_prefix(lang)}/faq"{" class=on" if current == "faq" else ""}>{u["faq"]}</a>
+    <a class="hide-sm" id="nav-login" href="{app_home}#login">{u["login"]}</a>
+    <a class="cta" id="nav-signup" href="{app_home}#signup">{u["signup"]}</a>
   </nav>
 </header>
-<script>try{{if(localStorage.getItem("arena.token")){{const l=document.getElementById("nav-login"),c=document.getElementById("nav-signup");l.remove();c.textContent="Abrir la app";c.href="/";document.querySelectorAll(".cta-box a").forEach(a=>{{a.textContent="Abrir la app";a.href="/"}})}}}}catch(e){{}}</script>
-{'<div class="progress" id="progress"></div><script>addEventListener("scroll",()=>{const d=document.documentElement;const p=d.scrollTop/(d.scrollHeight-d.clientHeight||1);document.getElementById("progress").style.width=(p*100)+"%"},{passive:true})</script>' if og_type == "article" else ""}
+<script>try{{localStorage.setItem("arena.lang","{u["lang"]}");if(localStorage.getItem("arena.token")){{const l=document.getElementById("nav-login"),c=document.getElementById("nav-signup");l.remove();c.textContent="{u["open"]}";c.href="{app_home}";document.querySelectorAll(".cta-box a").forEach(a=>{{a.textContent="{u["open"]}";a.href="{app_home}"}})}}}}catch(e){{}}</script>
+{progress}
 <main>
 {body}
 <section class="cta-box">
-  <div><h3>Probá Tably Team con tu idea</h3><p>Escribí lo que querés construir y mirá cómo el equipo lo debate, lo diseña y lo construye.</p></div>
-  <a href="/#signup">Crear cuenta gratis</a>
+  <div><h3>{u["cta_title"]}</h3><p>{u["cta_text"]}</p></div>
+  <a href="{app_home}#signup">{u["cta_btn"]}</a>
 </section>
 </main>
 <footer>
   <div class="in">
-    <div><div class="brand">Tably <em>Team</em></div><p>{SITE_TAGLINE}. Un equipo de IA con roles que debate tu idea, la diseña, la construye y la revisa. Vos aprobás cada paso.</p></div>
-    <div><h4>Producto</h4><a href="/">Inicio</a><a href="/#signup">Crear cuenta</a><a href="/#login">Iniciar sesión</a></div>
-    <div><h4>Recursos</h4><a href="/blog">Blog</a><a href="/faq">Preguntas frecuentes</a><a href="/blog/feed.xml">RSS</a><a href="/llms.txt">llms.txt</a><a href="/sitemap.xml">Sitemap</a></div>
-    <div class="legal">© {date.today().year} {SITE_NAME}. Las marcas de los proveedores de IA pertenecen a sus dueños.</div>
+    <div><div class="brand">Tably <em>Team</em></div><p>{u["tagline"]}. {u["footer_text"]}</p></div>
+    <div><h4>{u["product"]}</h4><a href="{app_home}">{u["home"]}</a><a href="{app_home}#signup">{u["signup"]}</a><a href="{app_home}#login">{u["login"]}</a></div>
+    <div><h4>{u["resources"]}</h4><a href="{_prefix(lang)}/blog">{u["blog"]}</a><a href="{_prefix(lang)}/faq">{u["faq"]}</a><a href="{_prefix(lang)}/blog/feed.xml">RSS</a><a href="/llms.txt">llms.txt</a><a href="/sitemap.xml">Sitemap</a></div>
+    <div class="legal">© {date.today().year} {SITE_NAME}. {u["legal"]}</div>
   </div>
 </footer>
 </body>
@@ -350,34 +433,14 @@ def _page(*, title: str, description: str, path: str, body: str, ld: list[dict],
 
 def _card(p: Post, feature: bool = False) -> str:
     esc = html.escape
+    u = UI[p.lang]
     logo_src, color = _brand(p.provider)
     logo = f'<img src="{esc(logo_src)}" alt="" aria-hidden="true">' if p.provider else f'<span class="kind">{esc(p.category)}</span>'
     wm = f'<img class="wm" src="{esc(logo_src)}" alt="" aria-hidden="true">' if p.provider else ""
     cls = "card" + (" feature" if feature else "") + (" brand" if p.provider else "")
-    return (f'<a class="{cls}" style="--brand:{esc(color)}" href="/blog/{esc(p.slug)}">{wm}<div class="top">{logo}<time datetime="{esc(p.date)}">{_fmt_date(p.date)}</time></div>'
+    return (f'<a class="{cls}" style="--brand:{esc(color)}" href="{esc(p.path())}">{wm}<div class="top">{logo}<time datetime="{esc(p.date)}">{_fmt_date(p.date, p.lang)}</time></div>'
             f'<h2>{esc(p.title)}</h2><p>{esc(p.description)}</p>'
-            f'<div class="foot"><span>{p.reading_min} min de lectura</span><span class="read">Leer →</span></div></a>')
-
-
-_MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
-
-
-def _fmt_date(iso: str) -> str:
-    try:
-        d = date.fromisoformat(iso)
-        return f"{d.day} de {_MONTHS[d.month - 1]} de {d.year}"
-    except ValueError:
-        return iso
-
-
-CATEGORY_ORDER = ["Inteligencias artificiales", "Prompt engineering y referencias", "Cómo funciona Tably", "Publicar y móvil", "Costos y seguridad"]
-CATEGORY_LEDE = {
-    "Inteligencias artificiales": "Una guía por modelo: qué lo distingue, dónde no usarlo, qué rol darle y cuánto cuesta. Y la comparativa por rol.",
-    "Prompt engineering y referencias": "Cómo escribir el pedido para que salga bien y cómo Tably estudia las apps que te gustan antes de construir.",
-    "Cómo funciona Tably": "El equipo, las dos vías de construcción y quién escribe el código.",
-    "Publicar y móvil": "Salir a internet con base de datos y usuarios, y construir para iOS y Android.",
-    "Costos y seguridad": "Qué se paga, a quién, cómo bajarlo, y qué pasa con tus claves, tu código y tus datos.",
-}
+            f'<div class="foot"><span>{p.reading_min} {u["min"]}</span><span class="read">{u["read"]}</span></div></a>')
 
 
 def cat_slug(c: str) -> str:
@@ -386,90 +449,105 @@ def cat_slug(c: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", base.lower()).strip("-")
 
 
-def categories() -> list[tuple[str, list[Post]]]:
-    ps = posts()
-    order = CATEGORY_ORDER + sorted({p.category for p in ps} - set(CATEGORY_ORDER))
+def categories(lang: str = "es") -> list[tuple[str, list[Post]]]:
+    ps = posts(lang)
+    known = CATEGORY_ORDER_EN if lang == "en" else CATEGORY_ORDER
+    order = known + sorted({p.category for p in ps} - set(known))
     return [(c, [p for p in ps if p.category == c]) for c in order if any(p.category == c for p in ps)]
 
 
-def all_tags() -> list[tuple[str, int]]:
+def all_tags(lang: str = "es") -> list[tuple[str, int]]:
     counts: dict[str, int] = {}
-    for p in posts():
+    for p in posts(lang):
         for t in p.tags:
             counts[t] = counts.get(t, 0) + 1
     return sorted(((t, n) for t, n in counts.items() if n >= 2), key=lambda kv: (-kv[1], kv[0]))[:12]
 
 
-def blog_index_html(tag: str | None = None) -> str:
+def _crumbs(lang: str, *items: tuple[str, str]) -> list[dict]:
+    return [{"@type": "ListItem", "position": i + 1, "name": n, "item": u} for i, (n, u) in enumerate(items)]
+
+
+def blog_index_html(tag: str | None = None, lang: str = "es") -> str:
     esc = html.escape
+    u = UI[lang]
+    pre = _prefix(lang)
+    ledes = CATEGORY_LEDE_EN if lang == "en" else CATEGORY_LEDE
     if tag:
-        ps = [p for p in posts() if tag in p.tags]
-        chips = '<a class="tag" href="/blog">← Todas las secciones</a>' + "".join(f'<a class="tag{" on" if t == tag else ""}" href="/blog?tag={esc(t)}">{esc(t)} · {n}</a>' for t, n in all_tags())
-        sections = f'<section class="cat"><h2>Tema: {esc(tag)}</h2><div class="grid">{"".join(_card(p) for p in ps)}</div></section>'
+        ps = [p for p in posts(lang) if tag in p.tags]
+        chips = f'<a class="tag" href="{pre}/blog">{u["all_sections"]}</a>' + "".join(f'<a class="tag{" on" if t == tag else ""}" href="{pre}/blog?tag={esc(t)}">{esc(t)} · {n}</a>' for t, n in all_tags(lang))
+        sections = f'<section class="cat"><h2>{u["topic"]}: {esc(tag)}</h2><div class="grid">{"".join(_card(p) for p in ps)}</div></section>'
     else:
-        cats = categories()
+        cats = categories(lang)
         chips = "".join(f'<a class="tag" href="#{cat_slug(c)}">{esc(c)} · {len(ps)}</a>' for c, ps in cats)
-        sections = "".join(f'<section class="cat" id="{cat_slug(c)}"><div class="cat-head"><h2>{esc(c)}</h2><p>{esc(CATEGORY_LEDE.get(c, ""))}</p></div><div class="grid">{"".join(_card(p) for p in ps)}</div></section>' for c, ps in cats)
-    body = (f'<div class="hero"><div class="eyebrow">Blog</div><h1>Guías para construir apps con un equipo de IA</h1>'
-            f'<p class="lede">Qué hace bien cada inteligencia artificial, cómo elegir una para cada rol, qué cuesta construir una app y cómo funciona Tably Team por dentro. '
-            f'Escrito por el equipo que lo construye.</p></div><div class="filters">{chips}</div>{sections}')
-    ld = [_org_ld(), {"@type": "Blog", "@id": f"{SITE_URL}/blog#blog", "name": f"{SITE_NAME} · Blog", "url": f"{SITE_URL}/blog", "publisher": {"@id": f"{SITE_URL}/#organization"},
-                      "blogPost": [{"@type": "BlogPosting", "headline": p.title, "url": p.url(), "datePublished": p.date, "dateModified": p.updated} for p in posts()]},
-          {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Inicio", "item": SITE_URL}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": f"{SITE_URL}/blog"}]}]
-    return _page(title="Blog: guías sobre IA para construir apps", description="Guías detalladas sobre Claude, GPT, Gemini, DeepSeek, Grok, Llama, Kimi, Mistral y más: para qué sirve cada una, cómo elegirlas por rol y cómo Tably Team construye apps con ellas.",
-                 path="/blog", body=body, ld=ld, current="blog")
+        sections = "".join(f'<section class="cat" id="{cat_slug(c)}"><div class="cat-head"><h2>{esc(c)}</h2><p>{esc(ledes.get(c, ""))}</p></div><div class="grid">{"".join(_card(p) for p in ps)}</div></section>' for c, ps in cats)
+    body = (f'<div class="hero"><div class="eyebrow">{u["blog"]}</div><h1>{u["blog_h1"]}</h1><p class="lede">{u["blog_lede"]}</p></div><div class="filters">{chips}</div>{sections}')
+    ld = [_org_ld(), {"@type": "Blog", "@id": f"{SITE_URL}{pre}/blog#blog", "name": f"{SITE_NAME} · Blog", "url": f"{SITE_URL}{pre}/blog", "inLanguage": lang, "publisher": {"@id": f"{SITE_URL}/#organization"},
+                      "blogPost": [{"@type": "BlogPosting", "headline": p.title, "url": p.url(), "datePublished": p.date, "dateModified": p.updated} for p in posts(lang)]},
+          {"@type": "BreadcrumbList", "itemListElement": _crumbs(lang, (u["home"], SITE_URL), (u["blog"], f"{SITE_URL}{pre}/blog"))}]
+    return _page(lang=lang, title=u["blog_title"], description=u["blog_desc"], path=f"{pre}/blog", body=body, ld=ld, current="blog")
 
 
 def post_html(p: Post) -> str:
     esc = html.escape
-    others = [o for o in posts() if o.slug != p.slug]
+    lang = p.lang
+    u = UI[lang]
+    pre = _prefix(lang)
+    others = [o for o in posts(lang) if o.slug != p.slug]
     related = ([o for o in others if o.category == p.category] + [o for o in others if o.category != p.category and set(o.tags) & set(p.tags)])[:3] or others[:3]
-    share = (f'<div class="share">Compartir<br><a href="https://twitter.com/intent/tweet?url={esc(p.url())}&text={esc(p.title)}" rel="noopener" target="_blank">X</a>'
+    share = (f'<div class="share">{u["share"]}<br><a href="https://twitter.com/intent/tweet?url={esc(p.url())}&text={esc(p.title)}" rel="noopener" target="_blank">X</a>'
              f'<a href="https://www.linkedin.com/sharing/share-offsite/?url={esc(p.url())}" rel="noopener" target="_blank">LinkedIn</a>'
              f'<a href="https://wa.me/?text={esc(p.title)}%20{esc(p.url())}" rel="noopener" target="_blank">WhatsApp</a></div>')
-    toc = f'<aside class="toc-box"><div class="t">En este artículo</div>{p.toc_html}{share}</aside>' if p.toc_html.strip() else f'<aside class="toc-box">{share}</aside>'
+    toc = f'<aside class="toc-box"><div class="t">{u["in_article"]}</div>{p.toc_html}{share}</aside>' if p.toc_html.strip() else f'<aside class="toc-box">{share}</aside>'
     logo_src, color = _brand(p.provider)
     logo = f'<img class="logo" src="{esc(logo_src)}" alt="">' if p.provider else ""
     wm = f'<img class="wm" src="{esc(logo_src)}" alt="" aria-hidden="true">' if p.provider else ""
-    tags = "".join(f'<a class="tag" href="/blog?tag={esc(t)}">{esc(t)}</a>' for t in p.tags)
-    body = (f'<div class="hero{" brand" if p.provider else ""}" style="--brand:{esc(color)}">{wm}<div class="crumbs"><a href="/">Inicio</a> › <a href="/blog">Blog</a> › <a href="/blog#{cat_slug(p.category)}">{esc(p.category)}</a></div><div class="eyebrow">{esc(p.category)}</div><h1>{esc(p.title)}</h1><p class="lede">{esc(p.description)}</p>'
-            f'<div class="meta">{logo}<time datetime="{esc(p.date)}">{_fmt_date(p.date)}</time>'
-            + (f'<span>actualizado el {_fmt_date(p.updated)}</span>' if p.updated != p.date else "")
-            + f'<span>{p.reading_min} min de lectura</span><span>por el equipo de {SITE_NAME}</span><span class="tags">{tags}</span></div></div>'
+    tags = "".join(f'<a class="tag" href="{pre}/blog?tag={esc(t)}">{esc(t)}</a>' for t in p.tags)
+    body = (f'<div class="hero{" brand" if p.provider else ""}" style="--brand:{esc(color)}">{wm}<div class="crumbs"><a href="{"/" if lang == "es" else "/?lang=en"}">{u["home"]}</a> › <a href="{pre}/blog">{u["blog"]}</a> › <a href="{pre}/blog#{cat_slug(p.category)}">{esc(p.category)}</a></div>'
+            f'<div class="eyebrow">{esc(p.category)}</div><h1>{esc(p.title)}</h1><p class="lede">{esc(p.description)}</p>'
+            f'<div class="meta">{logo}<time datetime="{esc(p.date)}">{_fmt_date(p.date, lang)}</time>'
+            + (f'<span>{u["updated"]} {_fmt_date(p.updated, lang)}</span>' if p.updated != p.date else "")
+            + f'<span>{p.reading_min} {u["min"]}</span><span>{u["by"]} {SITE_NAME}</span><span class="tags">{tags}</span></div></div>'
             f'<div class="article"><article class="prose">{p.body_html}</article>{toc}</div>'
-            f'<section class="more"><h2>Seguir leyendo</h2><div class="grid">{"".join(_card(o) for o in related)}</div></section>')
+            f'<section class="more"><h2>{u["more"]}</h2><div class="grid">{"".join(_card(o) for o in related)}</div></section>')
     ld = [_org_ld(),
-          {"@type": "Article", "@id": f"{p.url()}#article", "headline": p.title, "description": p.description, "url": p.url(), "mainEntityOfPage": p.url(), "inLanguage": "es",
+          {"@type": "Article", "@id": f"{p.url()}#article", "headline": p.title, "description": p.description, "url": p.url(), "mainEntityOfPage": p.url(), "inLanguage": lang,
            "datePublished": p.date, "dateModified": p.updated, "keywords": ", ".join(p.keywords or p.tags), "wordCount": len(re.findall(r"\w+", p.body_md)),
            "author": {"@type": "Organization", "name": SITE_NAME, "url": SITE_URL}, "publisher": {"@id": f"{SITE_URL}/#organization"}, "image": f"{SITE_URL}/icon-512.png"},
-          {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Inicio", "item": SITE_URL}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": f"{SITE_URL}/blog"},
-                                                          {"@type": "ListItem", "position": 3, "name": p.title, "item": p.url()}]}]
-    return _page(title=p.title, description=p.description, path=f"/blog/{p.slug}", body=body, ld=ld, og_type="article", published=p.date, modified=p.updated, keywords=p.keywords or p.tags, current="blog")
+          {"@type": "BreadcrumbList", "itemListElement": _crumbs(lang, (u["home"], SITE_URL), (u["blog"], f"{SITE_URL}{pre}/blog"), (p.title, p.url()))}]
+    has_alt = post(p.slug, "en" if lang == "es" else "es") is not None
+    return _page(lang=lang, title=p.title, description=p.description, path=p.path(), body=body, ld=ld, og_type="article", published=p.date, modified=p.updated, keywords=p.keywords or p.tags, current="blog", has_alt=has_alt)
 
 
-def faq_html() -> str:
+def faq_html(lang: str = "es") -> str:
     esc = html.escape
-    items = faq()
-    body = (f'<div class="hero"><div class="eyebrow">Preguntas frecuentes</div><h1>Lo que te preguntás antes de construir</h1>'
-            f'<p class="lede">Qué es, cuánto cuesta, qué IA usar, dónde queda tu código, cómo se publica la app y qué pasa con tus claves. Respuestas directas.</p></div>'
-            f'<div class="search-row"><input class="search" id="q" type="search" placeholder="Buscar entre {len(items)} preguntas…" autocomplete="off" aria-label="Buscar"><span class="count" id="count">{len(items)} preguntas</span></div><div class="faq" id="faq">'
+    u = UI[lang]
+    pre = _prefix(lang)
+    items = faq(lang)
+    body = (f'<div class="hero"><div class="eyebrow">{u["faq"]}</div><h1>{u["faq_h1"]}</h1><p class="lede">{u["faq_lede"]}</p></div>'
+            f'<div class="search-row"><input class="search" id="q" type="search" placeholder="{esc(u["search"].format(n=len(items)))}" autocomplete="off" aria-label="Search"><span class="count" id="count">{len(items)} {u["qn"]}</span></div><div class="faq" id="faq">'
             + "".join(f'<details id="{esc(i.slug)}"><summary>{esc(i.question)}</summary><div class="a">{i.answer_html}</div></details>' for i in items) + "</div>"
-            '<script>const q=document.getElementById("q"),all=[...document.querySelectorAll("#faq details")];q.addEventListener("input",()=>{const v=q.value.trim().toLowerCase();let n=0;all.forEach(d=>{const hit=!v||d.textContent.toLowerCase().includes(v);d.style.display=hit?"":"none";if(hit)n++;if(v&&hit)d.open=true});document.getElementById("count").textContent=n+(n===1?" pregunta":" preguntas")});'
+            f'<script>const q=document.getElementById("q"),all=[...document.querySelectorAll("#faq details")];q.addEventListener("input",()=>{{const v=q.value.trim().toLowerCase();let n=0;all.forEach(d=>{{const hit=!v||d.textContent.toLowerCase().includes(v);d.style.display=hit?"":"none";if(hit)n++;if(v&&hit)d.open=true}});document.getElementById("count").textContent=n+(n===1?" {u["q1"]}":" {u["qn"]}")}});'
             'if(location.hash){const d=document.getElementById(location.hash.slice(1));if(d){d.open=true;d.scrollIntoView()}}</script>')
-    ld = [_org_ld(), {"@type": "FAQPage", "@id": f"{SITE_URL}/faq#faq", "url": f"{SITE_URL}/faq", "inLanguage": "es",
+    ld = [_org_ld(), {"@type": "FAQPage", "@id": f"{SITE_URL}{pre}/faq#faq", "url": f"{SITE_URL}{pre}/faq", "inLanguage": lang,
                       "mainEntity": [{"@type": "Question", "name": i.question, "acceptedAnswer": {"@type": "Answer", "text": i.answer_text}} for i in items]},
-          {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Inicio", "item": SITE_URL}, {"@type": "ListItem", "position": 2, "name": "Preguntas frecuentes", "item": f"{SITE_URL}/faq"}]}]
-    return _page(title="Preguntas frecuentes", description="Respuestas directas sobre Tably Team: qué es, cuánto cuesta, qué IA conviene para cada rol, cómo se publica la app, dónde queda tu código y cómo se cuidan tus API keys.",
-                 path="/faq", body=body, ld=ld, current="faq")
+          {"@type": "BreadcrumbList", "itemListElement": _crumbs(lang, (u["home"], SITE_URL), (u["faq"], f"{SITE_URL}{pre}/faq"))}]
+    return _page(lang=lang, title=u["faq_title"], description=u["faq_desc"], path=f"{pre}/faq", body=body, ld=ld, current="faq")
 
 
 # ------------------------------------------------------------------ machine-readable files
 
 def sitemap_xml() -> str:
     today = date.today().isoformat()
-    urls = [(SITE_URL + "/", today, "weekly", "1.0"), (f"{SITE_URL}/blog", max([p.updated for p in posts()] or [today]), "weekly", "0.8"), (f"{SITE_URL}/faq", today, "monthly", "0.8")]
-    urls += [(p.url(), p.updated, "monthly", "0.7") for p in posts()]
-    body = "".join(f"<url><loc>{html.escape(u)}</loc><lastmod>{d}</lastmod><changefreq>{c}</changefreq><priority>{pr}</priority></url>" for u, d, c, pr in urls)
+    rows: list[tuple[str, str, str, str]] = [(SITE_URL + "/", today, "weekly", "1.0")]
+    for lang in LANGS:
+        pre = _prefix(lang)
+        ps = posts(lang)
+        if not ps and lang != "es":
+            continue
+        rows += [(f"{SITE_URL}{pre}/blog", max([p.updated for p in ps] or [today]), "weekly", "0.8"), (f"{SITE_URL}{pre}/faq", today, "monthly", "0.8")]
+        rows += [(p.url(), p.updated, "monthly", "0.7") for p in ps]
+    body = "".join(f"<url><loc>{html.escape(u)}</loc><lastmod>{d}</lastmod><changefreq>{c}</changefreq><priority>{pr}</priority></url>" for u, d, c, pr in rows)
     return f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{body}</urlset>'
 
 
@@ -477,29 +555,38 @@ def robots_txt() -> str:
     return "\n".join(["User-agent: *", "Allow: /", "Disallow: /api/", "Disallow: /ws/", "Disallow: /git/", "Disallow: /apps/", "Disallow: /run/", "", f"Sitemap: {SITE_URL}/sitemap.xml", ""])
 
 
-def rss_xml() -> str:
+def rss_xml(lang: str = "es") -> str:
     esc = html.escape
-    items = "".join(f"<item><title>{esc(p.title)}</title><link>{esc(p.url())}</link><guid>{esc(p.url())}</guid><pubDate>{p.date}</pubDate><description>{esc(p.description)}</description></item>" for p in posts())
-    return (f'<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>{SITE_NAME} · Blog</title><link>{SITE_URL}/blog</link>'
-            f'<description>{esc(SITE_DESCRIPTION)}</description><language>es</language>{items}</channel></rss>')
+    pre = _prefix(lang)
+    items = "".join(f"<item><title>{esc(p.title)}</title><link>{esc(p.url())}</link><guid>{esc(p.url())}</guid><pubDate>{p.date}</pubDate><description>{esc(p.description)}</description></item>" for p in posts(lang))
+    return (f'<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>{SITE_NAME} · Blog</title><link>{SITE_URL}{pre}/blog</link>'
+            f'<description>{esc(SITE_DESCRIPTION)}</description><language>{lang}</language>{items}</channel></rss>')
 
 
 def llms_txt() -> str:
-    """llms.txt: a short, structured guide for LLM crawlers and answer engines (what the site is, where the canonical content lives)."""
+    """llms.txt: a short, structured guide for LLM crawlers and answer engines (what the site is, where the canonical content lives), in both languages."""
     lines = [f"# {SITE_NAME}", "", f"> {SITE_DESCRIPTION}", "",
              "Tably Team es una plataforma donde un equipo de agentes de IA con roles (CEO, CTO, Head of Engineering, Product, Diseño y QA), cada uno con el modelo que elijas "
              "(Claude, GPT, Gemini, DeepSeek, Grok, Llama, Kimi, Mistral, OpenRouter u Ollama), debate una idea, la investiga contra apps de referencia, la diseña, la construye "
              "(con Claude Code, Codex o un modelo por API) y la revisa. La app se puede correr, descargar o publicar en Tably Cloud.", "",
-             "## Páginas principales", "", f"- [Inicio]({SITE_URL}/): la plataforma", f"- [Preguntas frecuentes]({SITE_URL}/faq): respuestas directas sobre precio, modelos, privacidad y publicación",
-             f"- [Blog]({SITE_URL}/blog): guías detalladas", "", "## Artículos", ""]
-    lines += [f"- [{p.title}]({p.url()}): {p.description}" for p in posts()]
-    lines += ["", "## Opcional", "", f"- [llms-full.txt]({SITE_URL}/llms-full.txt): todo el contenido en un solo archivo de texto", f"- [Sitemap]({SITE_URL}/sitemap.xml)", ""]
+             "Tably Team is a platform where a team of AI agents with roles (CEO, CTO, Head of Engineering, Product, Design and QA), each on the model you choose, debates an idea, "
+             "researches it against reference apps, designs it, builds it (with Claude Code, Codex or an API model) and reviews it. The app can be run, downloaded or published on Tably Cloud.", "",
+             "## Páginas principales · Main pages", "", f"- [Inicio / Home]({SITE_URL}/)", f"- [Preguntas frecuentes]({SITE_URL}/faq) · [FAQ (English)]({SITE_URL}/en/faq)",
+             f"- [Blog (español)]({SITE_URL}/blog) · [Blog (English)]({SITE_URL}/en/blog)", ""]
+    for lang, title in (("es", "## Artículos (español)"), ("en", "## Articles (English)")):
+        ps = posts(lang)
+        if ps:
+            lines += [title, ""] + [f"- [{p.title}]({p.url()}): {p.description}" for p in ps] + [""]
+    lines += ["## Opcional · Optional", "", f"- [llms-full.txt]({SITE_URL}/llms-full.txt): todo el contenido en texto plano · all content as plain text", f"- [Sitemap]({SITE_URL}/sitemap.xml)", ""]
     return "\n".join(lines)
 
 
 def llms_full_txt() -> str:
-    parts = [llms_txt(), "", "---", "", "# Preguntas frecuentes", ""]
-    parts += [f"## {i.question}\n\n{i.answer_md}\n" for i in faq()]
-    for p in posts():
-        parts += ["", "---", "", f"# {p.title}", "", f"URL: {p.url()}", f"Publicado: {p.date} · Actualizado: {p.updated}", "", p.description, "", p.body_md, ""]
+    parts = [llms_txt()]
+    for lang, faq_title in (("es", "# Preguntas frecuentes"), ("en", "# Frequently asked questions")):
+        items = faq(lang)
+        if items:
+            parts += ["", "---", "", faq_title, ""] + [f"## {i.question}\n\n{i.answer_md}\n" for i in items]
+        for p in posts(lang):
+            parts += ["", "---", "", f"# {p.title}", "", f"URL: {p.url()}", f"{'Published' if lang == 'en' else 'Publicado'}: {p.date} · {'Updated' if lang == 'en' else 'Actualizado'}: {p.updated}", "", p.description, "", p.body_md, ""]
     return "\n".join(parts)
