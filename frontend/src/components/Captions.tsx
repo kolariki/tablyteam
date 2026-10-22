@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useT } from '../lib/i18n'
 import { partialTags } from '../lib/parse'
 import ProviderLogo from './ProviderLogo'
+import AgentAvatar from './AgentAvatar'
 import { agentMap, useAgentColor, useArena } from '../store'
 
 /** Lower-third subtitles — the thing that makes a screen recording read as a video. */
@@ -55,7 +56,7 @@ export default function Captions({ big = false }: { big?: boolean }) {
     const color = colorOf(a)
     content = (
       <div className="flex items-start gap-3 max-w-4xl">
-        <ProviderLogo provider={a?.wanted_provider ?? a?.provider} size={big ? 40 : 30} className="shrink-0" />
+        <AgentAvatar agent={a} size={big ? 44 : 34} className="shrink-0" />
         <div>
           <div className="text-xs uppercase tracking-widest font-bold" style={{ color }}>{a?.name}</div>
           <div className={`${big ? 'text-2xl' : 'text-lg'} leading-snug font-medium`}>

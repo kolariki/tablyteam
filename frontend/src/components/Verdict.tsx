@@ -6,6 +6,7 @@ import { useT } from '../lib/i18n'
 import { partialTags } from '../lib/parse'
 import Md from './Md'
 import ProviderLogo from './ProviderLogo'
+import AgentAvatar from './AgentAvatar'
 import { agentMap, useAgentColor, useArena } from '../store'
 
 import CouncilVerdict from './CouncilVerdict'
@@ -105,7 +106,7 @@ export default function Verdict({ onRedebate, onRerun }: { onRedebate?: (note: s
         <div className="relative flex items-center gap-5 border-b border-line px-7 py-6" style={{ background: `linear-gradient(135deg, ${wColor}14 0%, transparent 60%)` }}>
           {winner && (
             <motion.div initial={{ scale: 0.6, rotate: -12, opacity: 0 }} animate={{ scale: 1, rotate: 0, opacity: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 16, delay: 0.15 }} className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-surface shadow-[0_14px_30px_-14px_rgba(30,38,34,.5)]" style={{ border: `2px solid ${wColor}` }}>
-              <ProviderLogo provider={winner.wanted_provider ?? winner.provider} size={40} />
+              <AgentAvatar agent={winner} size={56} />
               <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[26px] leading-none drop-shadow">👑</span>
             </motion.div>
           )}
@@ -179,7 +180,7 @@ export default function Verdict({ onRedebate, onRerun }: { onRedebate?: (note: s
                     const isW = a.id === wId
                     return (
                       <div key={a.id} className="flex items-center gap-3">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface shadow-sm" style={{ border: `1.5px solid ${color}` }}><ProviderLogo provider={a.wanted_provider ?? a.provider} size={16} /></span>
+                        <AgentAvatar agent={a} size={32} ring={false} className="shadow-sm" />
                         <div className="w-24 truncate text-[13px] font-semibold" style={{ color }}>{a.name}{isW && ' 👑'}</div>
                         <div className="h-3 flex-1 overflow-hidden rounded-full bg-surface-2">
                           <motion.div className="h-full rounded-full" style={{ background: color }} initial={{ width: 0 }} animate={{ width: `${(n / max) * 100}%` }} transition={{ delay: 0.4 + i * 0.12, duration: 0.7, ease: 'easeOut' }} />
@@ -287,7 +288,7 @@ function DecisionList({ decisions, editing, edits, setEdits, colorOf, maxH = '',
         const changed = edits[id] != null && edits[id] !== d.text
         return (
           <li key={id} className={`rounded-xl border bg-surface px-4 py-3 ${big ? 'text-[14px]' : 'text-[12.5px]'} ${changed ? 'border-gold/50' : 'border-line'}`}>
-            <span className="flex items-center gap-1.5 font-semibold" style={{ color: colorOf(d.agent!) }}><ProviderLogo provider={d.agent!.wanted_provider ?? d.agent!.provider} size={14} /> {d.agent!.name}{changed && <span className="ml-1 rounded-full bg-gold/10 px-1.5 text-[9.5px] font-bold text-gold">{T('editado', 'edited')}</span>}</span>
+            <span className="flex items-center gap-1.5 font-semibold" style={{ color: colorOf(d.agent!) }}><AgentAvatar agent={d.agent!} size={18} /> {d.agent!.name}{changed && <span className="ml-1 rounded-full bg-gold/10 px-1.5 text-[9.5px] font-bold text-gold">{T('editado', 'edited')}</span>}</span>
             {editing ? (
               <textarea value={value} onChange={(e) => { const v = e.target.value; setEdits((x) => ({ ...x, [id]: v })) }} rows={Math.min(14, Math.max(3, value.split('\n').length + 1))} className="mt-1.5 w-full resize-y rounded-lg border border-line bg-paper px-3 py-2 font-mono text-[12.5px] leading-relaxed outline-none transition focus:border-accent" />
             ) : (

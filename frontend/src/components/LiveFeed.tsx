@@ -4,6 +4,7 @@ import { useT } from '../lib/i18n'
 import { fmtMs, fmtUsd, partialTags, STANCE } from '../lib/parse'
 import Md from './Md'
 import ProviderLogo from './ProviderLogo'
+import AgentAvatar from './AgentAvatar'
 import { agentMap, useAgentColor, useArena } from '../store'
 import type { Turn } from '../types'
 
@@ -44,7 +45,7 @@ function Header({ agentId, turn, extra }: { agentId: string; turn: number; extra
   return (
     <div className="flex items-center gap-2">
       <span className="w-7 h-7 rounded-full flex items-center justify-center bg-surface border" style={{ borderColor: `${color}55` }}>
-        <ProviderLogo provider={a?.wanted_provider ?? a?.provider} size={17} />
+        <AgentAvatar agent={a} size={22} />
       </span>
       <span className="font-bold" style={{ color }}>{a?.name ?? agentId}</span>
       <span className="font-mono text-[10px] text-ink-3 truncate">{a?.model}</span>

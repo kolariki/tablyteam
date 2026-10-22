@@ -9,6 +9,7 @@ import ModelSelect from './ModelSelect'
 import { tr, useT } from '../lib/i18n'
 import { agentMap, useAgentColor, useArena } from '../store'
 import ProviderLogo from './ProviderLogo'
+import AgentAvatar from './AgentAvatar'
 import { toast } from './Toast'
 
 /** End of a review-mode session: the council's consolidated verdict + change list → "build again with these changes". */
@@ -179,7 +180,7 @@ export default function CouncilVerdict() {
                     return (
                       <motion.div key={t.turn} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[12.5px]" style={{ borderLeft: `3px solid ${colorOf(a)}` }}>
                         <div className="flex items-center gap-2">
-                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface shadow-sm" style={{ border: `1.5px solid ${colorOf(a)}` }}><ProviderLogo provider={a?.wanted_provider ?? a?.provider} size={14} /></span>
+                          <AgentAvatar agent={a} size={28} ring={false} className="shadow-sm" />
                           <span className="font-semibold" style={{ color: colorOf(a) }}>{a?.name}</span>
                           <span className={`ml-auto inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${ok ? 'border-ok/30 bg-ok/10 text-ok' : 'border-gold/40 bg-gold/10 text-gold'}`}>{ok ? <CheckCircle2 size={11} /> : <XCircle size={11} />} {ok ? T('aprueba', 'approves') : T('pide cambios', 'requests changes')}</span>
                         </div>

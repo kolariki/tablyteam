@@ -16,6 +16,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useT } from '../lib/i18n'
 import { partialTags } from '../lib/parse'
 import ProviderLogo from './ProviderLogo'
+import AgentAvatar from './AgentAvatar'
 import { agentMap, useAgentColor, useArena } from '../store'
 
 const NODE = 132
@@ -95,7 +96,7 @@ function AgentNode({ data }: NodeProps<Node<AgentData>>) {
         animate={{ scale: speaking ? 1.07 : 1 }}
         transition={{ type: 'spring', stiffness: 260, damping: 18 }}
       >
-        <ProviderLogo provider={agent.wanted_provider ?? agent.provider} size={40} className="drop-shadow-sm" />
+        <AgentAvatar agent={agent} size={56} className="drop-shadow-sm" />
         <div className="mt-1 serif font-medium text-[17px] leading-tight text-ink max-w-[110px] truncate">{agent.name}</div>
         <div className="mt-0.5 max-w-[112px] truncate font-mono text-[9.5px] leading-tight text-ink-3" title={agent.model}>{agent.model}</div>
         {speaking && !waiting && <SoundBars color={color} />}
