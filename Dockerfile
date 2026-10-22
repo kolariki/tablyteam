@@ -1,5 +1,6 @@
 # Tably Team · single service for Railway: the API serves the built frontend, runs Claude Code / Codex for the users
-# (each with their own subscription token) and keeps everything under /data (mount a volume there).
+# (each with their own subscription token) and keeps everything under /data: attach a Railway Volume mounted at /data in the
+# service settings (no VOLUME instruction here: Railway rejects Dockerfiles that declare one).
 FROM node:22-bookworm-slim AS web
 WORKDIR /web
 COPY frontend/package*.json ./
@@ -23,6 +24,5 @@ COPY backend/content ./content
 COPY --from=web /web/dist /app/frontend/dist
 ENV ARENA_DATA_DIR=/data/sessions ARENA_STATIC_DIR=/app/frontend/dist ARENA_CHROME=/usr/bin/chromium \
     CLAUDE_CONFIG_DIR=/data/claude-root HOME=/data/home PORT=8000
-VOLUME ["/data"]
 EXPOSE 8000
 CMD ["sh", "-c", "mkdir -p /data/home /data/claude-root && uv run --no-sync uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
