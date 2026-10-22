@@ -96,11 +96,15 @@ function AgentNode({ data }: NodeProps<Node<AgentData>>) {
         animate={{ scale: speaking ? 1.07 : 1 }}
         transition={{ type: 'spring', stiffness: 260, damping: 18 }}
       >
-        <AgentAvatar agent={agent} size={56} className="drop-shadow-sm" />
-        <div className="mt-1 serif font-medium text-[17px] leading-tight text-ink max-w-[110px] truncate">{agent.name}</div>
-        <div className="mt-0.5 max-w-[112px] truncate font-mono text-[9.5px] leading-tight text-ink-3" title={agent.model}>{agent.model}</div>
-        {speaking && !waiting && <SoundBars color={color} />}
+        {/* the person fills the circle; the provider's mark is on the shirt */}
+        <AgentAvatar agent={agent} size={NODE - 6} ring={false} className="!bg-transparent" />
       </motion.div>
+      {/* name + model under the circle, as a small label (arrows meet at the centre, so it stays clear of them) */}
+      <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 flex-col items-center" style={{ top: NODE + 6, width: 160 }}>
+        <span className="serif rounded-full border bg-white/95 px-3 py-[3px] text-[15px] font-medium leading-tight text-ink shadow-sm" style={{ borderColor: `${color}66` }}>{agent.name}</span>
+        <span className="mt-0.5 max-w-[150px] truncate font-mono text-[9.5px] leading-tight text-ink-3" title={agent.model}>{agent.model}</span>
+        {speaking && !waiting && <SoundBars color={color} />}
+      </div>
 
       {isWinner && (
         <motion.div initial={{ y: -10, opacity: 0, scale: 0.4 }} animate={{ y: 0, opacity: 1, scale: 1 }} className="absolute -top-9 left-1/2 -translate-x-1/2 text-4xl drop-shadow-[0_4px_6px_rgba(156,118,34,0.35)]">👑</motion.div>
