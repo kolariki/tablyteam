@@ -115,6 +115,8 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
         <img data-brand-icon src="/icon.svg" alt="" aria-hidden className="h-7 w-7 rounded-lg shadow-sm" draggable={false} />
         <span className="serif text-lg"><span data-brand-text>Tably</span> <em data-brand-text className="text-accent">Team</em></span>
         <div className="ml-auto flex items-center gap-2">
+          <a href="/blog" className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-2 hover:text-ink sm:inline">{T('Blog', 'Blog')}</a>
+          <a href="/faq" className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-2 hover:text-ink sm:inline">{T('Preguntas frecuentes', 'FAQ')}</a>
           <button onClick={onLogin} className="rounded-lg px-3 py-1.5 text-sm text-ink-2 hover:text-ink">{T('Iniciar sesión', 'Sign in')}</button>
           <button onClick={onSignup} className="rounded-lg bg-accent text-white px-3.5 py-1.5 text-sm font-medium hover:brightness-110">{T('Crear cuenta', 'Create account')}</button>
         </div>
@@ -169,9 +171,74 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
       </section>
 
       <LogoMarquee />
+      <Resources />
       </div>
       <MadeWith />
     </div>
+  )
+}
+
+/* ------------------------------------------------------------------ resources: the latest guides and the FAQ (server-rendered pages exist for crawlers; here they are a teaser) */
+
+type PostMeta = { slug: string; title: string; description: string; date: string; reading_min: number; provider: string | null; tags: string[] }
+type FaqItem = { question: string; html: string; slug: string }
+
+function Resources() {
+  const T = useT()
+  const [posts, setPosts] = useState<PostMeta[]>([])
+  const [faq, setFaq] = useState<FaqItem[]>([])
+  useEffect(() => {
+    fetch('/api/content/blog').then((r) => (r.ok ? r.json() : [])).then(setPosts).catch(() => {})
+    fetch('/api/content/faq').then((r) => (r.ok ? r.json() : [])).then(setFaq).catch(() => {})
+  }, [])
+  if (!posts.length && !faq.length) return null
+  return (
+    <section className="max-w-[1400px] mx-auto px-6 pb-24">
+      {posts.length > 0 && (
+        <div data-scroll-reveal>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.3em] text-accent">{T('Guías', 'Guides')}</div>
+              <h2 className="serif mt-1 text-[34px] leading-tight">{T('Qué IA elegir, cuánto cuesta y cómo funciona por dentro', 'Which AI to pick, what it costs and how it works inside')}</h2>
+            </div>
+            <a href="/blog" className="rounded-full border border-line bg-surface px-4 py-2 text-sm text-ink-2 transition hover:border-accent hover:text-accent">{T('Ver todos los artículos', 'See all articles')} →</a>
+          </div>
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            {posts.slice(0, 6).map((p) => (
+              <a key={p.slug} href={`/blog/${p.slug}`} className="panel group flex flex-col gap-2 rounded-2xl p-5 transition hover:border-accent">
+                <div className="flex items-center gap-2 text-[12px] text-ink-3">
+                  {p.provider && <ProviderLogo provider={p.provider} size={18} />}
+                  <span>{p.reading_min} {T('min de lectura', 'min read')}</span>
+                </div>
+                <h3 className="serif text-[22px] leading-tight group-hover:text-accent">{p.title}</h3>
+                <p className="text-[13.5px] leading-relaxed text-ink-2">{p.description}</p>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+      {faq.length > 0 && (
+        <div data-scroll-reveal className="mt-16 grid gap-8 lg:grid-cols-[1fr_1.6fr]">
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.3em] text-accent">{T('Preguntas frecuentes', 'FAQ')}</div>
+            <h2 className="serif mt-1 text-[34px] leading-tight">{T('Lo que te preguntás antes de empezar', 'What you ask before you start')}</h2>
+            <p className="mt-3 text-[14.5px] leading-relaxed text-ink-2">{T('Precio, modelos, privacidad, publicación. Respuestas directas.', 'Pricing, models, privacy, publishing. Straight answers.')}</p>
+            <a href="/faq" className="mt-4 inline-block rounded-full border border-line bg-surface px-4 py-2 text-sm text-ink-2 transition hover:border-accent hover:text-accent">{T('Todas las preguntas', 'All questions')} →</a>
+          </div>
+          <div className="flex flex-col gap-2">
+            {faq.slice(0, 7).map((f) => (
+              <details key={f.slug} className="panel group rounded-2xl px-5 py-1">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-3 text-[15px] font-semibold [&::-webkit-details-marker]:hidden">
+                  {f.question}
+                  <span className="shrink-0 text-xl font-normal text-accent transition group-open:rotate-45">+</span>
+                </summary>
+                <div className="md md-compact pb-4 text-[14px] leading-relaxed text-ink-2" dangerouslySetInnerHTML={{ __html: f.html }} />
+              </details>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
   )
 }
 

@@ -2127,6 +2127,72 @@ def cloud_app_root(slug: str):
     return FileResponse(p)
 
 
+# ------------------------------------------------------------------ public content: blog, FAQ and the machine-readable files (SEO / answer engines)
+from . import content as contentmod
+from fastapi.responses import HTMLResponse
+
+
+@app.get("/api/content/blog")
+def content_blog_list():
+    return [p.meta() for p in contentmod.posts()]
+
+
+@app.get("/api/content/blog/{slug}")
+def content_blog_post(slug: str):
+    p = contentmod.post(slug)
+    if not p:
+        raise HTTPException(404, "No existe ese artículo")
+    return {**p.meta(), "html": p.body_html, "toc": p.toc_html, "keywords": p.keywords}
+
+
+@app.get("/api/content/faq")
+def content_faq():
+    return [{"question": i.question, "html": i.answer_html, "text": i.answer_text, "slug": i.slug} for i in contentmod.faq()]
+
+
+@app.get("/blog", response_class=HTMLResponse, include_in_schema=False)
+def page_blog():
+    return HTMLResponse(contentmod.blog_index_html())
+
+
+@app.get("/blog/feed.xml", include_in_schema=False)
+def page_blog_feed():
+    return Response(contentmod.rss_xml(), media_type="application/rss+xml")
+
+
+@app.get("/blog/{slug}", response_class=HTMLResponse, include_in_schema=False)
+def page_blog_post(slug: str):
+    p = contentmod.post(slug)
+    if not p:
+        raise HTTPException(404, "No existe ese artículo")
+    return HTMLResponse(contentmod.post_html(p))
+
+
+@app.get("/faq", response_class=HTMLResponse, include_in_schema=False)
+def page_faq():
+    return HTMLResponse(contentmod.faq_html())
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+def page_sitemap():
+    return Response(contentmod.sitemap_xml(), media_type="application/xml")
+
+
+@app.get("/robots.txt", include_in_schema=False)
+def page_robots():
+    return PlainTextResponse(contentmod.robots_txt())
+
+
+@app.get("/llms.txt", include_in_schema=False)
+def page_llms():
+    return PlainTextResponse(contentmod.llms_txt(), media_type="text/plain; charset=utf-8")
+
+
+@app.get("/llms-full.txt", include_in_schema=False)
+def page_llms_full():
+    return PlainTextResponse(contentmod.llms_full_txt(), media_type="text/plain; charset=utf-8")
+
+
 # ------------------------------------------------------------------ single-service deploy: the built frontend is served by the API
 _STATIC = Path(env("ARENA_STATIC_DIR", str(Path(__file__).resolve().parents[2] / "frontend" / "dist")))
 if _STATIC.is_dir() and (_STATIC / "index.html").exists():

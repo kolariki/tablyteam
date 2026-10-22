@@ -72,7 +72,7 @@ function AppInner() {
   const showBriefExport = useArena((s) => s.showBriefExport)
   const user = useArena((s) => s.user)
   const authChecked = useArena((s) => s.authChecked)
-  const [gate, setGate] = useState<'landing' | 'login' | 'signup'>(location.hash === '#login' ? 'login' : 'landing')
+  const [gate, setGate] = useState<'landing' | 'login' | 'signup'>(location.hash === '#login' ? 'login' : location.hash === '#signup' ? 'signup' : 'landing')
   const cleanup = useRef<(() => void) | null>(null)
   const buildWs = useRef<(() => void) | null>(null)
   const [intro, setIntro] = useState<{ provider: string; model: string; title: string } | null>(null)
