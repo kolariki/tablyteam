@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { countTo, gsap, heroIntro, sceneIn, scrollReveal, useGSAP } from '../lib/anim'
 import { useLang, useT } from '../lib/i18n'
 import LangSwitch from './LangSwitch'
+import AgentAvatar from './AgentAvatar'
 import LogoMarquee from './LogoMarquee'
 import TeamBackdrop from './TeamBackdrop'
 import ProviderLogo, { LogoWatermark } from './ProviderLogo'
@@ -99,13 +100,15 @@ const ease = (x: number) => Math.min(1, Math.max(0, x))
 
 export default function Landing({ onLogin, onSignup }: { onLogin: () => void; onSignup: () => void }) {
   const T = useT()
-  const prefix = useLang() === 'en' ? '/en' : ''  // the public pages (blog, FAQ) have an English edition under /en
+  const lang = useLang()
+  const prefix = lang === 'en' ? '/en' : ''  // the public pages (blog, FAQ) have an English edition under /en
   const page = useRef<HTMLDivElement>(null)
+  // the title is split into letters for the intro; when the language changes it remounts (key) and the intro runs again on the new text
   useGSAP(() => {
     if (!page.current) return
     heroIntro(page.current)
     scrollReveal(page.current)
-  }, { scope: page })
+  }, { scope: page, dependencies: [lang] })
   return (
     <div ref={page} className="relative h-full overflow-y-auto overflow-x-hidden scroll-thin arena-bg">
       {/* the team building, blurred, behind everything */}
@@ -137,7 +140,7 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
         </div>
         <div>
           <div data-hero-kicker className="text-xs uppercase tracking-[0.5em] text-accent">{T('tu equipo que diseña y construye', 'your team that designs and builds')}</div>
-          <h1 data-hero-title className="mt-3 text-6xl md:text-7xl leading-[0.95] tracking-tight opacity-0">
+          <h1 key={lang} data-hero-title className="mt-3 text-6xl md:text-7xl leading-[0.95] tracking-tight opacity-0">
             {T('Escribí tu idea.', 'Write your idea.')} <em data-hero-word className="text-accent">Tably</em> {T('la construye.', 'builds it.')}
           </h1>
           <p data-hero-copy className="mt-5 text-lg text-ink-2 leading-relaxed max-w-lg">
@@ -505,7 +508,7 @@ function SceneTeam({ t: raw }: { t: number }) {
             >
               {picked && <LogoWatermark provider={m.provider} opacity={0.1} />}
               <div className="relative flex items-center gap-2">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-surface shadow-sm" style={{ border: `1.5px solid ${picked ? m.color : '#DCE2DE'}` }}><ProviderLogo provider={m.provider} size={20} /></span>
+                <span className="rounded-full bg-surface p-[2px] shadow-sm" style={{ boxShadow: `0 0 0 1.5px ${picked ? m.color : '#DCE2DE'}` }}><AgentAvatar agent={{ name: m.name, role: m.id, provider: m.provider }} size={38} ring={false} logo={0.34} chip /></span>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[14px] font-semibold leading-tight" style={{ color: picked ? m.color : undefined }}>{T(m.name, m.name_en)}</div>
                   <div className="truncate text-[10px] uppercase tracking-widest text-ink-3">{T(m.role, m.role_en)}</div>
@@ -587,9 +590,9 @@ function SceneRefs({ t: raw }: { t: number }) {
 }
 
 /* 5 · the team debates: CEO → CTO → Head of Eng → Product */
-const R = 118
+const R = 128
 const CX = 280
-const CY = 190
+const CY = 238
 const pos = (i: number) => ({ x: CX + Math.cos(-Math.PI / 2 + (i * Math.PI) / 2) * R * 1.55, y: CY + Math.sin(-Math.PI / 2 + (i * Math.PI) / 2) * R })
 const BUBBLE = (i: number, p: { x: number; y: number }) =>
   [{ left: p.x + 46, top: p.y - 26 }, { left: p.x - 210, top: p.y + 44 }, { left: p.x - 46 - 210, top: p.y - 44 }, { left: p.x - 30, top: p.y + 44 }][i]
@@ -667,12 +670,13 @@ function SceneArena({ t }: { t: number }) {
               <motion.div
                 animate={{ scale: on ? 1.1 : target ? 1.05 : 1, y: on ? -4 : 0 }}
                 transition={{ type: 'spring', stiffness: 260, damping: 18 }}
-                className="relative flex h-[76px] w-[76px] flex-col items-center justify-center rounded-full"
-                style={{ background: `radial-gradient(circle at 35% 28%, #FFFFFF 0%, ${m.color}18 80%)`, border: `${on || target ? 2.5 : 1.5}px solid ${on || target ? m.color : m.color + '88'}`, boxShadow: on ? `0 0 0 6px ${m.color}22, 0 18px 36px -14px ${m.color}AA` : '0 2px 4px rgba(30,38,34,.08), 0 12px 24px -16px rgba(30,38,34,.45)' }}
+                className="relative flex w-[112px] flex-col items-center"
               >
-                <ProviderLogo provider={m.provider} size={22} />
-                <div className="serif text-[11.5px] leading-tight mt-0.5">{T(m.name, m.name_en)}</div>
-                <div className="font-mono text-[7.5px] text-ink-3">{m.model.split('-').slice(0, 2).join('-')}</div>
+                <span className="rounded-full bg-surface p-[3px] shadow-[0_10px_24px_-10px_rgba(30,38,34,.5)]" style={{ boxShadow: `0 0 0 ${on || target ? 3 : 2}px ${on || target ? m.color : m.color + '66'}` }}>
+                  <AgentAvatar agent={{ name: m.name, role: m.id, provider: m.provider }} size={74} ring={false} logo={0.34} chip />
+                </span>
+                <div className="serif mt-1.5 text-[13px] leading-tight text-ink">{T(m.name, m.name_en)}</div>
+                <div className="font-mono text-[8.5px] text-ink-3">{m.model.split('-').slice(0, 2).join('-')}</div>
               </motion.div>
             </div>
           )
