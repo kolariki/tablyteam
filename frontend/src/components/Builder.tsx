@@ -461,6 +461,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
                 <div>{T('Construcción terminada:', 'Build finished:')} {Object.keys(b.files).length} {T('archivos. Descargá el .zip, seguí las instrucciones del README y, si querés cambios, escribile al constructor abajo.', 'files. Download the .zip, follow the README instructions and, if you want changes, write to the builder below.')}</div>
               </div>
             )}
+            {b.status === 'completed' && !b.liveTurn && Object.keys(b.files).length > 0 && <SavingsCard />}
           </div>
           <div className="border-t border-line bg-surface p-3">
             {/* quick actions: the full visual-polish checklist is one click (the server expands "pulido visual" into it) */}
@@ -632,6 +633,60 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
 }
 
 /** The live strip under the chat box: the agent's current action with its path, this turn's counters and the clock. */
+/** What this build saved versus doing it by hand in a chat with an LLM: an estimate, with its assumptions stated. */
+function SavingsCard() {
+  const T = useT()
+  const b = useBuild()
+  const [open, setOpen] = useState(false)
+  const files = Object.values(b.files)
+  const codeTokens = Math.round(files.reduce((a, f) => a + (f.content?.length ?? 0), 0) / 4)
+  if (!codeTokens) return null
+  // by hand: K rounds of "paste the project, ask for the next piece"; every round resends what exists so far and the
+  // model rewrites it; each round costs a person ~8 minutes (prompting, pasting, running, reading)
+  const K = Math.min(14, Math.max(4, b.stages.length || Math.ceil(files.length / 6)))
+  const baselineTokens = Math.round((codeTokens * (K + 1)) / 2 + codeTokens * 1.4 + K * 1200)
+  const baselineMinutes = K * 8
+  const ourTokens = b.tokens || codeTokens
+  const price = b.cost > 0 && b.tokens > 0 ? b.cost / b.tokens : 20 / 1e6
+  const baselineCost = baselineTokens * price
+  const ourCost = (b.provider === 'claude-code' || b.provider === 'codex') ? b.fees : b.cost
+  const tokSaved = Math.max(0, baselineTokens - ourTokens)
+  const minSaved = Math.max(0, baselineMinutes - Math.round(b.buildSeconds / 60))
+  const usdSaved = Math.max(0, baselineCost - ourCost)
+  const pct = baselineTokens ? Math.round((100 * tokSaved) / baselineTokens) : 0
+  const fmtTok = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n))
+  const fmtMin = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m} min`)
+  return (
+    <div className="rounded-2xl border border-accent/25 bg-accent-soft/40 px-4 py-3 text-sm">
+      <div className="flex items-center gap-2">
+        <Sparkles size={16} className="shrink-0 text-accent" />
+        <div className="font-semibold">{T('Lo que te ahorró Tably en esta construcción', 'What Tably saved you on this build')}</div>
+        <span className="ml-auto rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-white">{pct}% tokens</span>
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        {[
+          [T('Tokens', 'Tokens'), fmtTok(tokSaved), `${fmtTok(ourTokens)} ${T('vs', 'vs')} ~${fmtTok(baselineTokens)}`],
+          [T('Tiempo', 'Time'), fmtMin(minSaved), `${fmtMin(Math.round(b.buildSeconds / 60))} ${T('vs', 'vs')} ~${fmtMin(baselineMinutes)}`],
+          [T('Costo', 'Cost'), `$${usdSaved.toFixed(2)}`, `$${ourCost.toFixed(2)} ${T('vs', 'vs')} ~$${baselineCost.toFixed(2)}`],
+        ].map(([l, v, sub]) => (
+          <div key={l} className="rounded-xl border border-line bg-surface px-3 py-2">
+            <div className="text-[10.5px] uppercase tracking-[0.2em] text-ink-3">{l}</div>
+            <div className="font-mono text-[18px] leading-tight text-ink">{v}</div>
+            <div className="truncate text-[11px] text-ink-3" title={sub}>{sub}</div>
+          </div>
+        ))}
+      </div>
+      <button onClick={() => setOpen((v) => !v)} className="mt-2 flex items-center gap-1 text-[11.5px] text-ink-3 hover:text-ink"><ChevronDown size={12} className={`transition ${open ? 'rotate-180' : ''}`} /> {T('Cómo se estima', 'How it is estimated')}</button>
+      {open && (
+        <p className="mt-1 text-[11.5px] leading-snug text-ink-3">
+          {T(`Comparado con construir lo mismo a mano en un chat con un LLM: ${K} rondas de «pegá el proyecto y pedí la siguiente parte», donde cada ronda reenvía lo que ya existe y el modelo lo reescribe, más unos 8 minutos de trabajo tuyo por ronda. El precio por token es el de tu modelo (o un promedio de lista). Lo tuyo son tokens, tiempo y costo medidos en esta construcción. Es una estimación: el orden de magnitud, no una factura.`,
+            `Compared with building the same thing by hand in a chat with an LLM: ${K} rounds of "paste the project and ask for the next part", where every round resends what already exists and the model rewrites it, plus about 8 minutes of your work per round. The token price is your model's (or a list average). Yours are the tokens, time and cost measured on this build. It is an estimate: the order of magnitude, not an invoice.`)}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function LiveStatusBar() {
   const T = useT()
   const b = useBuild()

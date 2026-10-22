@@ -692,7 +692,8 @@ class Build:
     async def _run_engine(self, resume_with: str | None) -> None:
         """One pass with a local CLI agent working in self.workdir. Emits the same events as the API builder."""
         assert self.engine and self.workdir
-        first = not self.files and resume_with is None
+        # the design phase writes design/ before any code: that does not make it a resume
+        first = resume_with is None and not any(not p.startswith("design/") for p in self.files)
         if first:
             bar = quality_bar([a.get("role") for a in self.team] or None)
             prompt = (f"Leé BRIEF.md en este directorio: es la especificación completa del producto. CONSTRUÍ el producto entero, siguiendo su plan por etapas, "

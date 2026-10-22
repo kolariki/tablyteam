@@ -92,6 +92,18 @@ function AppInner() {
     cleanup.current = connect(id, onEvent, () => {})
   }
 
+  /** Fast lane: the prompt becomes the brief, the builder starts, the builder view opens (no council). */
+  const direct = async (cfg: SessionConfig) => {
+    const engines = await api.engines().catch(() => [])
+    const ok = engines.find((e) => e.ok)
+    const providers = await api.providers().catch(() => [])
+    const apiProv = providers.find((p) => p.configured && p.id !== 'mock') ?? providers.find((p) => p.id === 'mock')
+    const provider = ok?.id ?? apiProv?.id ?? 'mock'
+    const model = ok ? 'default' : apiProv?.default_model ?? 'mock-1'
+    const r = await api.directBuild({ topic: cfg.topic, title: cfg.title, platform: cfg.platform, references: cfg.references ?? [], deep_analysis: !!cfg.deep_analysis, context: cfg.context ?? null, language: cfg.language, agents: cfg.agents, provider, model, target: 'claude-code', design: true })
+    await openSaved(r.session_id, true, true)
+  }
+
   /** Same brief and team, from scratch (a failed turn, a model outage…). Run soon after and the cached role context is reused. */
   const rerun = async () => {
     const cfg = useArena.getState().config
@@ -500,7 +512,7 @@ function AppInner() {
   if (view === 'audit') return <>{banner}{demoLayer}<AuditSetup onBack={() => useArena.getState().set({ view: 'setup' })} onStart={startAudit} /></>
   if (view === 'settings') return <>{banner}{demoLayer}<Settings onBack={() => useArena.getState().set({ view: 'setup' })} /></>
   if (view === 'agents') return <>{banner}{demoLayer}<AgentSessions onBack={() => useArena.getState().set({ view: 'setup' })} /></>
-  if (view === 'setup') return <>{banner}{demoLayer}<Setup key={user.id} user={user} onLogout={logout} onSettings={() => useArena.getState().set({ view: 'settings' })} onAudit={() => useArena.getState().set({ view: 'audit' })} onStart={start} onReplay={startReplay} onOpen={(id, mode) => (mode === 'run' ? runApp(id) : openSaved(id, mode !== 'arena', mode === 'builder')).catch((e) => toast.error(tr('No se pudo abrir', 'Could not open'), (e as Error).message))} />{runOverlayLayer}</>
+  if (view === 'setup') return <>{banner}{demoLayer}<Setup key={user.id} user={user} onLogout={logout} onSettings={() => useArena.getState().set({ view: 'settings' })} onAudit={() => useArena.getState().set({ view: 'audit' })} onStart={start} onDirect={direct} onReplay={startReplay} onOpen={(id, mode) => (mode === 'run' ? runApp(id) : openSaved(id, mode !== 'arena', mode === 'builder')).catch((e) => toast.error(tr('No se pudo abrir', 'Could not open'), (e as Error).message))} />{runOverlayLayer}</>
 
   const exporter = (
     <>

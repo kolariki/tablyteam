@@ -280,7 +280,15 @@ async def stream_brief(user: User, session_id: str, req: BriefRequest) -> AsyncI
         raise ValueError(f"Proveedor sin configurar: {req.provider}")
     cfg = data["config"]
     system = BRIEF_SYSTEM.format(language=cfg.get("language", "español"), howto=TARGETS[req.target]["howto"])
-    user_msg = f"DEBATE A CONVERTIR EN BRIEF:\n\n{transcript}"
+    if cfg.get("mode") == "direct":
+        # the fast lane: no debate, the (prompt-engineered) request is the whole input
+        user_msg = ("PEDIDO DEL USUARIO (ya pasó por prompt engineering; no hubo debate de equipo). Convertilo en el brief completo: donde el pedido no decide algo, "
+                    "decidilo vos con el criterio de un equipo senior y marcalo como «(supuesto)». Las secciones «Decisiones del debate» y «Desacuerdos» pasan a ser "
+                    "«Decisiones tomadas» y «Alternativas descartadas», con el porqué.\n\n" + str(cfg.get("topic") or ""))
+        if cfg.get("context") and "Referentes" not in str(cfg.get("context")):
+            user_msg += f"\n\nCONTEXTO ADJUNTO POR EL USUARIO:\n{str(cfg['context'])[:20000]}"
+    else:
+        user_msg = f"DEBATE A CONVERTIR EN BRIEF:\n\n{transcript}"
     plat = cfg.get("platform") or "web"
     if plat == "mobile":
         user_msg += ("\n\nPLATAFORMA ELEGIDA POR EL USUARIO: APP MÓVIL (iOS y Android). El brief es para una app móvil: stack por defecto Expo (React Native) + TypeScript + expo-router, "

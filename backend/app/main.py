@@ -832,6 +832,67 @@ async def session_brief(session_id: str, req: BriefRequest, user: User = Current
     return StreamingResponse(stream_brief(user, session_id, req), media_type="text/markdown; charset=utf-8")
 
 
+@app.post("/api/direct-builds")
+async def create_direct_build(body: dict, user: User = CurrentUser):
+    """The fast lane: one (prompt-engineered) request → brief written by a model → builder, no council. Returns the session
+    and the build; the build runs in the background like any other."""
+    import time as _t
+
+    from .auth import user_dir
+    from .exporter import BriefRequest, stream_brief
+
+    topic = (body.get("topic") or "").strip()
+    if not topic:
+        raise HTTPException(400, "Contá qué querés construir")
+    title = (body.get("title") or "").strip() or topic[:60]
+    provider, model, target = body.get("provider") or "mock", body.get("model") or "", body.get("target") or "claude-code"
+    if target not in TARGETS:
+        target = "claude-code"
+    refs = [r.strip() for r in body.get("references", []) if isinstance(r, str) and r.strip()] if isinstance(body.get("references"), list) else []
+    # who writes the brief: the builder's own API model, else the first configured API provider, else mock
+    eff = keystore.creds(user.id)
+    bp, bm = (provider, model) if (not is_engine(provider) and eff.get(provider) and eff[provider].source != "none") else (None, None)
+    if not bp:
+        for pid in ("anthropic", "openai", "gemini", "deepseek", "xai", "groq", "mistral", "openrouter", "kimi", "ollama"):
+            c = eff.get(pid)
+            if c and c.source != "none":
+                bp, bm = pid, c.model or PROVIDERS[pid].default_model
+                break
+    if not bp:
+        bp, bm = "mock", "mock-1"
+    sid = _t.strftime("%Y%m%d-%H%M%S-") + __import__("uuid").uuid4().hex[:6]
+    agents = [a for a in (body.get("agents") or []) if isinstance(a, dict) and a.get("role")]
+    config = {"topic": topic, "title": title, "mode": "direct", "agents": agents, "max_turns": 0, "min_turns": 0, "language": body.get("language") or "español rioplatense",
+              "final_vote": False, "closing_round": False, "max_tokens": 0, "pace_ms": 0, "platform": body.get("platform") or "web", "references": refs,
+              "deep_analysis": bool(body.get("deep_analysis")), "context": body.get("context") or None}
+    (user_dir(user.id) / f"{sid}.json").write_text(json.dumps({"id": sid, "owner": user.id, "status": "direct", "config": config, "events": [
+        {"type": "session.started", "seq": 0, "ts": _t.time(), "session_id": sid, "config": config, "providers": {}, "langfuse_url": None},
+        {"type": "session.completed", "seq": 1, "ts": _t.time(), "status": "direct", "stats": {"agents": {}, "turns": 0, "total_cost_usd": 0, "total_tokens": 0, "disagreement_rate": 0, "verdict": None}},
+    ]}, ensure_ascii=False))
+    # the brief, written now (it is what the builder follows); cached next to the session like any brief
+    parts: list[str] = []
+    try:
+        async for chunk in stream_brief(user, sid, BriefRequest(provider=bp, model=bm, target=target, include_transcript=False, regenerate=True)):
+            parts.append(chunk)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    brief = "".join(parts)
+    if is_engine(provider):
+        st = next(e for e in engine_status(user.id) if e["id"] == provider)
+        if not st["ok"]:
+            raise HTTPException(400, f"{st['label']}: {st['hint'] or 'no disponible'}")
+        cred = Cred("local", None, model or "default", "local")
+    else:
+        cred = eff.get(provider)
+        if not cred or cred.source == "none":
+            raise HTTPException(400, f"Falta la API key de {provider}")
+    req = BuildRequest(session_id=sid, provider=provider, model=model or (cred.model or ""), target=target, review_rounds=0, council=True, design=bool(body.get("design", True)),
+                       design_review=False, research=bool(refs), references=refs, deep_analysis=bool(body.get("deep_analysis")), platform=config["platform"])
+    b = start_build(user, req, cred, brief, title, agents, eff)
+    b.chat.insert(0, {"role": "system", "text": "Vía rápida: brief escrito desde tu pedido (sin consejo) y construcción directa.", "ts": _t.time()})
+    return {"session_id": sid, "id": b.id, "brief_by": f"{bp} · {bm}"}
+
+
 # ---------------------------------------------------------------------------- in-app builder
 def _brief_for(user: User, session_id: str, target: str) -> str:
     path = session_path(user, session_id).with_suffix(f".brief.{target}.md")

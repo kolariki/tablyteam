@@ -106,6 +106,7 @@ export const api = {
   updateTeam: (sessionId: string, agents: AgentConfig[]) => j<{ agents: AgentConfig[] }>(authed(`/api/sessions/${sessionId}/team`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ agents }) })),
   session: (id: string) => j<{ id: string; status: string; config?: SessionConfig; events: ArenaEvent[] }>(authed(`/api/sessions/${id}`)),
   start: (cfg: SessionConfig) => j<{ id: string }>(post('/api/sessions', cfg)),
+  directBuild: (body: Record<string, unknown>) => j<{ session_id: string; id: string; brief_by: string }>(post('/api/direct-builds', body)),
   stop: (id: string) => j(post(`/api/sessions/${id}/stop`, {})),
   councilRedo: (id: string) => j<Record<string, unknown>>(post(`/api/sessions/${id}/council/redo`, {})),
   resumeSession: (id: string, action = 'retry') => j(post(`/api/sessions/${id}/resume`, { action })),

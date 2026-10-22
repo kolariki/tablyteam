@@ -1,7 +1,7 @@
 import { useArena } from '../store'
 import { useBuild, type Activity } from '../buildStore'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bookmark, Check, Eye, FolderOpen, Gavel, Globe, Loader2, LogOut, MonitorSmartphone, Play, Plus, Puzzle, Settings2, Smartphone, Trash2, Users, X } from 'lucide-react'
+import { Bookmark, Check, Eye, FolderOpen, Gavel, Globe, Loader2, LogOut, MonitorSmartphone, Play, Plus, Puzzle, Settings2, Smartphone, Trash2, Users, X, Zap } from 'lucide-react'
 import { toast, useConfirm, usePrompt } from './Toast'
 import SkillPicker from './SkillPicker'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
@@ -28,13 +28,14 @@ interface Props {
   onSettings: () => void
   onAudit: () => void
   onStart: (cfg: SessionConfig) => Promise<void>
+  onDirect: (cfg: SessionConfig) => Promise<void>  // fast lane: brief from the prompt → builder, no council
   onReplay: (id: string) => void
   onOpen: (id: string, mode?: OpenMode) => void | Promise<unknown>
 }
 
 export type OpenMode = 'arena' | 'builder' | 'run'
 
-export default function Setup({ user, onLogout, onSettings, onAudit, onStart, onReplay, onOpen }: Props) {
+export default function Setup({ user, onLogout, onSettings, onAudit, onStart, onDirect, onReplay, onOpen }: Props) {
   const T = useT()
   const { prompt: askName, dialog: nameDialog } = usePrompt()
   const { confirm: confirmDelete, dialog: deleteDialog } = useConfirm()
@@ -192,7 +193,8 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   const launchContext = useRef<string | null>(null)
 
   /** Benchmark the references first, with the reverse-engineering screen; then the team intro; then the council. */
-  const research = async () => {
+  const [directBusy, setDirectBusy] = useState(false)
+  const research = async (direct = false) => {
     if (!validate()) return
     let context = cfg.context ?? null
     const refs = (cfg.references ?? []).map((r) => r.trim()).filter(Boolean)
@@ -225,6 +227,20 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
       setBusy(false)
     }
     launchContext.current = context
+    if (direct) {
+      // no council: the brief is written from the prompt and the builder starts; the home shows the opening loader meanwhile
+      setDirectBusy(true)
+      setOpening(T('Escribiendo el brief y arrancando el constructor…', 'Writing the brief and starting the builder…'))
+      try {
+        await onDirect({ ...cfg, context })
+      } catch (e) {
+        setError((e as Error).message)
+        setOpening(null)
+      } finally {
+        setDirectBusy(false)
+      }
+      return
+    }
     setLaunching(true)
   }
 
@@ -667,7 +683,17 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
               const stops = order.map((p, i) => `${brandTheme(p).tint} ${(((i + 0.5) / order.length) * 100).toFixed(2)}%`).join(', ')
               const background = order.length === 1 ? brandTheme(order[0]).tint : `linear-gradient(90deg, ${stops})`
               return (
-                <button onClick={research} disabled={busy || launching || cfg.agents.length < 2} style={{ background }} className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-black/10 text-ink px-6 py-3.5 font-bold text-lg shadow-sm hover:scale-[1.02] transition disabled:opacity-50" title={order.join(' · ')}>
+                <>
+                <button
+                  onClick={() => research(true)}
+                  disabled={busy || launching || directBusy}
+                  title={T('Sin consejo: el pedido (con prompt engineering) se convierte en brief y el constructor arranca ya. Más rápido y más barato; el consejo queda a un clic después.', 'No council: the (prompt-engineered) request becomes the brief and the builder starts right away. Faster and cheaper; the council is one click away afterwards.')}
+                  className="group flex items-center gap-2.5 rounded-2xl border border-accent/40 bg-surface px-5 py-3.5 text-lg font-bold text-accent shadow-sm transition hover:bg-accent-soft disabled:opacity-50"
+                >
+                  {directBusy ? <Loader2 size={20} className="animate-spin" /> : <Zap size={20} className="transition group-hover:scale-110" />}
+                  {directBusy ? tr('Arrancando…', 'Starting…') : tr('Construir directo', 'Build directly')}
+                </button>
+                <button onClick={() => research(false)} disabled={busy || launching || directBusy || cfg.agents.length < 2} style={{ background }} className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-black/10 text-ink px-6 py-3.5 font-bold text-lg shadow-sm hover:scale-[1.02] transition disabled:opacity-50" title={order.join(' · ')}>
                   {/* launch: the play icon slides out to the right, then the logos follow one by one (each one shows up big on stage as it leaves) */}
                   <span className="flex items-center -space-x-1">
                     {order.map((p, i) => (
@@ -686,6 +712,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                   </motion.span>
                   {launching ? tr('Entrando a la arena…', 'Entering the arena…') : busy ? tr('Investigando referencias…', 'Researching references…') : tr('Iniciar experimento', 'Start experiment')}
                 </button>
+                </>
               )
             })()}
         </div>
