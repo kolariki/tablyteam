@@ -1,6 +1,7 @@
 ---
 title: Qué IA elegir para cada rol de tu equipo (CEO, CTO, ingeniería, producto, diseño y QA)
 description: Comparativa práctica de Claude, GPT, Gemini, DeepSeek, Grok, Llama, Kimi y Mistral por rol. Qué modelo rinde mejor en dirección, tecnología, ingeniería, producto, diseño y calidad, con tres equipos listos para copiar.
+category: Inteligencias artificiales
 date: 2026-10-22
 updated: 2026-10-22
 tags: [comparativa, equipo de IA, modelos de IA, cómo elegir]

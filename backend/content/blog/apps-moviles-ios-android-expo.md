@@ -1,6 +1,7 @@
 ---
 title: Apps móviles para iOS y Android con IA: cómo Tably construye con Expo y las corre en el simulador
 description: Cómo Tably Team construye apps móviles con React Native y Expo, cómo elegir entre web, móvil o ambas con un solo código, qué necesitás instalado para correrlas en el simulador de iOS y el emulador de Android, y cómo se publican en las tiendas.
+category: Publicar y móvil
 date: 2026-10-22
 tags: [apps móviles, iOS, Android, Expo, cómo funciona]
 keywords: [crear app móvil con IA, app iOS Android con inteligencia artificial, Expo React Native con IA, generar app para celular, simulador iOS emulador Android]

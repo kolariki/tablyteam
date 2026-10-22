@@ -1,6 +1,7 @@
 ---
 title: GPT (OpenAI): para qué sirve, qué modelos hay y qué rol darle en tu equipo
 description: Guía completa de los modelos GPT de OpenAI. Qué los distingue, cuándo usar la versión completa y cuándo la mini, qué es Codex como constructor y en qué roles de un equipo de IA rinden mejor.
+category: Inteligencias artificiales
 date: 2026-10-22
 tags: [GPT, OpenAI, modelos de IA]
 keywords: [GPT OpenAI, GPT-5, ChatGPT para programar, Codex CLI, para qué sirve GPT, mejor IA para producto]

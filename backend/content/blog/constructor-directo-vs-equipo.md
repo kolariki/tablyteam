@@ -1,6 +1,7 @@
 ---
 title: Constructor directo o constructor con equipo: cuál conviene para tu app
 description: Las dos formas de construir en Tably Team comparadas con honestidad. Qué hace cada una, cuánto tarda, cuánto cuesta, qué calidad esperar y una regla simple para elegir.
+category: Cómo funciona Tably
 date: 2026-10-22
 tags: [Tably Team, cómo funciona, costos]
 keywords: [construir app rápido con IA, prompt a app, equipo de agentes vs un modelo, Tably constructor directo]

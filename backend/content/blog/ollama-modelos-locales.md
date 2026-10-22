@@ -1,6 +1,7 @@
 ---
 title: Ollama: correr modelos de IA en tu propia computadora, gratis y en privado
 description: Qué es Ollama, qué modelos podés correr localmente (Llama, Mistral, Qwen, DeepSeek, Gemma), qué hardware necesitás, qué calidad esperar y cómo usarlo en un equipo de IA sin que ningún dato salga de tu máquina.
+category: Inteligencias artificiales
 date: 2026-10-22
 tags: [Ollama, modelos locales, privacidad, modelos de IA]
 keywords: [Ollama, modelos de IA locales, correr LLM en mi computadora, IA sin internet, IA privada, Llama local]

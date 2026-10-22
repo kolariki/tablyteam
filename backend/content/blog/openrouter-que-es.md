@@ -1,6 +1,7 @@
 ---
 title: OpenRouter: una sola API key para más de 300 modelos
 description: Qué es OpenRouter, cómo funciona, qué modelos abre (Qwen, Llama, DeepSeek, Claude, GPT y cientos más), qué cuesta y cómo aprovecharlo en un equipo de IA sin cargar diez claves distintas.
+category: Inteligencias artificiales
 date: 2026-10-22
 tags: [OpenRouter, modelos de IA, API]
 keywords: [OpenRouter, qué es OpenRouter, Qwen, una API para todos los modelos, comparar modelos de IA]

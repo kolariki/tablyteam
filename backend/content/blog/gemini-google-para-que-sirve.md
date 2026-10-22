@@ -1,6 +1,7 @@
 ---
 title: Gemini (Google): para qué sirve, Pro vs Flash y qué rol darle en tu equipo
 description: Guía de los modelos Gemini de Google. Diferencias entre Pro y Flash, su fortaleza en visión y contextos largos, cuánto cuestan y en qué roles de un equipo de IA conviene usarlos.
+category: Inteligencias artificiales
 date: 2026-10-22
 tags: [Gemini, Google, modelos de IA]
 keywords: [Gemini Google, Gemini Pro, Gemini Flash, para qué sirve Gemini, IA con visión, modelo multimodal]

@@ -1,6 +1,7 @@
 ---
 title: Qué es Tably Team y cómo construye una app con un equipo de inteligencias artificiales
 description: Tably Team arma un equipo de IA con roles reales (CEO, CTO, ingeniería, producto, diseño y QA), lo pone a debatir tu idea, a diseñarla y a construirla. Así funciona por dentro, paso a paso.
+category: Cómo funciona Tably
 date: 2026-10-22
 tags: [Tably Team, cómo funciona, equipo de IA]
 keywords: [construir app con IA, equipo de agentes de IA, generador de apps con inteligencia artificial, Tably Team]

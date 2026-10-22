@@ -1,6 +1,7 @@
 ---
 title: Cuánto cuesta construir una app con IA: tokens, suscripciones y lo que de verdad paga la factura
 description: Un desglose honesto del costo de construir una app con un equipo de IA: qué cobran los proveedores, qué cuesta un debate del consejo, cómo construir sin gastar tokens con una suscripción y cómo Tably muestra el costo real.
+category: Costos y seguridad
 date: 2026-10-22
 tags: [costos, tokens, suscripción, guía práctica]
 keywords: [cuánto cuesta hacer una app con IA, costo tokens IA, precio construir app con inteligencia artificial, costo API Claude GPT, generador de apps gratis]

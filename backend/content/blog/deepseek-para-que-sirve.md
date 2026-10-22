@@ -1,6 +1,7 @@
 ---
 title: DeepSeek: para qué sirve, por qué es tan barato y qué rol darle en tu equipo
 description: Guía de los modelos DeepSeek. Su relación calidad/precio, su estilo directo en el debate, su rendimiento en código y matemática, y los roles de un equipo de IA donde conviene usarlo.
+category: Inteligencias artificiales
 date: 2026-10-22
 tags: [DeepSeek, modelos de IA, costos]
 keywords: [DeepSeek, DeepSeek chat, DeepSeek para programar, IA barata, modelo abierto, para qué sirve DeepSeek]

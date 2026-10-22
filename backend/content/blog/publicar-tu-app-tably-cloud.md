@@ -1,6 +1,7 @@
 ---
 title: Publicar tu app con Tably Cloud: git propio, un clic para salir a internet, base de datos y autenticación
 description: Cómo Tably Team publica lo que construye: repositorio git por proyecto, publicación con un clic (en Tably, Cloudflare o Fly), base de datos y autenticación con Neon o Supabase, migraciones y cómo llevarte todo a tu propia infraestructura.
+category: Publicar y móvil
 date: 2026-10-22
 tags: [Tably Cloud, publicar, hosting, base de datos]
 keywords: [publicar app hecha con IA, hosting para app generada, deploy con un clic, Supabase Neon con IA, alternativa a Vercel Railway para apps con IA]

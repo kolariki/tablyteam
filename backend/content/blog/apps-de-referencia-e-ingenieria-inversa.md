@@ -1,6 +1,7 @@
 ---
 title: Apps de referencia e ingeniería inversa: cómo Tably estudia las apps que te gustan antes de construir la tuya
 description: Cómo funciona la investigación de referencias en Tably Team: visita real con navegador, capturas, descripción con un modelo de visión y, con el análisis profundo, ingeniería inversa de bundles, rutas y APIs para replicar una app con fidelidad.
+category: Prompt engineering y referencias
 date: 2026-10-22
 tags: [apps de referencia, ingeniería inversa, cómo funciona, diseño]
 keywords: [clonar una app con IA, ingeniería inversa de apps, apps de referencia, replicar diseño de una app, REA reverse engineering]

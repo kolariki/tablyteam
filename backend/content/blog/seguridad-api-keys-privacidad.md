@@ -1,6 +1,7 @@
 ---
 title: Seguridad y privacidad en Tably Team: qué pasa con tus API keys, tu código y tus datos
 description: Dónde se guardan tus claves, qué ve cada proveedor de IA, dónde vive tu código, qué datos salen de tu máquina, cómo funciona el token de suscripción y qué opciones tenés si necesitás que nada salga de tu infraestructura.
+category: Costos y seguridad
 date: 2026-10-22
 tags: [seguridad, privacidad, API keys]
 keywords: [seguridad API keys IA, privacidad datos inteligencia artificial, dónde se guarda mi código IA, token Claude seguridad, IA sin enviar datos]

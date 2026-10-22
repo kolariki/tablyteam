@@ -1,6 +1,7 @@
 ---
 title: Grok (xAI): para qué sirve, qué lo diferencia y qué rol darle en tu equipo
 description: Guía de los modelos Grok de xAI. Su estilo directo, su acceso a información reciente, su rendimiento en razonamiento y los roles de un equipo de IA donde aporta más.
+category: Inteligencias artificiales
 date: 2026-10-22
 tags: [Grok, xAI, modelos de IA]
 keywords: [Grok xAI, Grok 4, para qué sirve Grok, IA con información reciente, modelo de razonamiento]

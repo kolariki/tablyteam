@@ -1,6 +1,7 @@
 ---
 title: Claude Code vs Codex vs API: quién escribe el código de tu app y cuánto cuesta
 description: Los tres tipos de constructor de Tably Team comparados: Claude Code y Codex por suscripción, o un modelo por API con tu clave. Diferencias de calidad, costo, velocidad y cómo usar tu suscripción desde el teléfono con la computadora apagada.
+category: Cómo funciona Tably
 date: 2026-10-22
 tags: [Claude Code, Codex, constructor, costos]
 keywords: [Claude Code vs Codex, agente de programación, construir app con suscripción Claude, Codex CLI, costo de construir app con IA]

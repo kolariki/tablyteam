@@ -49,6 +49,7 @@ class Post:
     toc_html: str
     reading_min: int
     provider: str | None = None  # the AI the article is about (for the logo)
+    category: str = "Guías"
     keywords: list[str] = field(default_factory=list)
 
     def url(self) -> str:
@@ -56,7 +57,7 @@ class Post:
 
     def meta(self) -> dict:
         return {"slug": self.slug, "title": self.title, "description": self.description, "date": self.date, "updated": self.updated, "tags": self.tags,
-                "reading_min": self.reading_min, "provider": self.provider, "url": f"/blog/{self.slug}"}
+                "reading_min": self.reading_min, "provider": self.provider, "category": self.category, "url": f"/blog/{self.slug}"}
 
 
 @dataclass
@@ -120,7 +121,7 @@ def _load() -> None:
         kws = meta.get("keywords") if isinstance(meta.get("keywords"), list) else [t.strip() for t in str(meta.get("keywords") or "").split(",") if t.strip()]
         posts.append(Post(slug=meta.get("slug") or f.stem, title=str(meta.get("title") or f.stem), description=str(meta.get("description") or ""), date=d,
                           updated=str(meta.get("updated") or d), tags=tags, body_md=body, body_html=body_html, toc_html=toc, reading_min=max(1, round(words / _WORDS_PER_MIN)),
-                          provider=meta.get("provider") or None, keywords=kws))
+                          provider=meta.get("provider") or None, keywords=kws, category=str(meta.get("category") or "Guías")))
     posts.sort(key=lambda p: (p.date, p.slug), reverse=True)
     faq: list[Faq] = []
     fp = CONTENT_DIR / "faq.md"
@@ -231,7 +232,7 @@ a.tag:hover{border-color:var(--accent);color:var(--accent)}
 .search-row{display:flex;align-items:center;gap:16px;margin:0 0 20px}.search-row .count{font-size:13px;color:var(--ink-3);white-space:nowrap}
 .search{flex:1;width:100%;height:50px;border:1px solid var(--line);border-radius:999px;background:var(--surface);padding:0 18px;font:inherit;font-size:15px;color:var(--ink);outline:none}
 .search:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-.cta-box{margin:64px 0 0;background:var(--ink);color:#fff;border-radius:24px;padding:36px 40px;display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;position:relative;overflow:hidden}
+.cta-box{margin:64px 0 0;background:var(--ink);color:#fff;border-radius:24px;padding:36px 40px;display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;position:relative;overflow:clip}
 .cta-box::after{content:"";position:absolute;right:-80px;top:-80px;width:280px;height:280px;border-radius:999px;background:radial-gradient(closest-side,rgba(47,107,93,.7),transparent)}
 .cta-box h3{font-family:"Newsreader",serif;font-weight:400;font-size:30px;margin:0 0 6px;letter-spacing:-.01em}.cta-box p{margin:0;opacity:.8;max-width:520px}
 .cta-box a{position:relative;background:#fff;color:var(--ink);text-decoration:none;font-weight:600;border-radius:999px;padding:13px 24px;white-space:nowrap}
@@ -258,7 +259,10 @@ footer .legal{grid-column:1/-1;padding-top:18px;border-top:1px solid var(--line)
 .hero.brand>*:not(.wm){position:relative;max-width:760px}
 .hero.brand .meta .logo{box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .cta-box{background:var(--accent)}
-.cta-box::after{background:radial-gradient(closest-side,rgba(255,255,255,.22),transparent)}
+.cta-box::after{background:radial-gradient(closest-side,rgba(255,255,255,.22),transparent);pointer-events:none;z-index:0}
+.cta-box a{z-index:1}
+.cat{margin:0 0 56px;scroll-margin-top:84px}.cat-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;margin:0 0 18px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.cat h2{font-family:"Newsreader",serif;font-weight:400;font-size:30px;margin:0;letter-spacing:-.01em}.cat-head p{margin:0;color:var(--ink-3);font-size:14.5px;max-width:640px}
 .cta-box a{background:#fff;color:var(--accent)}.cta-box a:hover{background:var(--accent-soft)}
 .cta-box p{opacity:.9}
 """
@@ -347,7 +351,7 @@ def _page(*, title: str, description: str, path: str, body: str, ld: list[dict],
 def _card(p: Post, feature: bool = False) -> str:
     esc = html.escape
     logo_src, color = _brand(p.provider)
-    logo = f'<img src="{esc(logo_src)}" alt="" aria-hidden="true">' if p.provider else f'<span class="kind">{esc(p.tags[0]) if p.tags else "Guía"}</span>'
+    logo = f'<img src="{esc(logo_src)}" alt="" aria-hidden="true">' if p.provider else f'<span class="kind">{esc(p.category)}</span>'
     wm = f'<img class="wm" src="{esc(logo_src)}" alt="" aria-hidden="true">' if p.provider else ""
     cls = "card" + (" feature" if feature else "") + (" brand" if p.provider else "")
     return (f'<a class="{cls}" style="--brand:{esc(color)}" href="/blog/{esc(p.slug)}">{wm}<div class="top">{logo}<time datetime="{esc(p.date)}">{_fmt_date(p.date)}</time></div>'
@@ -366,6 +370,28 @@ def _fmt_date(iso: str) -> str:
         return iso
 
 
+CATEGORY_ORDER = ["Inteligencias artificiales", "Prompt engineering y referencias", "Cómo funciona Tably", "Publicar y móvil", "Costos y seguridad"]
+CATEGORY_LEDE = {
+    "Inteligencias artificiales": "Una guía por modelo: qué lo distingue, dónde no usarlo, qué rol darle y cuánto cuesta. Y la comparativa por rol.",
+    "Prompt engineering y referencias": "Cómo escribir el pedido para que salga bien y cómo Tably estudia las apps que te gustan antes de construir.",
+    "Cómo funciona Tably": "El equipo, las dos vías de construcción y quién escribe el código.",
+    "Publicar y móvil": "Salir a internet con base de datos y usuarios, y construir para iOS y Android.",
+    "Costos y seguridad": "Qué se paga, a quién, cómo bajarlo, y qué pasa con tus claves, tu código y tus datos.",
+}
+
+
+def cat_slug(c: str) -> str:
+    import unicodedata
+    base = unicodedata.normalize("NFKD", c).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", "-", base.lower()).strip("-")
+
+
+def categories() -> list[tuple[str, list[Post]]]:
+    ps = posts()
+    order = CATEGORY_ORDER + sorted({p.category for p in ps} - set(CATEGORY_ORDER))
+    return [(c, [p for p in ps if p.category == c]) for c in order if any(p.category == c for p in ps)]
+
+
 def all_tags() -> list[tuple[str, int]]:
     counts: dict[str, int] = {}
     for p in posts():
@@ -376,12 +402,17 @@ def all_tags() -> list[tuple[str, int]]:
 
 def blog_index_html(tag: str | None = None) -> str:
     esc = html.escape
-    ps = [p for p in posts() if not tag or tag in p.tags]
-    chips = '<a class="tag%s" href="/blog">Todos</a>' % ("" if tag else " on") + "".join(f'<a class="tag{" on" if t == tag else ""}" href="/blog?tag={esc(t)}">{esc(t)} · {n}</a>' for t, n in all_tags())
-    cards = "".join(_card(p, feature=(i == 0 and not tag)) for i, p in enumerate(ps))
+    if tag:
+        ps = [p for p in posts() if tag in p.tags]
+        chips = '<a class="tag" href="/blog">← Todas las secciones</a>' + "".join(f'<a class="tag{" on" if t == tag else ""}" href="/blog?tag={esc(t)}">{esc(t)} · {n}</a>' for t, n in all_tags())
+        sections = f'<section class="cat"><h2>Tema: {esc(tag)}</h2><div class="grid">{"".join(_card(p) for p in ps)}</div></section>'
+    else:
+        cats = categories()
+        chips = "".join(f'<a class="tag" href="#{cat_slug(c)}">{esc(c)} · {len(ps)}</a>' for c, ps in cats)
+        sections = "".join(f'<section class="cat" id="{cat_slug(c)}"><div class="cat-head"><h2>{esc(c)}</h2><p>{esc(CATEGORY_LEDE.get(c, ""))}</p></div><div class="grid">{"".join(_card(p) for p in ps)}</div></section>' for c, ps in cats)
     body = (f'<div class="hero"><div class="eyebrow">Blog</div><h1>Guías para construir apps con un equipo de IA</h1>'
             f'<p class="lede">Qué hace bien cada inteligencia artificial, cómo elegir una para cada rol, qué cuesta construir una app y cómo funciona Tably Team por dentro. '
-            f'Escrito por el equipo que lo construye.</p></div><div class="filters">{chips}</div><div class="grid">{cards}</div>')
+            f'Escrito por el equipo que lo construye.</p></div><div class="filters">{chips}</div>{sections}')
     ld = [_org_ld(), {"@type": "Blog", "@id": f"{SITE_URL}/blog#blog", "name": f"{SITE_NAME} · Blog", "url": f"{SITE_URL}/blog", "publisher": {"@id": f"{SITE_URL}/#organization"},
                       "blogPost": [{"@type": "BlogPosting", "headline": p.title, "url": p.url(), "datePublished": p.date, "dateModified": p.updated} for p in posts()]},
           {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Inicio", "item": SITE_URL}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": f"{SITE_URL}/blog"}]}]
@@ -392,7 +423,7 @@ def blog_index_html(tag: str | None = None) -> str:
 def post_html(p: Post) -> str:
     esc = html.escape
     others = [o for o in posts() if o.slug != p.slug]
-    related = [o for o in others if set(o.tags) & set(p.tags)][:3] or others[:3]
+    related = ([o for o in others if o.category == p.category] + [o for o in others if o.category != p.category and set(o.tags) & set(p.tags)])[:3] or others[:3]
     share = (f'<div class="share">Compartir<br><a href="https://twitter.com/intent/tweet?url={esc(p.url())}&text={esc(p.title)}" rel="noopener" target="_blank">X</a>'
              f'<a href="https://www.linkedin.com/sharing/share-offsite/?url={esc(p.url())}" rel="noopener" target="_blank">LinkedIn</a>'
              f'<a href="https://wa.me/?text={esc(p.title)}%20{esc(p.url())}" rel="noopener" target="_blank">WhatsApp</a></div>')
@@ -401,7 +432,7 @@ def post_html(p: Post) -> str:
     logo = f'<img class="logo" src="{esc(logo_src)}" alt="">' if p.provider else ""
     wm = f'<img class="wm" src="{esc(logo_src)}" alt="" aria-hidden="true">' if p.provider else ""
     tags = "".join(f'<a class="tag" href="/blog?tag={esc(t)}">{esc(t)}</a>' for t in p.tags)
-    body = (f'<div class="hero{" brand" if p.provider else ""}" style="--brand:{esc(color)}">{wm}<div class="crumbs"><a href="/">Inicio</a> › <a href="/blog">Blog</a></div><div class="eyebrow">{esc(p.tags[0]) if p.tags else "Guía"}</div><h1>{esc(p.title)}</h1><p class="lede">{esc(p.description)}</p>'
+    body = (f'<div class="hero{" brand" if p.provider else ""}" style="--brand:{esc(color)}">{wm}<div class="crumbs"><a href="/">Inicio</a> › <a href="/blog">Blog</a> › <a href="/blog#{cat_slug(p.category)}">{esc(p.category)}</a></div><div class="eyebrow">{esc(p.category)}</div><h1>{esc(p.title)}</h1><p class="lede">{esc(p.description)}</p>'
             f'<div class="meta">{logo}<time datetime="{esc(p.date)}">{_fmt_date(p.date)}</time>'
             + (f'<span>actualizado el {_fmt_date(p.updated)}</span>' if p.updated != p.date else "")
             + f'<span>{p.reading_min} min de lectura</span><span>por el equipo de {SITE_NAME}</span><span class="tags">{tags}</span></div></div>'

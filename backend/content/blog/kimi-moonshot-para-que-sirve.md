@@ -1,6 +1,7 @@
 ---
 title: Kimi (Moonshot AI): para qué sirve y qué rol darle en tu equipo
 description: Guía de Kimi, los modelos de Moonshot AI. Su fortaleza en contextos largos y en tareas de agente, su precio y los roles de un equipo de IA donde rinde mejor.
+category: Inteligencias artificiales
 date: 2026-10-22
 tags: [Kimi, Moonshot AI, modelos de IA]
 keywords: [Kimi Moonshot, Kimi K2, para qué sirve Kimi, modelo de contexto largo, IA agente]

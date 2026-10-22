@@ -1,6 +1,7 @@
 ---
 title: Mistral: el modelo europeo, para qué sirve y qué rol darle en tu equipo
 description: Guía de los modelos de Mistral AI. Su enfoque europeo en privacidad, sus variantes Small, Medium y Large, su rendimiento en código y los roles de un equipo de IA donde aporta más.
+category: Inteligencias artificiales
 date: 2026-10-22
 tags: [Mistral, modelos de IA, privacidad]
 keywords: [Mistral AI, Mistral Medium, Mistral Large, Codestral, modelo europeo, IA con datos en Europa, para qué sirve Mistral]

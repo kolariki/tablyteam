@@ -1,6 +1,7 @@
 ---
 title: Cómo escribir el pedido de una app para que la IA la construya bien (prompt engineering aplicado)
 description: Qué poner y qué no poner en el pedido de tu app, cómo funciona el prompt engineering automático de Tably Team, ejemplos de pedidos buenos y malos, y una plantilla que podés copiar.
+category: Prompt engineering y referencias
 date: 2026-10-22
 tags: [prompt engineering, cómo funciona, guía práctica]
 keywords: [prompt engineering, cómo pedirle una app a la IA, escribir prompt para generar app, brief para desarrollar app, plantilla de prompt]

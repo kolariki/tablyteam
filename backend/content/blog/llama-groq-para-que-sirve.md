@@ -1,6 +1,7 @@
 ---
 title: Llama en Groq: el modelo abierto de Meta a velocidad de rayo
 description: Guía de Llama, los modelos abiertos de Meta, servidos por Groq. Por qué responde tan rápido, qué calidad esperar, cuánto cuesta y en qué roles de un equipo de IA conviene usarlo.
+category: Inteligencias artificiales
 date: 2026-10-22
 tags: [Llama, Groq, Meta, modelos de IA]
 keywords: [Llama Meta, Groq, Llama 3.3 70B, modelo abierto, IA rápida, para qué sirve Llama]

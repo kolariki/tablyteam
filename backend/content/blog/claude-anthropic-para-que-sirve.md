@@ -1,6 +1,7 @@
 ---
 title: Claude (Anthropic): para qué sirve, qué modelos hay y en qué rol rinde mejor
 description: Guía completa de Claude, la familia de modelos de Anthropic. Opus, Sonnet y Haiku, su estilo de razonamiento, dónde brilla al escribir código y diseñar productos, y qué roles de tu equipo conviene darle.
+category: Inteligencias artificiales
 date: 2026-10-22
 tags: [Claude, Anthropic, modelos de IA]
 keywords: [Claude Anthropic, Claude Opus, Claude Sonnet, Claude Haiku, Claude Code, para qué sirve Claude, mejor IA para programar]
