@@ -8,7 +8,7 @@ import Builder from './components/Builder'
 import BuilderIntro from './components/BuilderIntro'
 import Captions from './components/Captions'
 import LiveFeed from './components/LiveFeed'
-import { AgreementMatrix, ConfidenceChart, LatencyChart, StatTiles, Timeline, TokensChart } from './components/Metrics'
+import { AgreementMatrix, CostChart, LatencyChart, StatTiles, Timeline, TokensChart } from './components/Metrics'
 import Landing from './components/Landing'
 import Login from './components/Login'
 import Settings from './components/Settings'
@@ -547,11 +547,11 @@ function AppInner() {
             <Timeline />
             {/* the four analytics cards stay under the graph in focus mode too (a bit shorter, so the stage keeps the room); only a recording hides them */}
             {!recMode && (
-              <div className="grid grid-cols-[1.1fr_1fr_1fr_1.2fr] gap-2" style={{ height: focus ? Math.max(192, 80 + agentCount * 22) : Math.max(210, 84 + agentCount * 27) }}>
+              <div className="grid grid-cols-[1.1fr_1fr_1fr_1fr] gap-2" style={{ height: focus ? Math.max(192, 80 + agentCount * 22) : Math.max(210, 84 + agentCount * 27) }}>
                 <AgreementMatrix />
                 <LatencyChart />
                 <TokensChart />
-                <ConfidenceChart />
+                <CostChart />
               </div>
             )}
           </div>

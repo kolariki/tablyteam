@@ -168,7 +168,7 @@ function Empty({ text }: { text: string }) {
 }
 
 /** Horizontal bars, one per agent: name on the left, thin bar in the agent's colour, value on the right, a dashed mean line. */
-function Bars({ rows, value, fmt, mean, best, tip }: { rows: { id: string; name: string; color: string }[]; value: (r: any) => number; fmt: (v: number) => string; mean?: boolean; best?: 'min' | 'max'; tip: (r: any) => ReactNode }) {
+function Bars({ rows, value, fmt, mean, best, tip, valueWidth = 46 }: { rows: { id: string; name: string; color: string }[]; value: (r: any) => number; fmt: (v: number) => string; mean?: boolean; best?: 'min' | 'max'; tip: (r: any) => ReactNode; valueWidth?: number }) {
   const spot = useSpotlight()
   const t = useTip()
   const vals = rows.map(value)
@@ -191,7 +191,7 @@ function Bars({ rows, value, fmt, mean, best, tip }: { rows: { id: string; name:
               <motion.div className="absolute inset-y-0 left-0 rounded-sm" style={{ background: r.color }} initial={{ width: 0 }} animate={{ width: `${(100 * v) / max}%` }} transition={{ type: 'spring', stiffness: 120, damping: 20 }} />
               {mean && avg > 0 && <div className="absolute -inset-y-[3px] w-0 border-l border-dashed border-ink-3/60" style={{ left: `${(100 * avg) / max}%` }} />}
             </div>
-            <div className="w-[46px] shrink-0 text-right font-mono text-[10.5px] tabular-nums text-ink-2">{v ? fmt(v) : '—'}</div>
+            <div className="shrink-0 whitespace-nowrap text-right font-mono text-[10.5px] tabular-nums text-ink-2" style={{ width: valueWidth }}>{v ? fmt(v) : '—'}</div>
             <span className={`w-2 shrink-0 text-[9px] ${isBest ? 'text-accent' : 'text-transparent'}`} title={isBest ? tr('mejor', 'best') : undefined}>★</span>
           </div>
         )
@@ -243,22 +243,22 @@ export function LatencyChart() {
 export function TokensChart() {
   const T = useT()
   const { rows, turns } = useAgg()
-  const [k, setK] = useState<'tokens' | 'perTurn' | 'cost'>('tokens')
+  const [k, setK] = useState<'tokens' | 'perTurn'>('tokens')
   const total = rows.reduce((x, r) => x + r.tokens, 0)
   const top = rows.length > 1 && total ? [...rows].sort((a, b) => b.tokens - a.tokens)[0] : null
   return (
     <ChartCard
-      title={T('Verborragia', 'Verbosity')}
-      hint={k === 'tokens' ? T('tokens escritos en total', 'tokens written in total') : k === 'perTurn' ? T('promedio por intervención', 'average per intervention') : T('costo acumulado', 'accumulated cost')}
-      help={T('Cuánto escribe cada agente. Total: todos los tokens que produjo. Por turno: el largo típico de cada intervención. Costo: lo que gastó en USD según el precio de su modelo. Un agente que escribe mucho no necesariamente aporta más.', 'How much each agent writes. Total: every token it produced. Per turn: the typical length of each intervention. Cost: what it spent in USD at its model price. An agent that writes a lot does not necessarily contribute more.')}
-      right={<Seg value={k} onChange={setK} options={[{ key: 'tokens', label: 'total' }, { key: 'perTurn', label: T('por turno', 'per turn') }, { key: 'cost', label: T('costo', 'cost') }]} />}
+      title={T('Tokens', 'Tokens')}
+      hint={k === 'tokens' ? T('escritos en total', 'written in total') : T('promedio por intervención', 'average per intervention')}
+      help={T('Cuánto escribe cada agente. Total: todos los tokens que produjo. Por turno: el largo típico de cada intervención. Un agente que escribe mucho no necesariamente aporta más.', 'How much each agent writes. Total: every token it produced. Per turn: the typical length of each intervention. Cost: what it spent in USD at its model price. An agent that writes a lot does not necessarily contribute more.')}
+      right={<Seg value={k} onChange={setK} options={[{ key: 'tokens', label: 'total' }, { key: 'perTurn', label: T('por turno', 'per turn') }]} />}
       footer={top ? `${top.name} ${T('escribió el', 'wrote')} ${Math.round((100 * top.tokens) / total)}% ${T('del total', 'of the total')} (${fmtK(total)} tok)` : undefined}
     >
       {turns === 0 ? <Empty text={T('Todavía nadie habló.', 'Nobody has spoken yet.')} /> : (
         <Bars
           rows={rows}
-          value={(r) => (k === 'tokens' ? r.tokens : k === 'perTurn' ? r.perTurn : r.cost)}
-          fmt={k === 'cost' ? fmtUsd : fmtK}
+          value={(r) => (k === 'tokens' ? r.tokens : r.perTurn)}
+          fmt={fmtK}
           mean
           tip={(r) => (
             <div>
@@ -268,6 +268,43 @@ export function TokensChart() {
                 <span className="text-ink-3">{T('por turno', 'per turn')}</span><span>{r.perTurn.toLocaleString()} tok</span>
                 {r.reasoning > 0 && <><span className="text-ink-3">{T('razonamiento', 'reasoning')}</span><span>{fmtK(r.reasoning)} tok</span></>}
                 <span className="text-ink-3">{T('costo', 'cost')}</span><span>{fmtUsd(r.cost)}</span>
+              </div>
+            </div>
+          )}
+        />
+      )}
+    </ChartCard>
+  )
+}
+
+const fmtUsdShort = (v: number) => `$${v < 0.01 ? v.toFixed(4) : v < 1 ? v.toFixed(3) : v.toFixed(2)}`
+
+export function CostChart() {
+  const T = useT()
+  const { rows, turns } = useAgg()
+  const total = rows.reduce((x, r) => x + r.cost, 0)
+  const top = rows.length > 1 && total ? [...rows].sort((a, b) => b.cost - a.cost)[0] : null
+  return (
+    <ChartCard
+      title={T('Costo', 'Cost')}
+      hint={T('acumulado en USD, por agente', 'accumulated in USD, per agent')}
+      help={T('Lo que gastó cada agente según el precio de lista de su modelo (entrada + salida). Un modelo caro que habla poco puede costar menos que uno barato que escribe de más. Los agentes con Claude Code por suscripción no suman.', 'What each agent spent at its model list price (input + output). An expensive model that speaks little can cost less than a cheap one that over-writes. Agents on a Claude Code subscription do not count.')}
+      footer={total > 0 ? `${T('Total', 'Total')} ${fmtUsd(total)}${top ? ` · ${top.name} ${Math.round((100 * top.cost) / total)}%` : ''}` : undefined}
+    >
+      {turns === 0 ? <Empty text={T('Todavía nadie habló.', 'Nobody has spoken yet.')} /> : total === 0 ? <Empty text={T('Sin costo por API en este debate.', 'No API cost in this debate.')} /> : (
+        <Bars
+          rows={rows}
+          value={(r) => r.cost}
+          fmt={fmtUsdShort}
+          valueWidth={56}
+          mean
+          tip={(r) => (
+            <div>
+              <div className="font-semibold" style={{ color: r.color }}>{r.name}</div>
+              <div className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 font-mono text-[11px] tabular-nums">
+                <span className="text-ink-3">{T('costo', 'cost')}</span><span>{fmtUsd(r.cost)}{total ? ` · ${Math.round((100 * r.cost) / total)}%` : ''}</span>
+                <span className="text-ink-3">tokens</span><span>{r.tokens.toLocaleString()}</span>
+                <span className="text-ink-3">{T('por turno', 'per turn')}</span><span>{r.perTurn.toLocaleString()} tok</span>
               </div>
             </div>
           )}
