@@ -1,0 +1,10 @@
+# Railway: one service built from the root Dockerfile, with a volume mounted at /data (SQLite, sessions, builds, git, apps).
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

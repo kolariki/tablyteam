@@ -32,6 +32,31 @@ ENGINES: dict[str, dict] = {
     "codex": {"label": "Codex CLI · ChatGPT", "logo": "openai", "bin": env("ARENA_CODEX_BIN", "codex"), "color": "#17896A"},
 }
 BUILD_ROOT = Path(env("ARENA_BUILD_DIR", str(DATA_DIR.parent / "builds")))
+CLAUDE_HOMES = Path(env("ARENA_CLAUDE_HOME_DIR", str(DATA_DIR.parent / "claude-home")))  # one Claude Code home per user (sessions, settings)
+
+# The engine environment of the user whose job is running (set by the build pipeline / the sessions chat): on a server
+# every user brings their own Claude Code subscription via `claude setup-token`, and gets their own config dir.
+import contextvars
+
+USER_ENV: contextvars.ContextVar[dict] = contextvars.ContextVar("engine_user_env", default={})
+
+
+def claude_home(user_id: str) -> Path:
+    d = CLAUDE_HOMES / user_id
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def user_claude_env(user_id: str) -> dict:
+    """Env that makes `claude` run as this user: their long-lived OAuth token (from `claude setup-token` on their own
+    computer) and a private config dir. Without a token, the machine's own login is used (local setups)."""
+    from . import keystore
+
+    token = keystore.get_key(user_id, "claude-code")
+    if not token:
+        return {}
+    return {"CLAUDE_CODE_OAUTH_TOKEN": token, "CLAUDE_CONFIG_DIR": str(claude_home(user_id))}
+
 SKIP_DIRS = {"node_modules", ".git", ".next", "dist", "build", ".venv", "__pycache__", ".turbo", ".cache", "coverage", ".claude"}
 MAX_FILE = 400_000
 TEXT_EXT_HINT = re.compile(r"\.(png|jpe?g|gif|webp|ico|pdf|zip|gz|woff2?|ttf|otf|mp[34]|mov|bin|lock)$", re.I)
@@ -65,12 +90,15 @@ def _simulate_logged_out() -> bool:
     return bool(os.environ.get("ARENA_ENGINES_OFFLINE")) or (DATA_DIR.parent / ".engines-offline").exists()
 
 
-def engine_status() -> list[dict]:
+def engine_status(user_id: str | None = None) -> list[dict]:
     out = []
     offline = _simulate_logged_out()
+    from . import keystore
+
+    token_set = bool(user_id and keystore.get_key(user_id, "claude-code"))
     for eid, spec in ENGINES.items():
         path = shutil.which(spec["bin"])
-        st = {"id": eid, "label": spec["label"], "logo": spec["logo"], "color": spec["color"], "installed": bool(path), "version": None, "auth": None, "ok": False, "hint": None}
+        st = {"id": eid, "label": spec["label"], "logo": spec["logo"], "color": spec["color"], "installed": bool(path), "version": None, "auth": None, "ok": False, "hint": None, "token_set": token_set if eid == "claude-code" else False}
         if not path:
             st["hint"] = "No está instalado en esta máquina." + (" Instalá Claude Code: https://claude.com/claude-code" if eid == "claude-code" else " Instalá Codex CLI: npm i -g @openai/codex")
             out.append(st)
@@ -80,6 +108,10 @@ def engine_status() -> list[dict]:
         if offline:
             st["auth"] = "sin sesión (simulado)"
             st["hint"] = "Iniciá sesión en tu terminal: `claude auth login`" if eid == "claude-code" else "Iniciá sesión en tu terminal: `codex login`"
+        elif eid == "claude-code" and token_set:
+            # the user's own subscription token (works on any machine, the PC can be off)
+            st["auth"] = "suscripción (token de tu cuenta)"
+            st["ok"] = True
         elif eid == "claude-code":
             code, txt = _run([path, "auth", "status"])
             try:
@@ -276,7 +308,7 @@ async def run_claude_code(prompt: str, cwd: Path, *, system: str | None = None, 
         cmd += ["--continue"]
     if model:
         cmd += ["--model", model]
-    env_ = {**os.environ, "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"}
+    env_ = {**os.environ, "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", **USER_ENV.get()}
     if mcp and mcp.get("path_dir"):
         env_["PATH"] = f"{mcp['path_dir']}:{env_.get('PATH', '')}"  # the MCP server's own Node first
     proc = await asyncio.create_subprocess_exec(*cmd, cwd=str(cwd), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, limit=STREAM_LIMIT, env=env_)

@@ -19,6 +19,17 @@ from pathlib import Path
 log = logging.getLogger("arena.agent_sessions")
 
 CLAUDE_ROOT = Path(os.environ.get("CLAUDE_CONFIG_DIR", os.path.expanduser("~/.claude")))
+
+
+def claude_root_for(user_id: str | None) -> Path:
+    """The sessions a user sees: their own Claude home on this server when they connected a token; else the machine's."""
+    if user_id:
+        from .local_engine import CLAUDE_HOMES
+        from . import keystore
+
+        if keystore.get_key(user_id, "claude-code"):
+            return CLAUDE_HOMES / user_id
+    return CLAUDE_ROOT
 CODEX_ROOT = Path(os.environ.get("CODEX_HOME", os.path.expanduser("~/.codex")))
 HEAD_BYTES = 256 * 1024
 TAIL_BYTES = 64 * 1024
@@ -129,9 +140,9 @@ def _claude_session_summary(path: Path) -> dict | None:
             "created": first_ts or st.st_mtime, "updated": last_ts or st.st_mtime, "size": st.st_size, "live": time.time() - st.st_mtime < 120}
 
 
-def _claude_sessions() -> list[dict]:
+def _claude_sessions(user_id: str | None = None) -> list[dict]:
     out = []
-    root = CLAUDE_ROOT / "projects"
+    root = claude_root_for(user_id) / "projects"
     if not root.exists():
         return out
     for proj in root.iterdir():
@@ -354,8 +365,8 @@ def _project_name(cwd: str | None, key: str) -> str:
     return key.strip("-").split("-")[-1] or key
 
 
-def list_sessions(engine: str) -> dict:
-    sessions = _claude_sessions() if engine == "claude" else _codex_sessions()
+def list_sessions(engine: str, user_id: str | None = None) -> dict:
+    sessions = _claude_sessions(user_id) if engine == "claude" else _codex_sessions()
     projects: dict[str, dict] = {}
     for s in sessions:
         key = s.get("cwd") or s["project_key"]
@@ -365,14 +376,14 @@ def list_sessions(engine: str) -> dict:
         pr["sessions"].sort(key=lambda x: -x["updated"])
         pr["updated"] = pr["sessions"][0]["updated"]
     out = sorted(projects.values(), key=lambda p: -p["updated"])
-    return {"engine": engine, "available": (CLAUDE_ROOT / "projects").exists() if engine == "claude" else (CODEX_ROOT / "sessions").exists(), "projects": out, "count": len(sessions)}
+    return {"engine": engine, "available": (claude_root_for(user_id) / "projects").exists() if engine == "claude" else (CODEX_ROOT / "sessions").exists(), "projects": out, "count": len(sessions)}
 
 
-def _find(engine: str, session_id: str) -> Path | None:
+def _find(engine: str, session_id: str, user_id: str | None = None) -> Path | None:
     if not re.fullmatch(r"[\w-]+", session_id):
         return None
     if engine == "claude":
-        for f in (CLAUDE_ROOT / "projects").glob(f"*/{session_id}.jsonl"):
+        for f in (claude_root_for(user_id) / "projects").glob(f"*/{session_id}.jsonl"):
             return f
         return None
     for f in (CODEX_ROOT / "sessions").rglob(f"rollout-*{session_id}.jsonl"):
@@ -380,8 +391,8 @@ def _find(engine: str, session_id: str) -> Path | None:
     return None
 
 
-def get_session(engine: str, session_id: str) -> dict | None:
-    path = _find(engine, session_id)
+def get_session(engine: str, session_id: str, user_id: str | None = None) -> dict | None:
+    path = _find(engine, session_id, user_id)
     if not path:
         return None
     st = path.stat()
@@ -401,13 +412,15 @@ def get_session(engine: str, session_id: str) -> dict | None:
 
 # ------------------------------------------------------------------------------------------------ chat (resume the session)
 
-async def chat(engine: str, session_id: str, text: str):
+async def chat(engine: str, session_id: str, text: str, user_id: str | None = None):
     """Continue the conversation with the real CLI (`claude --resume` / `codex resume`) in its own folder, streaming
     the engine's events as JSON lines: text_delta / text / thinking / activity / result / error."""
-    from .local_engine import run_claude_code, run_codex
+    from .local_engine import USER_ENV, run_claude_code, run_codex, user_claude_env
     from .tasks import spawn
 
-    path = _find(engine, session_id)
+    if user_id:
+        USER_ENV.set(user_claude_env(user_id))
+    path = _find(engine, session_id, user_id)
     if not path:
         yield json.dumps({"kind": "error", "error": "Sesión no encontrada"}) + "\n"
         return

@@ -163,6 +163,7 @@ export const api = {
   agentSessions: (engine: 'claude' | 'codex') => j<AgentSessionList>(authed(`/api/agents/sessions?engine=${engine}`)),
   agentChat: (engine: 'claude' | 'codex', id: string, text: string) => post(`/api/agents/sessions/${engine}/${id}/message`, { text }),
   agentSession: (engine: 'claude' | 'codex', id: string) => j<AgentSessionDetail>(authed(`/api/agents/sessions/${engine}/${id}`)),
+  saveClaudeToken: (token: string | null, clear = false) => j<{ status: { set: boolean; last4: string | null }; engines: EngineStatus[] }>(authed('/api/settings/claude-token', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, clear }) })),
   devices: () => j<{ ios: { ok: boolean; hint: string | null; booted: string | null }; android: { ok: boolean; hint: string | null; booted: string | null } }>(authed('/api/devices')),
   runScreenUrl: (sessionId: string, id: string, target: 'ios' | 'android') => `/api/sessions/${sessionId}/builds/${id}/run/screen?target=${target}&token=${encodeURIComponent(getToken() ?? '')}&t=`,
   runTap: (sessionId: string, id: string, target: 'ios' | 'android', x: number, y: number) => j<{ ok: boolean }>(post(`/api/sessions/${sessionId}/builds/${id}/run/tap`, { target, x, y })),
@@ -231,6 +232,7 @@ export interface EngineStatus {
   auth: string | null
   ok: boolean
   hint: string | null
+  token_set?: boolean  // Claude Code: the user's own subscription token is stored on this server
 }
 
 export interface ServiceVar {

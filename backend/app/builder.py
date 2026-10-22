@@ -45,7 +45,7 @@ from .expertise import expertise_block, quality_bar
 from . import skills as skillmod
 from .design import BUILDER_DESIGN_RULE, ENGINE_DESIGN_PROMPT, MOCK_DESIGN, DESIGN_USER, design_context_for_builder, design_system_prompt, POLISH_PROMPT, frontend_design_guide
 from .providers import PROVIDERS, CallResult, Cred, MockContext, stream
-from .local_engine import ENGINES, is_engine, run_engine, snapshot_dir, sync_files, workdir
+from .local_engine import ENGINES, is_engine, run_engine, snapshot_dir, sync_files, workdir, USER_ENV, user_claude_env
 from .roles import role_of
 from . import research as rsch
 
@@ -387,6 +387,7 @@ class Build:
         self.task = spawn(self.pipeline_audit())
 
     async def pipeline_audit(self) -> None:
+        USER_ENV.set(user_claude_env(self.user.id))  # the engine runs as this user (their own subscription token on a server)
         try:
             rnd = await self.run_review(1, mode="audit")
             if rnd and not self._stop.is_set():
@@ -464,6 +465,7 @@ class Build:
 
     async def pipeline(self, resume_with: str | None = None, review_first: bool = False) -> None:
         """build → (review → changes)* until the council approves, max rounds, stop or error. Closes the stream at the end."""
+        USER_ENV.set(user_claude_env(self.user.id))  # the engine runs as this user (their own subscription token on a server)
         try:
             if not review_first:
                 if resume_with is None and (self.req.research or self.req.references) and RESEARCH_PATH not in self.files and not self._stop.is_set():
@@ -1283,6 +1285,7 @@ class Build:
 
     async def research_then_apply(self, changes: list[dict], session_id: str, refs: list[str]) -> None:
         """References added when accepting the council's list: benchmark them first, then apply the list with that bar."""
+        USER_ENV.set(user_claude_env(self.user.id))  # the engine runs as this user (their own subscription token on a server)
         before = self.status
         try:
             self.chat.append({"role": "system", "text": f"Investigando {len(refs)} referente(s) antes de aplicar los cambios: {', '.join(refs)[:300]}", "ts": time.time()})

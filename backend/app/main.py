@@ -707,7 +707,7 @@ def dashboard(user: User = CurrentUser):
         "active_jobs": _active_jobs(user.id), "max_jobs": MAX_CONCURRENT_JOBS,
         "setup": {
             "api_keys": sum(1 for c in eff.values() if c.source == "user"),
-            "engines": [e for e in engine_status() if e["ok"]],
+            "engines": [e for e in engine_status(user.id) if e["ok"]],
             "langfuse": obs.ENABLED, "sessions": len(all_sessions),
         },
     }
@@ -864,16 +864,30 @@ def research_status(_: User = CurrentUser):
 
 
 @app.get("/api/engines")
-def engines(_: User = CurrentUser):
+def engines(user: User = CurrentUser):
     """Local CLI agents (Claude Code / Codex) usable as builder + review council without API billing."""
-    return engine_status()
+    return engine_status(user.id)
+
+
+@app.put("/api/settings/claude-token")
+def settings_claude_token(body: dict, user: User = CurrentUser):
+    """The user's own Claude Code subscription token (`claude setup-token` on their computer): with it, builds and the
+    sessions chat run on this server as them, PC off or not."""
+    tok = (body.get("token") or "").strip()
+    if body.get("clear"):
+        keystore.save(user.id, "claude-code", clear_key=True)
+    elif tok:
+        if not tok.startswith("sk-ant-oat"):
+            raise HTTPException(400, "Ese no parece un token de `claude setup-token` (empieza con sk-ant-oat…).")
+        keystore.save(user.id, "claude-code", api_key=tok)
+    return {"status": keystore.key_status(user.id, "claude-code"), "engines": engine_status(user.id)}
 
 
 @app.post("/api/builds")
 async def create_build(req: BuildRequest, user: User = CurrentUser):
     data = _saved(user, req.session_id)
     if is_engine(req.provider):
-        st = next(e for e in engine_status() if e["id"] == req.provider)
+        st = next(e for e in engine_status(user.id) if e["id"] == req.provider)
         if not st["ok"]:
             raise HTTPException(400, f"{st['label']}: {st['hint'] or 'no disponible'}")
         cred = Cred("local", None, req.model, "local")
@@ -970,7 +984,7 @@ async def create_audit(
     if len(agents) < 1:
         raise HTTPException(400, "Elegí al menos un rol auditor")
     if is_engine(provider):
-        st = next(e for e in engine_status() if e["id"] == provider)
+        st = next(e for e in engine_status(user.id) if e["id"] == provider)
         if not st["ok"]:
             raise HTTPException(400, f"{st['label']}: {st['hint'] or 'no disponible'}")
         cred = Cred("local", None, model, "local")
@@ -1984,14 +1998,14 @@ def agent_sessions_list(engine: str = "claude", user: User = CurrentUser):
     """Your Claude Code / Codex conversations on this machine, grouped by project (read-only)."""
     if engine not in ("claude", "codex"):
         raise HTTPException(400, "engine: claude | codex")
-    return agent_sessions.list_sessions(engine)
+    return agent_sessions.list_sessions(engine, user.id)
 
 
 @app.get("/api/agents/sessions/{engine}/{session_id}")
 def agent_session_get(engine: str, session_id: str, user: User = CurrentUser):
     if engine not in ("claude", "codex"):
         raise HTTPException(400, "engine: claude | codex")
-    d = agent_sessions.get_session(engine, session_id)
+    d = agent_sessions.get_session(engine, session_id, user.id)
     if not d:
         raise HTTPException(404, "Sesión no encontrada")
     return d
@@ -2006,7 +2020,7 @@ async def agent_session_message(engine: str, session_id: str, body: dict, user: 
     if not text:
         raise HTTPException(400, "Escribí un mensaje")
     _check_capacity(user.id)
-    return StreamingResponse(agent_sessions.chat(engine, session_id, text), media_type="application/x-ndjson", headers={"cache-control": "no-store", "x-accel-buffering": "no"})
+    return StreamingResponse(agent_sessions.chat(engine, session_id, text, user.id), media_type="application/x-ndjson", headers={"cache-control": "no-store", "x-accel-buffering": "no"})
 
 
 @app.get("/api/devices")
@@ -2050,6 +2064,14 @@ def cloud_app_root(slug: str):
     if not p:
         raise HTTPException(404)
     return FileResponse(p)
+
+
+# ------------------------------------------------------------------ single-service deploy: the built frontend is served by the API
+_STATIC = Path(env("ARENA_STATIC_DIR", str(Path(__file__).resolve().parents[2] / "frontend" / "dist")))
+if _STATIC.is_dir() and (_STATIC / "index.html").exists():
+    from fastapi.staticfiles import StaticFiles
+
+    app.mount("/", StaticFiles(directory=str(_STATIC), html=True), name="frontend")
 
 
 @app.on_event("shutdown")
