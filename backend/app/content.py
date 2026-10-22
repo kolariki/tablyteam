@@ -423,7 +423,7 @@ def _page(*, lang: str, title: str, description: str, path: str, body: str, ld: 
   <div class="in">
     <div><div class="brand">Tably <em>Team</em></div><p>{u["tagline"]}. {u["footer_text"]}</p></div>
     <div><h4>{u["product"]}</h4><a href="{app_home}">{u["home"]}</a><a href="{app_home}#signup">{u["signup"]}</a><a href="{app_home}#login">{u["login"]}</a></div>
-    <div><h4>{u["resources"]}</h4><a href="{_prefix(lang)}/blog">{u["blog"]}</a><a href="{_prefix(lang)}/faq">{u["faq"]}</a><a href="{_prefix(lang)}/blog/feed.xml">RSS</a><a href="/llms.txt">llms.txt</a><a href="/sitemap.xml">Sitemap</a></div>
+    <div><h4>{u["resources"]}</h4><a href="{_prefix(lang)}/blog">{u["blog"]}</a><a href="{_prefix(lang)}/faq">{u["faq"]}</a></div>
     <div class="legal">© {date.today().year} {SITE_NAME}. {u["legal"]}</div>
   </div>
 </footer>
