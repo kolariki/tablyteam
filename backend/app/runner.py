@@ -311,12 +311,7 @@ class AppRun:
             while time.time() - t0 < READY_TIMEOUT:
                 if server.done():
                     code = server.result()
-                    tail = "\n".join(self.logs[-80:])
-                    if "SQLITE_CORRUPT" in tail and (cwd / ".wrangler" / "state").exists():
-                        # wrangler's local KV/DO cache (shipped inside an uploaded zip) is corrupt: it is a throwaway cache
-                        shutil.rmtree(cwd / ".wrangler" / "state", ignore_errors=True)
-                        self._log("· el estado local de wrangler (.wrangler/state) estaba corrupto: se borró. Volvé a correr la app.")
-                        self._set("error", error="El worker de Cloudflare no arrancó por un caché local corrupto (.wrangler/state). Ya se limpió: tocá «Reintentar».")
+                    if self._wrangler_corrupt_cleanup():
                         return
                     self._set("error", error=f"El servidor terminó antes de arrancar (código {code}). Revisá los logs." if code else "El servidor terminó sin levantar un puerto.")
                     return
@@ -346,6 +341,8 @@ class AppRun:
                     self._set("running")
                     code = await server
                     if self.status == "running":
+                        if code not in (0, -15, 143, None) and self._wrangler_corrupt_cleanup():
+                            return
                         self._set("stopped" if code in (0, -15, 143, None) else "error", error=None if code in (0, -15, 143, None) else f"El servidor se cerró (código {code}).")
                     return
                 await asyncio.sleep(1)
@@ -358,6 +355,24 @@ class AppRun:
         except Exception as e:  # pragma: no cover
             self.kill()
             self._set("error", error=str(e)[:300])
+
+    def _wrangler_corrupt_cleanup(self) -> bool:
+        """wrangler's local KV/DO cache (`.wrangler/state`, often shipped inside an uploaded zip) is a throwaway: when the
+        worker dies with SQLITE_CORRUPT, every such folder under the project is removed and the run ends with a retry hint."""
+        tail = "\n".join(self.logs[-120:])
+        if "SQLITE_CORRUPT" not in tail:
+            return False
+        removed = []
+        for d in self.root.rglob(".wrangler"):
+            if "node_modules" in d.parts or not (d / "state").exists():
+                continue
+            shutil.rmtree(d / "state", ignore_errors=True)
+            removed.append(_rel(d / "state", self.root))
+        if not removed:
+            return False
+        self._log("· caché local de wrangler corrupto: se borró " + ", ".join(removed) + ". Volvé a correr la app.")
+        self._set("error", error="El worker de Cloudflare se cayó por un caché local corrupto (.wrangler/state). Ya se limpió: tocá «Reintentar».")
+        return True
 
     async def stop(self) -> None:
         if self.proxy:
