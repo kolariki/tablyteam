@@ -878,7 +878,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                   className="group flex items-center gap-2.5 rounded-2xl bg-accent px-6 py-3.5 text-lg font-bold text-white shadow-sm transition hover:brightness-110 disabled:opacity-50"
                 >
                   {directBusy ? <Loader2 size={20} className="animate-spin" /> : <Zap size={20} className="transition group-hover:scale-110" />}
-                  {directBusy ? tr('Arrancando…', 'Starting…') : tr('Construir directo', 'Build directly')}
+                  {directBusy ? tr('Arrancando…', 'Starting…') : tr('Build', 'Build')}
                 </button>
                 )}
                 {lane === 'team' && (
