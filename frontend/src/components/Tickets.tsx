@@ -245,6 +245,15 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
                         )
                       })}
                       {projOptions.length === 0 && <div className="px-3 py-2 text-[12px] text-ink-3">{T('Esa propiedad no tiene valores todavía.', 'That property has no values yet.')}</div>}
+                      {projOptions.some((o) => !projMap[o]?.build_id) && (
+                        <div className="flex items-center gap-2 border-t border-line bg-surface px-3 py-1.5 text-[12px] text-ink-2">
+                          <span>{T('Los que siguen sin proyecto →', 'The ones still without a project →')}</span>
+                          <select value="" onChange={(e) => { const [sid, bid] = e.target.value.split('|'); if (!bid) return; const next = { ...projMap }; for (const o of projOptions) if (!next[o]?.build_id) next[o] = { session_id: sid, build_id: bid, repo_url: next[o]?.repo_url ?? null }; saveProjects(projProp, next) }} className={`${SELECT} h-8 text-[12px]`}>
+                            <option value="">{T('elegir proyecto…', 'pick a project…')}</option>
+                            {projects.map((p) => (p.builds ?? []).map((b) => <option key={b.id} value={`${p.id}|${b.id}`}>{p.title || p.topic} · v{b.version ?? 1}</option>))}
+                          </select>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <select value={link?.build_id ? `${link.session_id}|${link.build_id}` : ''} onChange={(e) => { const [s, b] = e.target.value.split('|'); saveCfg({ session_id: s || null, build_id: b || null }) }} className={`${SELECT} mt-2 w-full`}>
