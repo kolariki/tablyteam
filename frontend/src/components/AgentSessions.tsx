@@ -8,9 +8,13 @@ import { readCache, writeCache } from '../lib/cache'
 import { fmtDur } from '../lib/duration'
 import { tr, useT } from '../lib/i18n'
 import { PanelLoader } from './HomeLoader'
+import { MUSE_ONLY } from '../lib/flags'
 import ProviderLogo from './ProviderLogo'
 
-type Engine = 'claude' | 'codex'
+type Engine = 'muse' | 'claude' | 'codex'
+const ENGINES: Engine[] = MUSE_ONLY ? ['muse'] : ['muse', 'claude', 'codex']
+const LOGO: Record<Engine, string> = { muse: 'meta', claude: 'anthropic', codex: 'openai' }
+const NAME: Record<Engine, string> = { muse: 'Muse Code', claude: 'Claude Code', codex: 'Codex' }
 const md = (s: string) => DOMPurify.sanitize(marked.parse(s, { async: false }) as string)
 const PILL = 'flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-[13px] text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent disabled:opacity-40'
 
@@ -144,7 +148,7 @@ function Conversation({ engine, id, onClose }: { engine: Engine; id: string; onC
     <div className="flex min-h-0 flex-1 flex-col">
       {/* header */}
       <div className="flex items-start gap-3 border-b border-line bg-surface px-6 py-4">
-        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface ring-1 ring-black/10"><ProviderLogo provider={engine === 'claude' ? 'anthropic' : 'openai'} size={18} /></span>
+        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface ring-1 ring-black/10"><ProviderLogo provider={LOGO[engine]} size={18} /></span>
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-[18px] leading-tight">{d.title}</h2>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-ink-3">
@@ -180,7 +184,7 @@ function Conversation({ engine, id, onClose }: { engine: Engine; id: string; onC
               </div>
             ) : (
               <div key={i} className="flex gap-3">
-                <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface ring-1 ring-black/10"><ProviderLogo provider={engine === 'claude' ? 'anthropic' : 'openai'} size={14} /></span>
+                <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface ring-1 ring-black/10"><ProviderLogo provider={LOGO[engine]} size={14} /></span>
                 <div className="min-w-0 flex-1">
                   {it.parts.map((p, j) =>
                     p.type === 'text' ? <article key={j} className="md text-[13.5px]" dangerouslySetInnerHTML={{ __html: md(p.text ?? '') }} /> : p.type === 'thinking' ? <ThinkingPart key={j} text={p.text ?? ''} /> : <ToolPart key={j} p={p} />,
@@ -195,7 +199,7 @@ function Conversation({ engine, id, onClose }: { engine: Engine; id: string; onC
                 <div className="max-w-[78%] rounded-2xl rounded-tr-md bg-accent-soft px-4 py-3 text-[13.5px] leading-relaxed text-ink"><div className="whitespace-pre-wrap break-words">{pending.user}</div></div>
               </div>
               <div className="flex gap-3">
-                <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface ring-1 ring-black/10"><ProviderLogo provider={engine === 'claude' ? 'anthropic' : 'openai'} size={14} /></span>
+                <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface ring-1 ring-black/10"><ProviderLogo provider={LOGO[engine]} size={14} /></span>
                 <div className="min-w-0 flex-1">
                   {pending.parts.map((p, j) => (p.type === 'text' ? <article key={j} className="md text-[13.5px]" dangerouslySetInnerHTML={{ __html: md(p.text ?? '') }} /> : <ToolPart key={j} p={p} />))}
                   {pending.text && <article className="md text-[13.5px]" dangerouslySetInnerHTML={{ __html: md(pending.text) }} />}
@@ -228,7 +232,7 @@ function Conversation({ engine, id, onClose }: { engine: Engine; id: string; onC
 /** Your Claude Code and Codex conversations, read from this machine, laid out like the claude.ai web. */
 export default function AgentSessions({ onBack }: { onBack: () => void }) {
   const T = useT()
-  const [engine, setEngine] = useState<Engine>(() => (readCache<Engine>('agents.engine') ?? 'claude'))
+  const [engine, setEngine] = useState<Engine>(() => { const c = readCache<Engine>('agents.engine'); return c && ENGINES.includes(c) ? c : ENGINES[0] })
   const [list, setList] = useState<AgentSessionList | null>(() => readCache<AgentSessionList>(`agents.${engine}`) ?? null)
   const [loading, setLoading] = useState(!list)
   const [q, setQ] = useState('')
@@ -260,9 +264,9 @@ export default function AgentSessions({ onBack }: { onBack: () => void }) {
           <div className="text-[17px] leading-tight">{T('Proyectos y conversaciones', 'Projects and conversations')}</div>
         </div>
         <div className="ml-auto flex items-center rounded-full border border-line bg-paper p-1 shadow-sm">
-          {(['claude', 'codex'] as Engine[]).map((e) => (
+          {ENGINES.map((e) => (
             <button key={e} onClick={() => { setEngine(e); setSel(null) }} className={`flex h-8 items-center gap-2 rounded-full px-3.5 text-[13px] font-medium transition ${engine === e ? 'bg-accent text-white shadow-sm' : 'text-ink-2 hover:text-ink'}`}>
-              <ProviderLogo provider={e === 'claude' ? 'anthropic' : 'openai'} size={14} className={engine === e ? 'brightness-[3]' : ''} /> {e === 'claude' ? 'Claude Code' : 'Codex'}
+              <ProviderLogo provider={LOGO[e]} size={14} className={engine === e ? 'brightness-[3]' : ''} /> {NAME[e]}
             </button>
           ))}
         </div>

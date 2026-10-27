@@ -161,9 +161,9 @@ export const api = {
   appRun: (sessionId: string, id: string) => j<{ services: RunService[]; run: AppRunState | null }>(authed(`/api/sessions/${sessionId}/builds/${id}/run`)),
   appStart: (sessionId: string, id: string, service: string) => j(post(`/api/sessions/${sessionId}/builds/${id}/run`, { service })),
   appStop: (sessionId: string, id: string) => j(authed(`/api/sessions/${sessionId}/builds/${id}/run`, { method: 'DELETE' })),
-  agentSessions: (engine: 'claude' | 'codex') => j<AgentSessionList>(authed(`/api/agents/sessions?engine=${engine}`)),
-  agentChat: (engine: 'claude' | 'codex', id: string, text: string) => post(`/api/agents/sessions/${engine}/${id}/message`, { text }),
-  agentSession: (engine: 'claude' | 'codex', id: string) => j<AgentSessionDetail>(authed(`/api/agents/sessions/${engine}/${id}`)),
+  agentSessions: (engine: 'muse' | 'claude' | 'codex') => j<AgentSessionList>(authed(`/api/agents/sessions?engine=${engine}`)),
+  agentChat: (engine: 'muse' | 'claude' | 'codex', id: string, text: string) => post(`/api/agents/sessions/${engine}/${id}/message`, { text }),
+  agentSession: (engine: 'muse' | 'claude' | 'codex', id: string) => j<AgentSessionDetail>(authed(`/api/agents/sessions/${engine}/${id}`)),
   saveClaudeToken: (token: string | null, clear = false) => j<{ status: { set: boolean; last4: string | null }; engines: EngineStatus[] }>(authed('/api/settings/claude-token', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, clear }) })),
   devices: () => j<{ ios: { ok: boolean; hint: string | null; booted: string | null }; android: { ok: boolean; hint: string | null; booted: string | null } }>(authed('/api/devices')),
   runScreenUrl: (sessionId: string, id: string, target: 'ios' | 'android') => `/api/sessions/${sessionId}/builds/${id}/run/screen?target=${target}&token=${encodeURIComponent(getToken() ?? '')}&t=`,
@@ -291,7 +291,7 @@ export interface CloudInfo {
 }
 export interface AgentSessionSummary {
   id: string
-  engine: 'claude' | 'codex'
+  engine: 'muse' | 'claude' | 'codex'
   title: string
   first_prompt: string | null
   cwd: string | null
@@ -303,7 +303,7 @@ export interface AgentSessionSummary {
   live: boolean
 }
 export interface AgentSessionList {
-  engine: 'claude' | 'codex'
+  engine: 'muse' | 'claude' | 'codex'
   available: boolean
   count: number
   projects: { key: string; name: string; path: string | null; updated: number; sessions: AgentSessionSummary[] }[]

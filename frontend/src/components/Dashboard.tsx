@@ -107,7 +107,7 @@ export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refres
     for (const s of [...data.sessions].sort((a, b) => b.created - a.created)) groups.set(key(s), [...(groups.get(key(s)) ?? []), s])
     return [...groups.values()].map(([lead, ...older]) => ({ ...lead, runs: older })).filter((r) => hit(r) || r.runs.some(hit))
   }, [data, q])
-  const isEngine = (p?: string) => p === 'claude-code' || p === 'codex'
+  const isEngine = (p?: string) => p === 'claude-code' || p === 'codex' || p === 'muse-code'
   const apiCost = (s: DashboardData['sessions'][number]) => (s.cost_usd ?? 0) + (s.council_cost_usd ?? 0) + (s.builds ?? []).reduce((a, b) => a + (isEngine(b.provider) ? 0 : b.cost_usd ?? 0) + (b.fees_usd ?? 0), 0)
 
   if (!data) return null

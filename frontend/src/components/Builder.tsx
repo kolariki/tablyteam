@@ -183,7 +183,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
   const shownFile = b.liveFile && b.selected === b.liveFile.path ? b.liveFile.content : b.files[b.selected ?? '']?.content
   const tree = useMemo(() => buildTree(Object.keys(b.files).concat(b.liveFile ? [b.liveFile.path] : [])), [b.files, b.liveFile?.path])
   const stageCount = b.stages.length
-  const isEngineBuild = b.provider === 'claude-code' || b.provider === 'codex'
+  const isEngineBuild = b.provider === 'claude-code' || b.provider === 'codex' || b.provider === 'muse-code'
   const codeTheme = useEditorTheme((s) => s.theme)
   const [payingFees, setPayingFees] = useState(false)
   const [stopping, setStopping] = useState(false)
@@ -649,7 +649,7 @@ function SavingsCard() {
   const ourTokens = b.tokens || codeTokens
   const price = b.cost > 0 && b.tokens > 0 ? b.cost / b.tokens : 20 / 1e6
   const baselineCost = baselineTokens * price
-  const ourCost = (b.provider === 'claude-code' || b.provider === 'codex') ? b.fees : b.cost
+  const ourCost = (b.provider === 'claude-code' || b.provider === 'codex' || b.provider === 'muse-code') ? b.fees : b.cost
   const tokSaved = Math.max(0, baselineTokens - ourTokens)
   const minSaved = Math.max(0, baselineMinutes - Math.round(b.buildSeconds / 60))
   const usdSaved = Math.max(0, baselineCost - ourCost)

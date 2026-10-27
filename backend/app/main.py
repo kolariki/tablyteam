@@ -2057,15 +2057,15 @@ async def git_http(user_id: str, repo: str, path: str, request: Request):
 @app.get("/api/agents/sessions")
 def agent_sessions_list(engine: str = "claude", user: User = CurrentUser):
     """Your Claude Code / Codex conversations on this machine, grouped by project (read-only)."""
-    if engine not in ("claude", "codex"):
-        raise HTTPException(400, "engine: claude | codex")
+    if engine not in ("claude", "codex", "muse"):
+        raise HTTPException(400, "engine: claude | codex | muse")
     return agent_sessions.list_sessions(engine, user.id)
 
 
 @app.get("/api/agents/sessions/{engine}/{session_id}")
 def agent_session_get(engine: str, session_id: str, user: User = CurrentUser):
-    if engine not in ("claude", "codex"):
-        raise HTTPException(400, "engine: claude | codex")
+    if engine not in ("claude", "codex", "muse"):
+        raise HTTPException(400, "engine: claude | codex | muse")
     d = agent_sessions.get_session(engine, session_id, user.id)
     if not d:
         raise HTTPException(404, "Sesión no encontrada")
@@ -2075,8 +2075,8 @@ def agent_session_get(engine: str, session_id: str, user: User = CurrentUser):
 @app.post("/api/agents/sessions/{engine}/{session_id}/message")
 async def agent_session_message(engine: str, session_id: str, body: dict, user: User = CurrentUser):
     """Chat from the sessions screen: resumes the real CLI session and streams its events as JSON lines."""
-    if engine not in ("claude", "codex"):
-        raise HTTPException(400, "engine: claude | codex")
+    if engine not in ("claude", "codex", "muse"):
+        raise HTTPException(400, "engine: claude | codex | muse")
     text = (body.get("text") or "").strip()[:20000]
     if not text:
         raise HTTPException(400, "Escribí un mensaje")

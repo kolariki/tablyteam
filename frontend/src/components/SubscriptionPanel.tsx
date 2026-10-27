@@ -2,6 +2,7 @@ import { CheckCircle2, Circle, Copy, KeyRound, Loader2, Smartphone, Terminal, Tr
 import { useEffect, useRef, useState } from 'react'
 import { api, type EngineStatus } from '../lib/api'
 import { tr, useT } from '../lib/i18n'
+import { visibleEngines } from '../lib/flags'
 import ProviderLogo, { LogoWatermark } from './ProviderLogo'
 import { toast } from './Toast'
 
@@ -13,6 +14,13 @@ const STEPS: Record<string, { plan: string; install: string; login: string; what
     login: 'claude auth login',
     what: 'Se abre el navegador: entrá con la cuenta de claude.ai que tiene el plan. No hace falta API key ni tarjeta.',
     what_en: 'Your browser opens: sign in with the claude.ai account that has the plan. No API key or card needed.',
+  },
+  'muse-code': {
+    plan: 'META_API_KEY · Meta Model API',
+    install: 'curl -fsSL https://dev.meta.ai/install.sh | sh',
+    login: 'muse login',
+    what: 'Con tu META_API_KEY cargada en «Modelos y API keys» no hace falta login: Tably corre Muse Code con esa key. `muse login` sirve para usar tu cuenta de Meta en la terminal.',
+    what_en: 'With your META_API_KEY loaded in “Models and API keys” there is no login needed: Tably runs Muse Code with that key. `muse login` lets you use your Meta account in the terminal.',
   },
   codex: {
     plan: 'ChatGPT Plus / Pro',
@@ -54,7 +62,7 @@ export default function SubscriptionPanel() {
         if (was && !was.ok && e.ok) toast.ok(`${e.label.split(' · ')[0]} ${tr('conectado', 'connected')}`, `${tr('Listo: usa', 'Ready: using')} ${e.auth ?? tr('tu plan', 'your plan')}.`)
       }
       prev.current = es
-      setEngines(es)
+      setEngines(visibleEngines(es))
     } catch (e) {
       if (!silent) toast.error(tr('No pude consultar los agentes locales', 'Could not check the local agents'), (e as Error).message)
     }

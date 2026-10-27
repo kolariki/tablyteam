@@ -30,6 +30,7 @@ export const BRAND_COLOR: Record<string, string> = {
   ollama: '#6E8226',
   mock: '#8A9299',
   'claude-code': '#C0603F',
+  'muse-code': '#0082FB',
   codex: '#17896A',
 }
 
@@ -82,6 +83,7 @@ export const BRAND_THEME: Record<string, { tint: string; bg: string; border: str
   openrouter: { tint: '#E5E0FA', bg: 'linear-gradient(135deg, #F1EEFF 0%, #E7E3FB 100%)', border: '#D2CBF3', accent: '#6467F2', ink: '#2B2A5A' },
   ollama: { tint: '#EAEAEA', bg: 'linear-gradient(135deg, #FAFAFA 0%, #ECECEC 100%)', border: '#D6D6D6', accent: '#222222', ink: '#1A1A1A' },
   mock: { tint: '#E9EDEB', bg: 'linear-gradient(135deg, #F6F7F6 0%, #ECEFED 100%)', border: '#DCE2DE', accent: '#8A9299', ink: '#3A4440' },
+  'muse-code': { tint: '#D9E9FF', bg: 'linear-gradient(135deg, #EEF5FF 0%, #DCEBFF 100%)', border: '#BBD5FA', accent: '#0064E0', ink: '#0B2E66' },
   'claude-code': { tint: '#F2E4D6', bg: 'linear-gradient(135deg, #F8F2EA 0%, #F1E4D6 100%)', border: '#E6CDB8', accent: '#C0603F', ink: '#3B2A22' },
   codex: { tint: '#E7ECEA', bg: 'linear-gradient(135deg, #F6F7F7 0%, #E9ECEB 100%)', border: '#D3D9D6', accent: '#0F0F0F', ink: '#1B1F1E' },
   // deploy targets (same card language as the model companies)

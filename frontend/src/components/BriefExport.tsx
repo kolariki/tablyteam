@@ -28,7 +28,7 @@ function extractPrompt(md: string): string | null {
   return m ? m[1].trim() : null
 }
 
-const isEngineProvider = (id: string) => id === 'claude-code' || id === 'codex'
+const isEngineProvider = (id: string) => id === 'claude-code' || id === 'codex' || id === 'muse-code'
 
 const LABEL = 'text-[11px] uppercase tracking-[0.25em] text-ink-3'
 const LABEL_ACCENT = 'text-[11px] uppercase tracking-[0.25em] text-accent'

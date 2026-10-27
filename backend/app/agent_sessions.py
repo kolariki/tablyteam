@@ -31,6 +31,7 @@ def claude_root_for(user_id: str | None) -> Path:
             return CLAUDE_HOMES / user_id
     return CLAUDE_ROOT
 CODEX_ROOT = Path(os.environ.get("CODEX_HOME", os.path.expanduser("~/.codex")))
+MUSE_ROOT = Path(os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share"))) / "muse" / "sessions"  # YYYY/MM/DD/<id>/session.jsonl
 HEAD_BYTES = 256 * 1024
 TAIL_BYTES = 64 * 1024
 MAX_TEXT = 12000  # per block, in the detail view
@@ -359,6 +360,95 @@ def _codex_detail(path: Path) -> dict:
 
 # ------------------------------------------------------------------------------------------------ public API
 
+# ------------------------------------------------------------------------------------------------ muse code (Meta)
+
+def _muse_records(path: Path):
+    for line in _iter_lines(path):
+        d = _loads(line)
+        if d and d.get("payload_type"):
+            yield d
+
+
+def _muse_prompt_text(payload: dict) -> str:
+    parts = [str(b.get("text") or "") for b in payload.get("refill_blocks") or [] if isinstance(b, dict)]
+    if not parts:
+        for m in payload.get("model_messages") or []:
+            for b in (m or {}).get("content") or []:
+                if isinstance(b, dict) and b.get("kind") == "text":
+                    parts.append(str(b.get("text") or ""))
+    return _clean("\n".join(p for p in parts if p))
+
+
+def _muse_session_summary(path: Path) -> dict | None:
+    st = path.stat()
+    title, cwd, branch, first_ts, model, name = None, None, None, None, None, None
+    for d in _muse_records(path):
+        pt = d.get("payload_type")
+        pl = d.get("payload") or {}
+        rec = pl.get("record") or {}
+        first_ts = first_ts or (d.get("recorded_at") / 1e6 if d.get("recorded_at") else None)
+        if pt == "runtime.session.metadata":
+            cwd = cwd or rec.get("workspace_root")
+        elif pt == "session.workspace_branch.observed":
+            branch = branch or ((rec.get("reference") or {}).get("name"))
+        elif pt == "runtime.user_intent.accepted" and not title:
+            title = _title_from(_muse_prompt_text(pl))
+        elif pt == "session.name.changed":
+            name = pl.get("new_name") or name
+        elif pt == "run.usage":
+            for m in pl.get("models") or []:
+                model = model or m.get("model")
+    if not title:
+        return None
+    return {"id": path.parent.name, "engine": "muse", "title": title, "name": name, "first_prompt": title, "cwd": cwd, "branch": branch, "model": model,
+            "created": first_ts or st.st_mtime, "updated": st.st_mtime, "size": st.st_size, "live": time.time() - st.st_mtime < 120}
+
+
+def _muse_sessions() -> list[dict]:
+    out = []
+    if not MUSE_ROOT.exists():
+        return out
+    for f in MUSE_ROOT.glob("*/*/*/*/session.jsonl"):
+        try:
+            s = _muse_session_summary(f)
+        except Exception as e:  # noqa: BLE001
+            log.debug("muse session %s: %s", f, e)
+            s = None
+        if s:
+            s["project_key"] = s.get("cwd") or f.parent.name
+            out.append(s)
+    return out
+
+
+def _muse_detail(path: Path) -> dict:
+    """Prompts are durable in the session log; the agent's replies and tool calls are there only when the build retains them
+    (headless runs keep the prompts and the run outcome). Shown in order, like the other engines."""
+    items: list[dict] = []
+    for d in _muse_records(path):
+        pt = d.get("payload_type")
+        pl = d.get("payload") or {}
+        ts = d.get("recorded_at") / 1e6 if d.get("recorded_at") else None
+        if pt == "runtime.user_intent.accepted":
+            t = _muse_prompt_text(pl)
+            if t:
+                items.append({"role": "user", "text": t[:MAX_TEXT], "ts": ts})
+        elif pt == "run.terminal.completed" and pl.get("text"):
+            items.append({"role": "assistant", "text": str(pl["text"])[:MAX_TEXT], "ts": ts})
+        elif pt == "run.output.delta" and pl.get("text"):
+            if items and items[-1].get("role") == "assistant" and items[-1].get("_delta"):
+                items[-1]["text"] = (items[-1]["text"] + str(pl["text"]))[:MAX_TEXT]
+            else:
+                items.append({"role": "assistant", "text": str(pl["text"])[:MAX_TEXT], "ts": ts, "_delta": True})
+        elif pt and "tool" in pt and not any(k in pt for k in ("result", "completed", "output")):
+            name = str(pl.get("tool") or pl.get("tool_name") or pl.get("name") or pt)
+            items.append({"role": "tool", "name": name, "text": json.dumps(pl.get("arguments") or pl.get("args") or pl.get("input") or {})[:600], "ts": ts})
+        if len(items) >= MAX_ITEMS:
+            break
+    for it in items:
+        it.pop("_delta", None)
+    return {"items": items, "count": len(items)}
+
+
 def _project_name(cwd: str | None, key: str) -> str:
     if cwd:
         return Path(cwd).name or cwd
@@ -366,7 +456,7 @@ def _project_name(cwd: str | None, key: str) -> str:
 
 
 def list_sessions(engine: str, user_id: str | None = None) -> dict:
-    sessions = _claude_sessions(user_id) if engine == "claude" else _codex_sessions()
+    sessions = _claude_sessions(user_id) if engine == "claude" else _muse_sessions() if engine == "muse" else _codex_sessions()
     projects: dict[str, dict] = {}
     for s in sessions:
         key = s.get("cwd") or s["project_key"]
@@ -376,7 +466,8 @@ def list_sessions(engine: str, user_id: str | None = None) -> dict:
         pr["sessions"].sort(key=lambda x: -x["updated"])
         pr["updated"] = pr["sessions"][0]["updated"]
     out = sorted(projects.values(), key=lambda p: -p["updated"])
-    return {"engine": engine, "available": (claude_root_for(user_id) / "projects").exists() if engine == "claude" else (CODEX_ROOT / "sessions").exists(), "projects": out, "count": len(sessions)}
+    available = (claude_root_for(user_id) / "projects").exists() if engine == "claude" else MUSE_ROOT.exists() if engine == "muse" else (CODEX_ROOT / "sessions").exists()
+    return {"engine": engine, "available": available, "projects": out, "count": len(sessions)}
 
 
 def _find(engine: str, session_id: str, user_id: str | None = None) -> Path | None:
@@ -384,6 +475,10 @@ def _find(engine: str, session_id: str, user_id: str | None = None) -> Path | No
         return None
     if engine == "claude":
         for f in (claude_root_for(user_id) / "projects").glob(f"*/{session_id}.jsonl"):
+            return f
+        return None
+    if engine == "muse":
+        for f in MUSE_ROOT.glob(f"*/*/*/{session_id}/session.jsonl"):
             return f
         return None
     for f in (CODEX_ROOT / "sessions").rglob(f"rollout-*{session_id}.jsonl"):
@@ -400,9 +495,9 @@ def get_session(engine: str, session_id: str, user_id: str | None = None) -> dic
     cached = _detail_cache.get(key)
     if cached and cached[0] == (st.st_mtime, st.st_size):
         return cached[1]
-    detail = _claude_detail(path) if engine == "claude" else _codex_detail(path)
-    summary = (_claude_session_summary if engine == "claude" else _codex_session_summary)(path) or {}
-    resume = f"claude --resume {session_id}" if engine == "claude" else f"codex resume {session_id}"
+    detail = _claude_detail(path) if engine == "claude" else _muse_detail(path) if engine == "muse" else _codex_detail(path)
+    summary = (_claude_session_summary if engine == "claude" else _muse_session_summary if engine == "muse" else _codex_session_summary)(path) or {}
+    resume = f"claude --resume {session_id}" if engine == "claude" else f"muse resume {session_id}" if engine == "muse" else f"codex resume {session_id}"
     result = {**{k: v for k, v in summary.items() if k not in ("project_key", "path")}, **detail, "resume": resume, "file": str(path)}
     if len(_detail_cache) > 40:
         _detail_cache.pop(next(iter(_detail_cache)))
@@ -415,7 +510,7 @@ def get_session(engine: str, session_id: str, user_id: str | None = None) -> dic
 async def chat(engine: str, session_id: str, text: str, user_id: str | None = None):
     """Continue the conversation with the real CLI (`claude --resume` / `codex resume`) in its own folder, streaming
     the engine's events as JSON lines: text_delta / text / thinking / activity / result / error."""
-    from .local_engine import USER_ENV, run_claude_code, run_codex, user_claude_env
+    from .local_engine import USER_ENV, run_claude_code, run_codex, run_muse_code, user_claude_env
     from .tasks import spawn
 
     if user_id:
@@ -424,7 +519,7 @@ async def chat(engine: str, session_id: str, text: str, user_id: str | None = No
     if not path:
         yield json.dumps({"kind": "error", "error": "Sesión no encontrada"}) + "\n"
         return
-    summary = (_claude_session_summary if engine == "claude" else _codex_session_summary)(path) or {}
+    summary = (_claude_session_summary if engine == "claude" else _muse_session_summary if engine == "muse" else _codex_session_summary)(path) or {}
     cwd = Path(summary.get("cwd") or "")
     if not cwd.is_dir():
         yield json.dumps({"kind": "error", "error": f"La carpeta de la sesión ya no existe: {cwd}"}) + "\n"
@@ -438,6 +533,8 @@ async def chat(engine: str, session_id: str, text: str, user_id: str | None = No
         try:
             if engine == "claude":
                 res = await run_claude_code(text, cwd, resume_session=session_id, on_event=on_event)
+            elif engine == "muse":
+                res = await run_muse_code(text, cwd, resume_session=session_id, on_event=on_event)
             else:
                 res = await run_codex(text, cwd, resume_session=session_id, on_event=on_event)
             await q.put({"kind": "result", "text": res.get("text", ""), "cost": res.get("cost", 0), "is_error": res.get("is_error", False), "error": res.get("error")})

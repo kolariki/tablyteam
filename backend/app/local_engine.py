@@ -30,7 +30,21 @@ ENGINES: dict[str, dict] = {
     # "default" from the UI resolves to the engine's strongest model, not to whatever the CLI happens to have configured
     "claude-code": {"label": "Claude Code · tu suscripción", "logo": "anthropic", "bin": env("ARENA_CLAUDE_BIN", "claude"), "color": "#C0603F", "default_model": env("ARENA_CLAUDE_MODEL", "claude-opus-5-5")},
     "codex": {"label": "Codex CLI · ChatGPT", "logo": "openai", "bin": env("ARENA_CODEX_BIN", "codex"), "color": "#17896A"},
+    # Meta's coding agent (`muse exec --json`): runs with the user's META_API_KEY from Tably, or with `muse login` on this machine
+    "muse-code": {"label": "Muse Code · Meta", "logo": "meta", "bin": env("ARENA_MUSE_BIN", "muse"), "color": "#0082FB", "default_model": env("ARENA_MUSE_MODEL", "muse-wonder-1.0")},
 }
+MUSE_HOME = Path(env("XDG_CONFIG_HOME", str(Path.home() / ".config"))) / "muse"
+
+
+def _which(spec: dict) -> str | None:
+    """The engine binary on PATH, or in the places the official installers use (~/.local/bin for Muse Code)."""
+    found = shutil.which(spec["bin"])
+    if found:
+        return found
+    for cand in (Path.home() / ".local" / "bin" / spec["bin"], Path("/usr/local/bin") / spec["bin"], Path("/opt/homebrew/bin") / spec["bin"]):
+        if cand.exists():
+            return str(cand)
+    return None
 BUILD_ROOT = Path(env("ARENA_BUILD_DIR", str(DATA_DIR.parent / "builds")))
 CLAUDE_HOMES = Path(env("ARENA_CLAUDE_HOME_DIR", str(DATA_DIR.parent / "claude-home")))  # one Claude Code home per user (sessions, settings)
 
@@ -52,10 +66,15 @@ def user_claude_env(user_id: str) -> dict:
     computer) and a private config dir. Without a token, the machine's own login is used (local setups)."""
     from . import keystore
 
+    out: dict = {}
     token = keystore.get_key(user_id, "claude-code")
-    if not token:
-        return {}
-    return {"CLAUDE_CODE_OAUTH_TOKEN": token, "CLAUDE_CONFIG_DIR": str(claude_home(user_id))}
+    if token:
+        out.update({"CLAUDE_CODE_OAUTH_TOKEN": token, "CLAUDE_CONFIG_DIR": str(claude_home(user_id))})
+    # Muse Code takes the Meta Model API key from the environment: the key the user loaded in «Modelos y API keys»
+    meta = keystore.get_key(user_id, "meta")
+    if meta:
+        out["META_API_KEY"] = meta
+    return out
 
 SKIP_DIRS = {"node_modules", ".git", ".next", "dist", "build", ".venv", "__pycache__", ".turbo", ".cache", "coverage", ".claude"}
 MAX_FILE = 400_000
@@ -96,11 +115,25 @@ def engine_status(user_id: str | None = None) -> list[dict]:
     from . import keystore
 
     token_set = bool(user_id and keystore.get_key(user_id, "claude-code"))
+    meta_key = bool(user_id and keystore.get_key(user_id, "meta"))
     for eid, spec in ENGINES.items():
-        path = shutil.which(spec["bin"])
+        path = _which(spec)
         st = {"id": eid, "label": spec["label"], "logo": spec["logo"], "color": spec["color"], "installed": bool(path), "version": None, "auth": None, "ok": False, "hint": None, "token_set": token_set if eid == "claude-code" else False}
         if not path:
-            st["hint"] = "No está instalado en esta máquina." + (" Instalá Claude Code: https://claude.com/claude-code" if eid == "claude-code" else " Instalá Codex CLI: npm i -g @openai/codex")
+            st["hint"] = "No está instalado en esta máquina." + (" Instalá Claude Code: https://claude.com/claude-code" if eid == "claude-code" else " Instalá Muse Code: curl -fsSL https://dev.meta.ai/install.sh | sh" if eid == "muse-code" else " Instalá Codex CLI: npm i -g @openai/codex")
+            out.append(st)
+            continue
+        if eid == "muse-code":
+            _, v = _run([path, "--version"])
+            st["version"] = v.splitlines()[0][:40] if v else None
+            if meta_key:
+                st["auth"] = "API key de Meta (tu cuenta de Tably)"
+                st["ok"] = True
+            elif (MUSE_HOME / "auth.json").exists() or os.environ.get("META_API_KEY"):
+                st["auth"] = "sesión de Muse (muse login)"
+                st["ok"] = True
+            else:
+                st["hint"] = "Cargá tu META_API_KEY en Modelos y API keys, o iniciá sesión en tu terminal: `muse login`"
             out.append(st)
             continue
         _, v = _run([path, "--version"])
@@ -398,8 +431,126 @@ async def run_codex(prompt: str, cwd: Path, *, system: str | None = None, contin
     return result
 
 
+# ------------------------------------------------------------------ muse code (Meta)
+
+
+def _muse_tool_activity(payload: dict, cwd: Path) -> tuple[dict | None, str | None]:
+    """Best-effort mapping of a Muse Code tool event to our activity vocabulary. Returns (activity, file_path)."""
+    name = str(payload.get("tool") or payload.get("tool_name") or payload.get("name") or (payload.get("call") or {}).get("name") or "").lower()
+    args = payload.get("arguments") or payload.get("args") or payload.get("input") or (payload.get("call") or {}).get("arguments") or {}
+    if isinstance(args, str):
+        try:
+            args = json.loads(args)
+        except Exception:  # noqa: BLE001
+            args = {"command": args}
+    if not isinstance(args, dict):
+        args = {}
+    path = str(args.get("path") or args.get("file_path") or args.get("file") or "")
+    if any(k in name for k in ("shell", "bash", "exec", "command", "run")):
+        return describe_tool("Bash", {"command": str(args.get("command") or args.get("cmd") or "")}, cwd), None
+    if any(k in name for k in ("write", "create", "apply_patch", "patch")):
+        return describe_tool("Write", {"file_path": path}, cwd), (path or None)
+    if "edit" in name or "replace" in name:
+        return describe_tool("Edit", {"file_path": path}, cwd), (path or None)
+    if any(k in name for k in ("read", "cat", "view", "open")):
+        return describe_tool("Read", {"file_path": path}, cwd), None
+    if any(k in name for k in ("search", "grep", "glob", "find", "ls", "list")):
+        return describe_tool("Grep", {"pattern": str(args.get("pattern") or args.get("query") or "")}, cwd), None
+    return None, None
+
+
+async def _muse_loop(proc, texts: list, result: dict, cwd: Path, on_event: Emit) -> None:
+    """`muse exec --json` prints MSP records: run.output.delta (text as it streams), run.terminal.* (how the turn ended),
+    run.usage (tokens), task.lifecycle.failed (a sub-task that failed) and tool records (names vary by build)."""
+    buf: list[str] = []
+    async for raw in proc.stdout:
+        line = raw.decode("utf-8", "replace").strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        pt = str(ev.get("payload_type") or "")
+        pl = ev.get("payload") or {}
+        if pt == "run.output.delta":
+            t = str(pl.get("text") or "")
+            if t:
+                buf.append(t)
+                await _call(on_event, "text_delta", text=t)
+        elif pt.startswith("run.terminal"):
+            term = str(pl.get("terminal") or pt.rsplit(".", 1)[-1])
+            final = str(pl.get("text") or "")
+            text = final or "".join(buf)
+            if text:
+                texts.append(text)
+                await _call(on_event, "text", text=text)
+            buf.clear()
+            result["turns"] += 1
+            if term != "completed":
+                result["is_error"] = True
+                result["error"] = str(pl.get("reason") or f"muse: {term}")[:400]
+        elif pt == "run.usage":
+            tot = 0
+            for m in pl.get("models") or []:
+                tot += int(m.get("input_tokens") or 0) + int(m.get("output_tokens") or 0) + int(m.get("reasoning_tokens") or 0)
+            result["tokens"] = tot
+        elif pt.startswith("run.reasoning") or pt.startswith("model.reasoning"):
+            t = str(pl.get("text") or "")
+            if t:
+                await _call(on_event, "reasoning", text=t[:500])
+        elif "tool" in pt or str(pl.get("kind") or "").startswith("tool"):
+            if any(k in pt for k in ("result", "completed", "output")):
+                continue  # one activity per call, on the request record
+            act, fp = _muse_tool_activity(pl, cwd)
+            if act:
+                await _call(on_event, "activity", act=act["kind"], label=act["label"], path=act["path"])
+            if fp:
+                await _call(on_event, "file_hint", path=fp)
+        elif pt == "task.lifecycle.failed":
+            reason = str(((pl.get("event") or {}).get("reason")) or "")
+            if reason and "base instructions" not in reason:
+                log.info("muse task failed: %s", reason)
+
+
+async def run_muse_code(prompt: str, cwd: Path, *, system: str | None = None, continue_: bool = False, resume_session: str | None = None, read_only: bool = False, model: str | None = None, mcp: dict | None = None, on_event: Emit = None, max_turns: int = MAX_TURNS) -> dict:
+    """Streams a headless Muse Code run (`muse exec --json`). Auth: META_API_KEY from the user's Tably key (USER_ENV), else the
+    machine's `muse login`. Approvals are off (there is nobody to answer them) and the sandbox too, like our other engines."""
+    spec = ENGINES["muse-code"]
+    binary = _which(spec) or spec["bin"]
+    full = (system + "\n\n" if system else "") + prompt
+    if read_only:
+        full = "Modo solo lectura: no modifiques ningún archivo ni corras comandos que escriban; solo leé y respondé.\n\n" + full
+    cmd = [binary, "exec", "--json", "--disable-approval", "--disable-sandbox", "--trust-workspace", "--max-model-steps", str(max_turns)]
+    cmd += ["--model", model or spec.get("default_model") or "muse-wonder-1.0"]
+    if resume_session:
+        cmd += ["--session-id", resume_session, "--allow-workspace-switch"]
+    cmd += [full]
+    env_ = {**os.environ, **USER_ENV.get()}
+    if mcp and mcp.get("path_dir"):
+        env_["PATH"] = f"{mcp['path_dir']}:{env_.get('PATH', '')}"
+    proc = await asyncio.create_subprocess_exec(*cmd, cwd=str(cwd), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, limit=STREAM_LIMIT, env=env_)
+    result: dict = {"text": "", "cost": 0.0, "turns": 0, "tokens": 0, "is_error": False, "error": None}
+    texts: list[str] = []
+    assert proc.stdout
+    try:
+        await _muse_loop(proc, texts, result, cwd, on_event)
+    finally:
+        if proc.returncode is None:
+            proc.kill()
+            await proc.wait()
+    stderr = (await proc.stderr.read()).decode("utf-8", "replace") if proc.stderr else ""
+    code = await proc.wait()
+    result["text"] = "\n\n".join(texts)
+    if code != 0 and not result["error"]:
+        result["is_error"] = True
+        result["error"] = ([l for l in stderr.strip().splitlines() if not l.startswith("muse: ")] or [f"muse exited {code}"])[-1][:400]
+    return result
+
+
 async def run_engine(engine: str, prompt: str, cwd: Path, **kw) -> dict:
-    return await (run_claude_code if engine == "claude-code" else run_codex)(prompt, cwd, **kw)
+    fn = run_claude_code if engine == "claude-code" else run_muse_code if engine == "muse-code" else run_codex
+    return await fn(prompt, cwd, **kw)
 
 
 async def _call(fn: Emit, kind: str, **data) -> None:

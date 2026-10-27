@@ -74,7 +74,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
           </span>
         </div>
         {error && <div className="mt-4 text-danger text-sm">{error}</div>}
-        {!MUSE_ONLY && <SubscriptionPanel />}
+        <SubscriptionPanel />
         <div className="mt-10">
           <div className="text-xs uppercase tracking-[0.3em] text-ink-3">API keys</div>
           <h2 className="text-3xl mt-1">{MUSE_FIRST ? T('Muse, el motor de Tably', 'Muse, the engine of Tably') : T('Modelos por API, para los debates', 'API models, for the debates')}</h2>

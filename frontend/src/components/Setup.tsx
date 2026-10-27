@@ -507,6 +507,8 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
         <ArenaIntro
           team={introTeam(cfg.agents.map((a) => ({ ...a, roleLabel: roles.roles.find((r) => r.id === a.role)?.label })), (p) => providers.find((x) => x.id === p)?.label.split(' · ')[0] ?? p)}
           onDone={async () => {
+            // hackathon edition: the stage is the show; nothing starts, back to the setup
+            if (HACKATHON_MODE) { setLaunching(false); return }
             // the stage fades out → start the debate; if it cannot start (missing topic, API error…) come back to the setup
             setStarting(true)
             try {
@@ -891,7 +893,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                 </button>
                 )}
                 {lane === 'team' && (
-                <button onClick={() => research(false)} disabled={busy || launching || directBusy || cfg.agents.length < 2} style={{ background }} className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-black/10 text-ink px-6 py-3.5 font-bold text-lg shadow-sm hover:scale-[1.02] transition disabled:opacity-50" title={order.join(' · ')}>
+                <button onClick={() => (HACKATHON_MODE ? setLaunching(true) : research(false))} disabled={busy || launching || directBusy || cfg.agents.length < 2} style={{ background }} className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-black/10 text-ink px-6 py-3.5 font-bold text-lg shadow-sm hover:scale-[1.02] transition disabled:opacity-50" title={order.join(' · ')}>
                   {/* launch: the play icon slides out to the right, then the logos follow one by one (each one shows up big on stage as it leaves) */}
                   <span className="flex items-center -space-x-1">
                     {order.map((p, i) => (
@@ -908,7 +910,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                   <motion.span animate={launching ? { x: 220, opacity: 0 } : { x: 0, opacity: 1 }} transition={{ duration: PLAY_OUT, ease: 'easeIn' }} className="inline-flex">
                     <Play size={20} className="group-hover:translate-x-0.5 transition" />
                   </motion.span>
-                  {launching ? tr('Entrando a la arena…', 'Entering the arena…') : busy ? tr('Investigando referencias…', 'Researching references…') : tr('Iniciar experimento', 'Start experiment')}
+                  {launching ? tr('Entrando a la arena…', 'Entering the arena…') : busy ? tr('Investigando referencias…', 'Researching references…') : HACKATHON_MODE ? tr('Empezar a construir', 'Start building') : tr('Iniciar experimento', 'Start experiment')}
                 </button>
                 )}
                 </>
