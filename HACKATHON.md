@@ -28,6 +28,8 @@ Each item links to the code and names the Meta model it uses. This list is updat
 | # | Feature | Meta model | Where |
 |---|---|---|---|
 | 1 | **Meta · Muse as a first-class provider**: Muse Spark 1.3 and Muse Wonder 1.0 available for every role of the council, for prompt engineering and as the API builder, through the Meta Model API (OpenAI-compatible surface). | `muse-spark-1.3`, `muse-wonder-1.0` | `backend/app/providers.py`, `backend/app/pricing.py`, `frontend/src/lib/brand.ts`, `frontend/src/components/ProviderRow.tsx` |
+| 2 | **Muse Code as the desktop builder**: Tably runs `muse exec --json` headless on the project (streams text, tool activity and tokens), resumes sessions, and «My sessions» lists and continues Muse Code conversations from this machine. Auth with the user's Meta Model API key or `muse login`. | Muse Code (`muse-wonder-1.0` by default) | `backend/app/local_engine.py`, `backend/app/agent_sessions.py`, `frontend/src/components/AgentSessions.tsx`, `frontend/src/components/SubscriptionPanel.tsx` |
+| 3 | **Muse-first product**: every role lands on its recommended Muse model (Wonder for direction and engineering, Spark for product, design and QA), prompt engineering on Spark, shares and intros grouped by Muse model, Muse-only pickers for the hackathon edition. | `muse-wonder-1.0`, `muse-spark-1.3` | `frontend/src/lib/muse.ts`, `frontend/src/lib/flags.ts`, `frontend/src/components/Setup.tsx` |
 
 _(more rows are added as features ship: Muse Code as desktop builder, SAM 3.1 on reference screenshots, Muse Image in the design stage, Muse Voice Transcribe for spoken requests, the growth levels, built-in analytics and the "for sale" marketplace with ownership transfer)_
 
