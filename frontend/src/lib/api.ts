@@ -173,6 +173,16 @@ export const api = {
   saveGithubToken: (token: string | null, clear = false) =>
     j<{ set: boolean; last4: string | null }>(authed('/api/settings/github', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, clear }) })),
   cloud: (sessionId: string, id: string) => j<CloudInfo>(authed(`/api/sessions/${sessionId}/builds/${id}/cloud`)),
+  notionStatus: () => j<{ set: boolean; last4: string | null; me: { name: string; workspace: string | null } | null; error: string | null; oauth?: boolean }>(authed('/api/notion/status')),
+  notionOauthUrl: () => j<{ url: string | null }>(authed('/api/notion/oauth/url')),
+  saveNotionToken: (token: string | null, clear = false) =>
+    j<{ set: boolean; last4: string | null; me: { name: string; workspace: string | null } | null; error: string | null }>(authed('/api/settings/notion', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, clear }) })),
+  notionDatabases: () => j<{ databases: { id: string; title: string; url: string | null }[] }>(authed('/api/notion/databases')),
+  ticketsConfig: () => j<TicketsConfig>(authed('/api/tickets/config')),
+  saveTicketsConfig: (body: Record<string, unknown>) => j<TicketsConfig>(authed('/api/tickets/config', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })),
+  tickets: () => j<{ link: TicketsConfig['link']; tickets: Ticket[]; runs: Record<string, TicketRun> }>(authed('/api/tickets')),
+  ticket: (pageId: string) => j<{ id: string; title: string; url: string | null; fields: Record<string, string>; markdown: string }>(authed(`/api/tickets/${pageId}`)),
+  ticketResolve: (pageId: string) => j<{ ok: boolean; build_id: string; session_id: string; branch: string; repo_url: string | null }>(post(`/api/tickets/${pageId}/resolve`, {})),
   levels: (sessionId: string, id: string) => j<LevelsPayload>(authed(`/api/sessions/${sessionId}/builds/${id}/levels`)),
   marketList: (sessionId: string, id: string, body: { pitch: string; price_usd: number | null; title?: string }) =>
     j<{ ok: boolean; listing: MarketListing }>(authed(`/api/sessions/${sessionId}/builds/${id}/market`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })),
@@ -263,6 +273,14 @@ export interface CloudStatus {
   auth: 'supabase' | null
   missing: Record<'cloudflare' | 'fly' | 'neon' | 'supabase', string | null>
   public_url: string
+}
+/** Notion tickets resolved by the team. */
+export interface Ticket { id: string; title: string; status: string | null; priority: string | null; assignee: string | null; due: string | null; pr: string | null; url: string | null; bucket: 'urgent' | 'high' | 'medium' | 'low' | 'none'; created: string; edited: string; extra: Record<string, string> }
+export interface TicketRun { user_id: string; page_id: string; title: string | null; session_id: string | null; build_id: string | null; status: 'queued' | 'building' | 'reviewing' | 'built' | 'changes' | 'pr' | 'approved' | string; base_commit: string | null; branch: string | null; pr_url: string | null; council_session: string | null; error: string | null; started: number; updated: number }
+export interface TicketsConfig {
+  link: { user_id?: string; database_id: string | null; database_title: string | null; props: Record<string, string | null>; status_map: Partial<Record<'todo' | 'in_progress' | 'review' | 'done', string | null>>; session_id: string | null; build_id: string | null; repo_url: string | null; assignee: string | null } | null
+  schema: { title: string; props: Record<string, string | null>; status_type: string | null; status_options: string[]; status_map: Record<string, string | null>; url: string | null } | { error: string } | null
+  github: { set: boolean; last4: string | null }
 }
 /** Growth levels: the strict ladder (1 En línea → 4 Monetizado) and how far the project is from the next step. */
 export interface LevelCheck { id: string; who: 'team' | 'user' | 'world'; label: string; label_en: string; ok: boolean; evidence: string | null }

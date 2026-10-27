@@ -26,6 +26,7 @@ import time
 import hashlib
 import logging
 import re
+import secrets
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -51,6 +52,7 @@ from . import runner as runmod
 from . import skills as skillmod
 from . import cloud as cloudmod
 from . import levels as levelsmod
+from . import tickets as ticketsmod
 from . import gitserver
 from . import agent_sessions
 from . import skills_catalog as catalog
@@ -1922,6 +1924,253 @@ async def _startup():
 
 
 # ================================================================================================ Tably Cloud · git propio, publicar, base de datos, migrar
+
+
+# ------------------------------------------------------------------------------------------------ tickets (Notion → team → builder → PR)
+
+def _notion_token(user: User) -> str:
+    tok = keystore.get_key(user.id, "notion")
+    if not tok:
+        raise HTTPException(400, "Conectá Notion primero (token de integración).")
+    return tok
+
+
+_NOTION_STATES: dict[str, tuple[str, float]] = {}  # oauth state → (user id, expiry)
+
+
+def _notion_redirect() -> str:
+    return (env("NOTION_REDIRECT_URI") or f"{cloudmod.public_url()}/api/notion/callback")
+
+
+@app.get("/api/notion/oauth/url")
+def notion_oauth_url(user: User = CurrentUser):
+    """«Conectar con Notion» with one click (needs the operator's public integration); null when not configured."""
+    if not ticketsmod.oauth_configured():
+        return {"url": None}
+    now = time.time()
+    for k, (_, exp) in list(_NOTION_STATES.items()):
+        if exp < now:
+            _NOTION_STATES.pop(k, None)
+    state = secrets.token_urlsafe(24)
+    _NOTION_STATES[state] = (user.id, now + 600)
+    return {"url": ticketsmod.oauth_url(_notion_redirect(), state)}
+
+
+@app.get("/api/notion/callback")
+def notion_callback(code: str = "", state: str = "", error: str = ""):
+    """Notion sends the user back here; the token is saved for the account that started the flow and the app reopens on Tickets."""
+    from fastapi.responses import RedirectResponse
+
+    front = (env("TABLY_APP_URL") or env("TABLY_CLOUD_URL") or "http://localhost:5173").rstrip("/")
+    uid_exp = _NOTION_STATES.pop(state, None)
+    if error or not code or not uid_exp or uid_exp[1] < time.time():
+        return RedirectResponse(f"{front}/#tickets=error", status_code=302)
+    try:
+        tok = ticketsmod.oauth_exchange(code, _notion_redirect())
+    except ticketsmod.NotionError as e:
+        log.warning("notion oauth: %s", e)
+        return RedirectResponse(f"{front}/#tickets=error", status_code=302)
+    if tok.get("access_token"):
+        keystore.save(uid_exp[0], "notion", api_key=tok["access_token"])
+    return RedirectResponse(f"{front}/#tickets", status_code=302)
+
+
+@app.get("/api/notion/status")
+def notion_status(user: User = CurrentUser):
+    st = keystore.key_status(user.id, "notion")
+    out: dict = {**st, "me": None, "error": None, "oauth": ticketsmod.oauth_configured()}
+    if st["set"]:
+        try:
+            out["me"] = ticketsmod.me(keystore.get_key(user.id, "notion") or "")
+        except ticketsmod.NotionError as e:
+            out["error"] = str(e)
+    return out
+
+
+@app.put("/api/settings/notion")
+def settings_notion(body: dict, user: User = CurrentUser):
+    tok = (body.get("token") or "").strip()
+    if tok:
+        try:
+            ticketsmod.me(tok)
+        except ticketsmod.NotionError as e:
+            raise HTTPException(400, str(e))
+    keystore.save(user.id, "notion", api_key=tok or None, clear_key=bool(body.get("clear")))
+    return notion_status(user)
+
+
+@app.get("/api/notion/databases")
+def notion_databases(user: User = CurrentUser):
+    try:
+        return {"databases": ticketsmod.databases(_notion_token(user))}
+    except ticketsmod.NotionError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/tickets/config")
+def tickets_config(user: User = CurrentUser):
+    link = ticketsmod.get_link(user.id)
+    schema = None
+    if link and link.get("database_id") and keystore.key_status(user.id, "notion")["set"]:
+        try:
+            schema = ticketsmod.schema(keystore.get_key(user.id, "notion") or "", link["database_id"])
+        except ticketsmod.NotionError as e:
+            schema = {"error": str(e)}
+    return {"link": link, "schema": schema, "github": keystore.key_status(user.id, "github")}
+
+
+@app.put("/api/tickets/config")
+def tickets_config_save(body: dict, user: User = CurrentUser):
+    """Which Notion database holds the tickets, which Tably project resolves them, and how the statuses map."""
+    fields: dict = {}
+    if "database_id" in body:
+        db_id = str(body.get("database_id") or "")
+        if db_id:
+            try:
+                sc = ticketsmod.schema(_notion_token(user), db_id)
+            except ticketsmod.NotionError as e:
+                raise HTTPException(400, str(e))
+            fields.update(database_id=db_id, database_title=sc["title"], props={**sc["props"], "status_type": sc["status_type"]},
+                          status_map=body.get("status_map") if isinstance(body.get("status_map"), dict) and body.get("status_map") else sc["status_map"])
+        else:
+            fields.update(database_id=None, database_title=None, props={}, status_map={})
+    if isinstance(body.get("status_map"), dict) and "database_id" not in body:
+        fields["status_map"] = body["status_map"]
+    if "session_id" in body or "build_id" in body:
+        sid, bid = body.get("session_id") or None, body.get("build_id") or None
+        if sid and bid:
+            _build_any(user, sid, bid)  # must be the user's
+        fields.update(session_id=sid, build_id=bid, repo_url=None if (ticketsmod.get_link(user.id) or {}).get("build_id") != bid else (ticketsmod.get_link(user.id) or {}).get("repo_url"))
+    if "assignee" in body:
+        fields["assignee"] = body.get("assignee") or None
+    if "repo_url" in body:
+        fields["repo_url"] = (body.get("repo_url") or "").strip() or None
+    link = ticketsmod.save_link(user.id, **fields)
+    return tickets_config(user)
+
+
+def _ticket_status(run: dict | None, b=None) -> dict | None:
+    """What the screen shows for a ticket the team took: building / reviewing / changes / pr / error."""
+    if not run:
+        return None
+    st = run["status"]
+    if b is not None and st in ("building", "reviewing"):
+        st = "building" if b.status in ("running", "design_review") else "reviewing" if b.status == "reviewing" or (b.council_sessions and b.status == "running") else st
+        if b.status in ("completed", "approved", "stopped", "error") and run["status"] == "building" and not b.pending_council() and not b.council_sessions:
+            st = "built"
+    return {**run, "status": st}
+
+
+@app.get("/api/tickets")
+def tickets_list(user: User = CurrentUser):
+    link = ticketsmod.get_link(user.id)
+    if not link or not link.get("database_id"):
+        return {"link": link, "tickets": [], "runs": {}}
+    try:
+        items = ticketsmod.tickets(_notion_token(user), link["database_id"], link.get("props") or {})
+    except ticketsmod.NotionError as e:
+        raise HTTPException(400, str(e))
+    done = (link.get("status_map") or {}).get("done")
+    items = [t for t in items if not (done and t.get("status") == done)]
+    runs = ticketsmod.runs(user.id)
+    b = BUILDS.get(link.get("build_id") or "")
+    out_runs = {pid: _ticket_status(r, b if b and b.user.id == user.id and r.get("build_id") == b.id else None) for pid, r in runs.items()}
+    return {"link": link, "tickets": items, "runs": out_runs}
+
+
+@app.get("/api/tickets/{page_id}")
+def ticket_detail(page_id: str, user: User = CurrentUser):
+    try:
+        return ticketsmod.page_markdown(_notion_token(user), page_id)
+    except ticketsmod.NotionError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/tickets/{page_id}/resolve")
+async def ticket_resolve(page_id: str, user: User = CurrentUser):
+    """The team takes the ticket: its page becomes the change request for the builder; the council verifies against it;
+    on approval the branch is pushed and the PR opened (see ticket_on_verdict)."""
+    link = ticketsmod.get_link(user.id)
+    if not link or not link.get("build_id") or not link.get("session_id"):
+        raise HTTPException(400, "Vinculá un proyecto de Tably a los tickets primero.")
+    token = _notion_token(user)
+    b = _build(user, link["build_id"], link["session_id"])
+    if b.status in ("running", "reviewing", "design_review"):
+        raise HTTPException(409, "El equipo ya está trabajando en este proyecto; esperá a que termine.")
+    busy = ticketsmod.run_for_build(user.id, b.id)
+    if busy and busy["page_id"] != page_id and busy["status"] in ("building", "reviewing"):
+        raise HTTPException(409, f"El equipo ya está con el ticket «{busy.get('title')}».")
+    _check_capacity(user.id)
+    try:
+        page = ticketsmod.page_markdown(token, page_id)
+    except ticketsmod.NotionError as e:
+        raise HTTPException(400, str(e))
+    root = _cloud_root(user, b)
+    gh = keystore.get_key(user.id, "github")
+    repo_url = link.get("repo_url")
+    if gh and not repo_url:
+        res = gitserver.push_github(user.id, b.id, gh, b.title or b.id, private=True, root=root)
+        if res.get("ok"):
+            repo_url = res["url"]
+            ticketsmod.save_link(user.id, repo_url=repo_url)
+            b.emit("cloud.github", url=repo_url)
+        else:
+            log.warning("ticket: could not create the GitHub repo: %s", res.get("error"))
+    base = gitserver._run(["rev-parse", "HEAD"], cwd=root).stdout.decode().strip() if (root / ".git").exists() else None
+    fields = "\n".join(f"- {k}: {v}" for k, v in (page.get("fields") or {}).items())
+    spec = f"TICKET DE NOTION «{page['title']}» ({page.get('url')})\n{fields}\n\n{page['markdown']}".strip()
+    changes = [{"severity": "bloqueante", "role": "Ticket", "text": spec[:8000]}]
+    b.council_priorities = f"Ticket «{page['title']}»: todo lo que pide el ticket tiene que estar resuelto y verificable (pantallas, endpoints, datos, casos borde). Ticket:\n{page['markdown'][:1800]}"
+    b.review_plan = {"max_rounds": len(b.council_sessions) + 1}
+    branch = f"tably/{ticketsmod._slug(page['title'])}-{page_id.replace('-', '')[:6]}"
+    ticketsmod.save_run(user.id, page_id, title=page["title"], session_id=link["session_id"], build_id=b.id, status="building", base_commit=base, branch=branch, pr_url=None, council_session=None, error=None, started=time.time())
+    props, smap = link.get("props") or {}, link.get("status_map") or {}
+    try:
+        ticketsmod.set_status(token, page_id, props.get("status") or "", props.get("status_type"), smap.get("in_progress"))
+        ticketsmod.comment(token, page_id, f"Tably Team tomó este ticket: el equipo lo está construyendo en «{b.title}» (rama {branch}). Cuando el consejo lo apruebe, abre el pull request y lo pasa a revisión.")
+    except ticketsmod.NotionError as e:
+        log.warning("notion status update failed: %s", e)
+    b.apply_council(changes, "")
+    return {"ok": True, "build_id": b.id, "session_id": link["session_id"], "branch": branch, "repo_url": repo_url}
+
+
+def ticket_on_verdict(b, session_id: str, approved: bool, changes: int) -> None:
+    """Called by the builder when the council finished a round on a build that is resolving a ticket."""
+    run = ticketsmod.run_for_build(b.user.id, b.id)
+    if not run:
+        return
+    link = ticketsmod.get_link(b.user.id) or {}
+    token = keystore.get_key(b.user.id, "notion")
+    props, smap = link.get("props") or {}, link.get("status_map") or {}
+    if not approved:
+        ticketsmod.save_run(b.user.id, run["page_id"], status="changes", council_session=session_id)
+        if token:
+            try:
+                ticketsmod.comment(token, run["page_id"], f"El consejo revisó el ticket y pidió {changes} cambio(s) antes de abrir el PR. El constructor los aplica en Tably.")
+            except ticketsmod.NotionError:
+                pass
+        return
+    gh = keystore.get_key(b.user.id, "github")
+    pr_url, err = None, None
+    if gh and link.get("repo_url"):
+        root = _cloud_root(b.user, b)
+        body = (f"Resuelve el ticket de Notion **{run.get('title')}**" + (f" ({run.get('page_url')})" if run.get("page_url") else "") + "\n\n"
+                f"Construido y revisado por el equipo de Tably Team (consejo: {len(b.council_sessions)} ronda(s), versión v{len(b.versions)}).\n\n"
+                + "\n".join(f"- {s.get('text', '')[:200]}" for s in (b.stages or [])[-6:]))
+        res = ticketsmod.open_pull_request(root, gh, link["repo_url"], run["branch"] or "tably/ticket", f"{run.get('title')}", body)
+        pr_url, err = res.get("url"), res.get("error")
+    else:
+        err = "Sin token de GitHub o repositorio vinculado: no se abrió el PR."
+    ticketsmod.save_run(b.user.id, run["page_id"], status="pr" if pr_url else "approved", pr_url=pr_url, error=err, council_session=session_id)
+    if token:
+        try:
+            ticketsmod.set_status(token, run["page_id"], props.get("status") or "", props.get("status_type"), smap.get("review"))
+            if pr_url:
+                ticketsmod.set_url(token, run["page_id"], props.get("pr"), pr_url)
+            ticketsmod.comment(token, run["page_id"], (f"Aprobado por el consejo de Tably Team. Pull request listo para code review: {pr_url}" if pr_url else f"Aprobado por el consejo de Tably Team. {err}"))
+        except ticketsmod.NotionError as e:
+            log.warning("notion update failed: %s", e)
+    b.emit("ticket.done", page_id=run["page_id"], pr_url=pr_url, error=err)
 
 
 # ------------------------------------------------------------------------------------------------ growth levels · analytics · marketplace

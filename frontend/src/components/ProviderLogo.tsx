@@ -7,7 +7,7 @@ const HAS_LOGO = new Set(['meta', 'anthropic', 'openai', 'deepseek', 'gemini', '
 
 const ALIAS: Record<string, string> = { 'claude-code': 'anthropic', codex: 'openai', 'muse-code': 'meta' }
 
-const HAS_SVG = new Set(['github', 'cloudflare'])
+const HAS_SVG = new Set(['github', 'cloudflare', 'notion'])
 
 export const logoUrl = (provider?: string | null) => {
   const p = provider ? ALIAS[provider] ?? provider : null

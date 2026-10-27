@@ -541,6 +541,9 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
             <button onClick={onAudit} title={T('Subí un proyecto existente y el equipo lo revisa desde cada rol', 'Upload an existing project and the team reviews it from every role')} className="flex h-10 items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-md transition hover:brightness-110 hover:shadow-lg">
               <Gavel size={16} /> {T('Auditar un proyecto', 'Audit a project')}
             </button>
+            <button onClick={() => useArena.getState().set({ view: 'tickets' })} title={T('Tus tickets de Notion: el equipo los resuelve y abre el PR', 'Your Notion tickets: the team resolves them and opens the PR')} className="flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white ring-1 ring-black/10"><ProviderLogo provider="notion" size={14} /></span> Tickets
+            </button>
             <button onClick={() => useArena.getState().set({ view: 'market' })} title={T('Apps construidas con Tably en venta, con su nivel y sus visitas reales', 'Apps built with Tably for sale, with their level and real visits')} className="flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent">
               <Store size={16} /> Marketplace
             </button>

@@ -1173,6 +1173,12 @@ class Build:
             self.emit("build.approved", round=len(self.council_sessions))
         self.emit("build.readiness", n=v["n"], readiness=v["readiness"], approved=bool(council.get("approved")), resolved=resolved)
         self._save()
+        try:  # a build resolving a Notion ticket: approval opens the PR and moves the ticket (see main.ticket_on_verdict)
+            from .main import ticket_on_verdict
+
+            ticket_on_verdict(self, session_id, bool(council.get("approved")), len(council.get("changes") or []))
+        except Exception as e:  # noqa: BLE001
+            log.warning("ticket hook failed: %s", e)
 
     def pending_council(self) -> str | None:
         """Council session whose verdict is waiting for the user's decision (build with its changes or not)."""
@@ -1570,7 +1576,8 @@ def rehydrate(user: User, session_id: str, build_id: str, cred: Cred, team: list
     brief_path = user_dir(user.id) / f"{session_id}.brief.claude-code.md"
     briefs = sorted(user_dir(user.id).glob(f"{session_id}.brief.*.md"))
     brief = (brief_path if brief_path.exists() else briefs[0]).read_text() if (brief_path.exists() or briefs) else ""
-    b = Build(user, BuildRequest(session_id=session_id, provider=d["provider"], model=d["model"]), cred, brief, d["title"], team, creds, build_id=d["id"])
+    saved_team = [a for a in (d.get("team") or []) if isinstance(a, dict) and role_of(a.get("role"))]  # the council the user set on this build survives restarts
+    b = Build(user, BuildRequest(session_id=session_id, provider=d["provider"], model=d["model"]), cred, brief, d["title"], saved_team or team, creds, build_id=d["id"])
     b.reviews = d.get("reviews", [])
     b.review_plan = d.get("review_plan")
     b.mode, b.context, b.audit_report = d.get("mode", "build"), d.get("context", ""), d.get("audit_report")

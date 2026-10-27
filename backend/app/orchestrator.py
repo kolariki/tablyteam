@@ -757,7 +757,8 @@ class Session:
         res_tag = f"\n<resolved>\n{res}\n</resolved>" if prior else ""
         pr = split_priorities((self.config.review_of or {}).get("priorities"))
         if pr:
-            res_tag += "\n<priorities>\n" + "\n".join(f"- [P{i + 1}] {'cumplida' if i % 2 else 'pendiente'} — simulado" for i in range(len(pr))) + "\n</priorities>"
+            rnd = int((self.config.review_of or {}).get("round") or 1)
+            res_tag += "\n<priorities>\n" + "\n".join(f"- [P{i + 1}] {'cumplida' if (i % 2 or rnd >= 2) else 'pendiente'} — simulado" for i in range(len(pr))) + "\n</priorities>"
         lv_items = ((self.config.review_of or {}).get("level") or {}).get("items") or []
         if lv_items:
             res_tag += "\n<level>\n" + "\n".join(f"- [{i['id']}] cumplido — simulado" for i in lv_items) + "\n</level>"

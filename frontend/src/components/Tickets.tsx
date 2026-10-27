@@ -1,0 +1,266 @@
+import DOMPurify from 'dompurify'
+import { AnimatePresence, motion } from 'framer-motion'
+import { AlertTriangle, Check, ChevronDown, ExternalLink, GitPullRequest, Hammer, Loader2, Search, Settings2, Users, X } from 'lucide-react'
+import { marked } from 'marked'
+import { useEffect, useMemo, useState } from 'react'
+import { api, type DashboardSession, type Ticket, type TicketRun, type TicketsConfig } from '../lib/api'
+import { useT } from '../lib/i18n'
+import { useArena } from '../store'
+import PageHeader from './PageHeader'
+import ProviderLogo from './ProviderLogo'
+import { toast } from './Toast'
+
+const md = (s: string) => DOMPurify.sanitize(marked.parse(s, { async: false }) as string)
+const PILL = 'flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-[13px] text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent disabled:opacity-40'
+const PRIMARY = 'flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40'
+const SELECT = 'h-9 rounded-xl border border-line bg-surface px-3 text-[13px] text-ink outline-none focus:border-accent'
+const CARD = 'rounded-2xl border border-line bg-surface p-5 shadow-[0_1px_2px_rgba(30,38,34,.04),0_8px_24px_-16px_rgba(30,38,34,.18)]'
+
+type Bucket = 'urgent' | 'high' | 'medium' | 'low' | 'none'
+const BUCKETS: { id: Bucket; es: string; en: string; color: string }[] = [
+  { id: 'urgent', es: 'Urgente', en: 'Urgent', color: '#dc2626' },
+  { id: 'high', es: 'Alta', en: 'High', color: '#d97706' },
+  { id: 'medium', es: 'Media', en: 'Medium', color: '#0082FB' },
+  { id: 'low', es: 'Baja', en: 'Low', color: '#059669' },
+  { id: 'none', es: 'Sin prioridad', en: 'No priority', color: '#9aa39e' },
+]
+const RUN_LABEL: Record<string, [string, string, string]> = {
+  building: ['Construyendo', 'Building', 'text-accent'],
+  reviewing: ['El consejo revisa', 'Council reviewing', 'text-accent'],
+  built: ['Construido · falta el consejo', 'Built · council pending', 'text-gold'],
+  changes: ['Cambios pedidos por el consejo', 'Council asked for changes', 'text-gold'],
+  pr: ['PR abierto · code review', 'PR open · code review', 'text-ok'],
+  approved: ['Aprobado · sin PR', 'Approved · no PR', 'text-gold'],
+  queued: ['En cola', 'Queued', 'text-ink-3'],
+}
+
+function overdue(due: string | null | undefined) {
+  if (!due) return false
+  const d = new Date(due.slice(0, 10) + 'T23:59:59')
+  return d.getTime() < Date.now()
+}
+
+/** Tickets from Notion, grouped by urgency; «Resolver ticket» hands each one to the team of the linked project. */
+export default function Tickets({ onBack }: { onBack: () => void }) {
+  const T = useT()
+  const en = T('es', 'en') === 'en'
+  const [notion, setNotion] = useState<{ set: boolean; last4: string | null; me: { name: string; workspace: string | null } | null; error: string | null; oauth?: boolean } | null>(null)
+  const [tok, setTok] = useState('')
+  const [cfg, setCfg] = useState<TicketsConfig | null>(null)
+  const [dbs, setDbs] = useState<{ id: string; title: string }[] | null>(null)
+  const [projects, setProjects] = useState<DashboardSession[]>([])
+  const [data, setData] = useState<{ tickets: Ticket[]; runs: Record<string, TicketRun> } | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [setup, setSetup] = useState(false)
+  const [q, setQ] = useState('')
+  const [who, setWho] = useState<string>('')
+  const [open, setOpen] = useState<Record<string, { markdown: string; fields: Record<string, string> } | 'loading' | undefined>>({})
+
+  const loadStatus = () => api.notionStatus().then(setNotion).catch(() => {})
+  const loadCfg = () => api.ticketsConfig().then(setCfg).catch(() => {})
+  const loadTickets = () => api.tickets().then((d) => { setData({ tickets: d.tickets, runs: d.runs }); setErr(null) }).catch((e) => setErr((e as Error).message))
+  useEffect(() => {
+    loadStatus(); loadCfg()
+    api.dashboard().then((d) => setProjects(d.sessions.filter((s) => (s.builds ?? []).length > 0))).catch(() => {})
+  }, [])
+  useEffect(() => { if (cfg?.link?.database_id && notion?.set) loadTickets() }, [cfg?.link?.database_id, cfg?.link?.build_id, notion?.set])
+  useEffect(() => { if (notion?.set && (setup || !cfg?.link?.database_id)) api.notionDatabases().then((d) => setDbs(d.databases)).catch((e) => setErr((e as Error).message)) }, [notion?.set, setup, cfg?.link?.database_id])
+  const active = useMemo(() => Object.values(data?.runs ?? {}).some((r) => r.status === 'building' || r.status === 'reviewing'), [data])
+  useEffect(() => {
+    if (!active) return
+    const t = setInterval(loadTickets, 8000)
+    return () => clearInterval(t)
+  }, [active])
+
+  const link = cfg?.link
+  const schema = cfg?.schema && !('error' in cfg.schema) ? cfg.schema : null
+  const ready = !!(notion?.set && link?.database_id && link?.build_id)
+  const showSetup = setup || !ready
+
+  const saveToken = async () => {
+    setBusy('token')
+    try { setNotion(await api.saveNotionToken(tok.trim())); setTok(''); toast.ok(T('Notion conectado', 'Notion connected')) } catch (e) { toast.error(T('No se pudo conectar Notion', 'Could not connect Notion'), (e as Error).message) } finally { setBusy(null) }
+  }
+  const saveCfg = async (body: Record<string, unknown>) => {
+    setBusy('cfg')
+    try { setCfg(await api.saveTicketsConfig(body)) } catch (e) { toast.error(T('No se pudo guardar', 'Could not save'), (e as Error).message) } finally { setBusy(null) }
+  }
+  const resolve = async (t: Ticket) => {
+    setBusy(t.id)
+    try {
+      const r = await api.ticketResolve(t.id)
+      toast.ok(T('El equipo tomó el ticket', 'The team took the ticket'), T(`Construyendo en la rama ${r.branch}. Cuando el consejo apruebe, abre el PR.`, `Building on branch ${r.branch}. When the council approves, it opens the PR.`), { label: T('Ver al equipo', 'Watch the team'), onClick: () => useArena.getState().set({ pendingBuild: { buildId: r.build_id, sessionId: r.session_id } }) })
+      loadTickets()
+    } catch (e) {
+      toast.error(T('No se pudo resolver', 'Could not resolve'), (e as Error).message)
+    } finally {
+      setBusy(null)
+    }
+  }
+  const expand = async (t: Ticket) => {
+    if (open[t.id]) { setOpen((o) => ({ ...o, [t.id]: undefined })); return }
+    setOpen((o) => ({ ...o, [t.id]: 'loading' }))
+    try { const d = await api.ticket(t.id); setOpen((o) => ({ ...o, [t.id]: { markdown: d.markdown, fields: d.fields } })) } catch (e) { toast.error(T('No pude leer el ticket', 'Could not read the ticket'), (e as Error).message); setOpen((o) => ({ ...o, [t.id]: undefined })) }
+  }
+
+  const people = useMemo(() => [...new Set((data?.tickets ?? []).map((t) => t.assignee).filter(Boolean) as string[])], [data])
+  const visible = (data?.tickets ?? []).filter((t) => (!q || t.title.toLowerCase().includes(q.toLowerCase())) && (!who || (t.assignee ?? '').includes(who)))
+  const project = projects.find((p) => p.id === link?.session_id)
+  const build = project?.builds?.find((b) => b.id === link?.build_id)
+
+  return (
+    <div className="min-h-full bg-paper">
+      <div className="mx-auto max-w-[1100px] px-6 py-6">
+        <PageHeader onBack={onBack} kicker="Notion" title="Tickets" subtitle={T('Tus tickets de Notion, por urgencia. «Resolver ticket» se lo da al equipo: lo construye, el consejo lo verifica contra el ticket y, si aprueba, abre el pull request y lo pasa a code review.', 'Your Notion tickets, by urgency. "Resolve ticket" hands it to the team: it builds it, the council verifies it against the ticket and, if it approves, opens the pull request and moves it to code review.')}
+          right={ready ? <button onClick={() => setSetup((v) => !v)} className={PILL}><Settings2 size={14} /> {T('Configurar', 'Set up')}</button> : undefined} />
+
+        {/* the link: Notion token → database → Tably project → status mapping → GitHub */}
+        <AnimatePresence initial={false}>
+          {showSetup && (
+            <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className={`${CARD} mt-6`}>
+              <div className="grid gap-5 md:grid-cols-2">
+                <div>
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-3"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-surface ring-1 ring-black/10"><ProviderLogo provider="notion" size={12} /></span> 1 · Notion</div>
+                  {notion?.set ? (
+                    <div className="mt-2 flex items-center gap-2 text-[13px]"><span className="flex items-center gap-1 text-ok"><Check size={13} /> {T('Conectado', 'Connected')}</span><span className="text-ink-2">{notion.me?.workspace ?? notion.me?.name ?? ''}</span>{notion.error && <span className="text-danger">{notion.error}</span>}<button onClick={async () => { await api.saveNotionToken(null, true); loadStatus(); setCfg(null); setData(null) }} className="ml-auto text-[12px] text-ink-3 hover:text-danger">{T('Desconectar', 'Disconnect')}</button></div>
+                  ) : (
+                    <>
+                      {notion?.oauth && (
+                        <button onClick={async () => { setBusy('oauth'); try { const r = await api.notionOauthUrl(); if (r.url) location.href = r.url } catch (e) { toast.error(T('No se pudo abrir Notion', 'Could not open Notion'), (e as Error).message); setBusy(null) } }} disabled={busy === 'oauth'} className={`${PRIMARY} mt-2`}>
+                          {busy === 'oauth' ? <Loader2 size={14} className="animate-spin" /> : <ProviderLogo provider="notion" size={14} />} {T('Conectar con Notion', 'Connect with Notion')}
+                        </button>
+                      )}
+                      <p className="mt-2 text-[12.5px] text-ink-2">{notion?.oauth ? T('O con una integración interna: creala en', 'Or with an internal integration: create it at') : T('Creá una integración interna en', 'Create an internal integration at')} <a href="https://www.notion.so/my-integrations" target="_blank" rel="noreferrer" className="text-accent hover:underline">notion.so/my-integrations</a>{T(', pegá el token acá y compartí la base de tickets con la integración (··· → Conexiones).', ', paste the token here and share the tickets database with the integration (··· → Connections).')}</p>
+                      <div className="mt-2 flex gap-2"><input type="password" autoComplete="off" value={tok} onChange={(e) => setTok(e.target.value)} placeholder="ntn_… / secret_…" className="h-9 flex-1 rounded-xl border border-line bg-paper px-3 text-[13px] outline-none focus:border-accent" /><button onClick={saveToken} disabled={!tok.trim() || busy === 'token'} className={PRIMARY}>{busy === 'token' ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} {T('Conectar', 'Connect')}</button></div>
+                    </>
+                  )}
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">2 · {T('Base de tickets', 'Tickets database')}</div>
+                  <select disabled={!notion?.set} value={link?.database_id ?? ''} onChange={(e) => saveCfg({ database_id: e.target.value })} className={`${SELECT} mt-2 w-full`}>
+                    <option value="">{dbs ? T('Elegí la base…', 'Pick the database…') : T('Cargando bases…', 'Loading databases…')}</option>
+                    {(dbs ?? (link?.database_id ? [{ id: link.database_id, title: link.database_title ?? link.database_id }] : [])).map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
+                  </select>
+                  {schema && (
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      {(['todo', 'in_progress', 'review', 'done'] as const).map((k) => (
+                        <label key={k} className="text-[11px] text-ink-3">
+                          {{ todo: T('Por hacer', 'To do'), in_progress: T('En curso', 'In progress'), review: 'Code review', done: T('Hecho', 'Done') }[k]}
+                          <select value={link?.status_map?.[k] ?? ''} onChange={(e) => saveCfg({ status_map: { ...(link?.status_map ?? {}), [k]: e.target.value || null } })} className={`${SELECT} mt-0.5 h-8 w-full text-[12px]`}>
+                            <option value="">—</option>
+                            {schema.status_options.map((o) => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  {cfg?.schema && 'error' in cfg.schema && <div className="mt-1 text-[12px] text-danger">{cfg.schema.error}</div>}
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">3 · {T('Proyecto de Tably que resuelve los tickets', 'Tably project that resolves the tickets')}</div>
+                  <select value={link?.build_id ? `${link.session_id}|${link.build_id}` : ''} onChange={(e) => { const [s, b] = e.target.value.split('|'); saveCfg({ session_id: s || null, build_id: b || null }) }} className={`${SELECT} mt-2 w-full`}>
+                    <option value="">{T('Elegí el proyecto…', 'Pick the project…')}</option>
+                    {projects.map((p) => (p.builds ?? []).map((b) => <option key={b.id} value={`${p.id}|${b.id}`}>{p.title || p.topic} · v{b.version ?? 1}</option>))}
+                  </select>
+                  <div className="mt-1 text-[11.5px] text-ink-3">{T('El equipo trabaja sobre el código de ese proyecto. Para un repo tuyo: auditá el proyecto primero («Auditar un proyecto») y elegilo acá.', 'The team works on that project\'s code. For a repo of yours: audit it first ("Audit a project") and pick it here.')}</div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-3"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-surface ring-1 ring-black/10"><ProviderLogo provider="github" size={12} /></span> 4 · GitHub</div>
+                  <div className="mt-2 text-[13px]">{cfg?.github?.set ? <span className="flex items-center gap-1 text-ok"><Check size={13} /> {T('Token cargado: el PR se abre solo', 'Token set: the PR opens by itself')}</span> : <span className="text-ink-2">{T('Sin token: el ticket se construye y se revisa, pero no hay PR.', 'No token: the ticket is built and reviewed, but no PR.')} <button onClick={() => useArena.getState().set({ view: 'settings' })} className="text-accent hover:underline">{T('Cargar en Modelos y API keys', 'Add it in Models & API keys')}</button></span>}</div>
+                  <input value={link?.repo_url ?? ''} onChange={(e) => setCfg((c) => (c ? { ...c, link: { ...(c.link ?? {}), repo_url: e.target.value } as TicketsConfig['link'] } : c))} onBlur={(e) => saveCfg({ repo_url: e.target.value })} placeholder={T('https://github.com/usuario/repo (vacío: Tably lo crea)', 'https://github.com/user/repo (empty: Tably creates it)')} className="mt-2 h-9 w-full rounded-xl border border-line bg-paper px-3 font-mono text-[12px] outline-none focus:border-accent" />
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {ready && (
+          <>
+            <div className="mt-6 flex flex-wrap items-center gap-2">
+              <span className="text-[11px] uppercase tracking-[0.25em] text-ink-3">{link?.database_title}</span>
+              {build && <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11.5px] text-ink-2"><Hammer size={11} className="mr-1 inline" />{project?.title || project?.topic} · v{build.version ?? 1}</span>}
+              <div className="ml-auto flex items-center gap-2">
+                {people.length > 0 && (
+                  <select value={who} onChange={(e) => setWho(e.target.value)} className={SELECT}><option value="">{T('Todos', 'Everyone')}</option>{people.map((p) => <option key={p} value={p}>{p}</option>)}</select>
+                )}
+                <label className="flex h-9 items-center gap-2 rounded-full border border-line bg-surface px-3 text-[13px]"><Search size={13} className="text-ink-3" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder={T('buscar…', 'search…')} className="w-36 bg-transparent outline-none" /></label>
+                <button onClick={loadTickets} className={PILL}>{T('Actualizar', 'Refresh')}</button>
+              </div>
+            </div>
+            {err && <div className="mt-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{err}</div>}
+            {!data && !err && <div className="mt-10 flex justify-center text-ink-3"><Loader2 size={18} className="animate-spin" /></div>}
+            {data && visible.length === 0 && <div className="mt-8 rounded-2xl border border-dashed border-line bg-surface px-6 py-10 text-center text-sm text-ink-2">{T('No hay tickets abiertos en esta base.', 'No open tickets in this database.')}</div>}
+            {BUCKETS.map((bk) => {
+              const items = visible.filter((t) => t.bucket === bk.id)
+              if (!items.length) return null
+              return (
+                <section key={bk.id} className="mt-6">
+                  <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ background: bk.color }} /><h2 className="text-[13px] font-semibold uppercase tracking-wide" style={{ color: bk.color }}>{en ? bk.en : bk.es}</h2><span className="font-mono text-[11px] text-ink-3">{items.length}</span></div>
+                  <div className="mt-2 flex flex-col gap-2">
+                    {items.map((t) => {
+                      const run = data!.runs[t.id]
+                      const working = run && (run.status === 'building' || run.status === 'reviewing')
+                      const lbl = run ? RUN_LABEL[run.status] : null
+                      const detail = open[t.id]
+                      return (
+                        <motion.div key={t.id} layout className="panel relative overflow-hidden rounded-2xl px-4 py-3">
+                          <div className="absolute inset-y-0 left-0 w-1" style={{ background: bk.color }} />
+                          <div className="flex items-start gap-3 pl-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <button onClick={() => expand(t)} className="text-left text-[14.5px] font-semibold text-ink hover:text-accent">{t.title}</button>
+                                {t.status && <span className="rounded-full border border-line bg-surface px-2 py-0.5 text-[11px] text-ink-2">{t.status}</span>}
+                                {t.priority && <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: `${bk.color}18`, color: bk.color }}>{t.priority}</span>}
+                                {t.due && <span className={`flex items-center gap-1 text-[11px] ${overdue(t.due) ? 'font-semibold text-danger' : 'text-ink-3'}`}>{overdue(t.due) && <AlertTriangle size={11} />}{t.due.slice(0, 10)}</span>}
+                              </div>
+                              <div className="mt-1 flex flex-wrap items-center gap-3 text-[11.5px] text-ink-3">
+                                {t.assignee && <span className="flex items-center gap-1"><Users size={11} /> {t.assignee}</span>}
+                                {Object.entries(t.extra ?? {}).map(([k, v]) => <span key={k}>{k}: <span className="text-ink-2">{v}</span></span>)}
+                                {t.url && <a href={t.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-accent"><ExternalLink size={11} /> Notion</a>}
+                                {lbl && <span className={`flex items-center gap-1 font-semibold ${lbl[2]}`}>{working && <Loader2 size={11} className="animate-spin" />}{run.status === 'pr' && <GitPullRequest size={11} />}{en ? lbl[1] : lbl[0]}{run.error && run.status !== 'pr' ? ` · ${run.error}` : ''}</span>}
+                                {run?.pr_url && <a href={run.pr_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-accent hover:underline"><GitPullRequest size={11} /> {T('Ver PR', 'View PR')}</a>}
+                              </div>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                              {run && run.build_id && run.session_id && (run.status === 'changes' || working || run.status === 'built') && (
+                                <button onClick={() => useArena.getState().set({ pendingBuild: { buildId: run.build_id!, sessionId: run.session_id! } })} className={PILL}>{run.status === 'changes' ? T('Ver veredicto', 'See verdict') : T('Ver al equipo', 'Watch the team')}</button>
+                              )}
+                              {run?.status !== 'pr' && (
+                                <button onClick={() => resolve(t)} disabled={!!busy || !!working || active} className={PRIMARY} title={active ? T('El equipo ya está con otro ticket', 'The team is already on another ticket') : undefined}>
+                                  {busy === t.id ? <Loader2 size={14} className="animate-spin" /> : <Hammer size={14} />} {run?.status === 'changes' || run?.status === 'approved' ? T('Resolver de nuevo', 'Resolve again') : T('Resolver ticket', 'Resolve ticket')}
+                                </button>
+                              )}
+                              <button onClick={() => expand(t)} className="rounded-md p-1 text-ink-3 hover:text-ink"><ChevronDown size={14} className={`transition ${detail ? 'rotate-180' : ''}`} /></button>
+                            </div>
+                          </div>
+                          <AnimatePresence initial={false}>
+                            {detail && (
+                              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                                <div className="mt-3 border-t border-line pl-2 pt-3">
+                                  {detail === 'loading' ? <Loader2 size={14} className="animate-spin text-ink-3" /> : (
+                                    <>
+                                      {Object.keys(detail.fields).length > 0 && <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-ink-3">{Object.entries(detail.fields).map(([k, v]) => <span key={k}>{k}: <span className="text-ink-2">{v}</span></span>)}</div>}
+                                      {detail.markdown.trim() ? <article className="md text-[13px]" dangerouslySetInnerHTML={{ __html: md(detail.markdown) }} /> : <div className="text-[12.5px] text-ink-3">{T('El ticket no tiene descripción: el equipo trabaja solo con el título.', 'The ticket has no description: the team works from the title alone.')}</div>}
+                                    </>
+                                  )}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </motion.div>
+                      )
+                    })}
+                  </div>
+                </section>
+              )
+            })}
+          </>
+        )}
+        {!ready && notion?.set && !link?.database_id && dbs && dbs.length === 0 && (
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-[13px] text-ink-2"><X size={14} className="mt-0.5 text-gold" /> {T('La integración no ve ninguna base. En Notion, abrí la base de tickets → ··· → Conexiones → agregá tu integración.', 'The integration sees no database. In Notion, open the tickets database → ··· → Connections → add your integration.')}</div>
+        )}
+      </div>
+    </div>
+  )
+}
