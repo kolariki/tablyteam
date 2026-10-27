@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { countTo, gsap, heroIntro, sceneIn, scrollReveal, useGSAP } from '../lib/anim'
 import { useLang, useT } from '../lib/i18n'
 import LangSwitch from './LangSwitch'
+import { HACKATHON_MODE } from '../lib/flags'
 import AgentAvatar from './AgentAvatar'
 import TeamBackdrop from './TeamBackdrop'
 import ProviderLogo, { LogoWatermark } from './ProviderLogo'
@@ -28,9 +29,6 @@ const BRIEF_LINES: [string, string][] = [
   ['## Fuera: radar, cuentas, widgets', '## Out: radar, accounts, widgets'],
   ['## Criterios de aceptación: 12 historias', '## Acceptance criteria: 12 stories'],
 ]
-/** Hackathon mode: the landing shows only the hero and the demo (feature cards, blog and FAQ stay hidden; the pages still exist). */
-const HACKATHON_MODE = true
-
 type Member = { id: string; name: string; name_en: string; role: string; role_en: string; provider: string; model: string; color: string; persona: string; persona_en: string; skills: string[] }
 const TEAM: Member[] = [
   { id: 'ceo', name: 'CEO', name_en: 'CEO', role: 'Dirección', role_en: 'Leadership', provider: 'meta', model: 'muse-wonder-1.0', color: '#C0603F', persona: 'visionario pero concreto', persona_en: 'visionary but concrete' , skills: ['pitch', 'alcance MVP'] },

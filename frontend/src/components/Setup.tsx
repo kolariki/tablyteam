@@ -10,7 +10,7 @@ import { fmtUsd } from '../lib/parse'
 import Dashboard from './Dashboard'
 import HomeLoader from './HomeLoader'
 import LaneCards from './LaneCards'
-import { MuseBadge } from './Landing'
+import { MUSE_FIRST } from '../lib/flags'
 import { readCache, writeCache } from '../lib/cache'
 import ModelSelect, { invalidateModels } from './ModelSelect'
 import ArenaIntro, { ICON_STEP, PLAY_OUT, iconExitAt, introTeam } from './ArenaIntro'
@@ -214,6 +214,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   const [directBusy, setDirectBusy] = useState(false)
   // how the user wants to build: alone with the builder (direct) or with the whole team (council first)
   const [lane, setLaneState] = useState<'direct' | 'team' | null>(() => { try { const v = localStorage.getItem('tably.lane'); return v === 'direct' || v === 'team' ? v : null } catch { return null } })
+  const [showAllProviders, setShowAllProviders] = useState(false)  // Muse first: the other providers' chips stay behind a link
   const [laneAsk, setLaneAsk] = useState(false)  // «crear el primer proyecto»: direct or team, then the form scrolls into view
   const pickLaneAndGo = (l: 'direct' | 'team') => {
     setLaneAsk(false)
@@ -413,7 +414,6 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
           <span className="flex items-center gap-2.5">
             <img src="/icon.svg" alt="" aria-hidden className="h-9 w-9 rounded-xl shadow-sm" draggable={false} />
             <span className="serif text-xl">Tably <em className="text-accent">Team</em></span>
-            <MuseBadge className="ml-2 hidden md:inline-flex" />
           </span>
           <div className="ml-auto flex items-center gap-2">
             <LangSwitch />
@@ -436,9 +436,12 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-8">
           {/* no hero on the home: the brand is in the header, the companies' row is the first thing */}
           <div className="flex flex-wrap gap-2 text-[11px]">
-            {providers.map((p) => (
+            {providers.filter((p) => !MUSE_FIRST || showAllProviders || p.id === 'meta' || p.id === 'mock' || p.configured).map((p) => (
               <ProviderChip key={p.id} provider={p} active={connecting === p.id} onSettings={onSettings} onOpen={() => setConnecting(p.id)} />
             ))}
+            {MUSE_FIRST && !showAllProviders && providers.some((p) => !(p.id === 'meta' || p.id === 'mock' || p.configured)) && (
+              <button type="button" onClick={() => setShowAllProviders(true)} className="rounded-full border border-dashed border-line px-2.5 py-1 font-mono text-[11px] text-ink-3 transition hover:border-accent hover:text-accent">{T('+ otros proveedores compatibles', '+ other compatible providers')}</button>
+            )}
           </div>
           {/* the chip being connected travels down here, alone and centred, so the others keep their place */}
           <AnimatePresence>

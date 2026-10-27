@@ -5,9 +5,10 @@ import { createPortal } from 'react-dom'
 import { useBuild } from '../buildStore'
 import { api } from '../lib/api'
 import { useT } from '../lib/i18n'
+import { MUSE_FIRST } from '../lib/flags'
 import ProviderLogo from './ProviderLogo'
 
-const RING = ['meta', 'anthropic', 'openai', 'deepseek', 'gemini', 'xai', 'groq', 'kimi', 'mistral', 'openrouter', 'ollama']
+const RING = MUSE_FIRST ? Array(6).fill('meta') as string[] : ['meta', 'anthropic', 'openai', 'deepseek', 'gemini', 'xai', 'groq', 'kimi', 'mistral', 'openrouter', 'ollama']
 
 /**
  * The team is researching the references before the council: a full screen that holds the user here (every click
@@ -115,7 +116,7 @@ export default function ResearchOverlay({ demo = false, onClose }: { demo?: bool
               const a = (i / RING.length) * Math.PI * 2
               const slot = (i - (RING.length - 1) / 2) * 28
               return (
-                <motion.span key={id} className="absolute flex h-14 w-14 items-center justify-center rounded-full border-2 border-surface bg-surface shadow-[0_18px_40px_-14px_rgba(30,38,34,.5)]" style={{ zIndex: RING.length - i }} initial={{ x: Math.cos(a) * 260, y: Math.sin(a) * 160, scale: 0.8 }} animate={{ x: [Math.cos(a) * 260, slot * 1.6, slot], y: [Math.sin(a) * 160, 0, 0], scale: [0.8, 1.1, 1] }} transition={{ duration: 1.15, times: [0, 0.75, 1], ease: ['easeInOut', 'easeOut'], delay: i * 0.05 }}>
+                <motion.span key={i} className="absolute flex h-14 w-14 items-center justify-center rounded-full border-2 border-surface bg-surface shadow-[0_18px_40px_-14px_rgba(30,38,34,.5)]" style={{ zIndex: RING.length - i }} initial={{ x: Math.cos(a) * 260, y: Math.sin(a) * 160, scale: 0.8 }} animate={{ x: [Math.cos(a) * 260, slot * 1.6, slot], y: [Math.sin(a) * 160, 0, 0], scale: [0.8, 1.1, 1] }} transition={{ duration: 1.15, times: [0, 0.75, 1], ease: ['easeInOut', 'easeOut'], delay: i * 0.05 }}>
                   <ProviderLogo provider={id} size={28} />
                 </motion.span>
               )

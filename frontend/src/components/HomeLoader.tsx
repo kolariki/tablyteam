@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion'
 import { useT } from '../lib/i18n'
 import ProviderLogo from './ProviderLogo'
+import { MUSE_FIRST } from '../lib/flags'
 
-const RING = ['meta', 'anthropic', 'openai', 'deepseek', 'gemini', 'xai', 'groq', 'kimi', 'mistral', 'openrouter', 'ollama']
+const RING = MUSE_FIRST ? Array(8).fill('meta') as string[] : ['meta', 'anthropic', 'openai', 'deepseek', 'gemini', 'xai', 'groq', 'kimi', 'mistral', 'openrouter', 'ollama']
 
 /** The Tably mark with the companies orbiting around it: the loader of the home and of any panel that is working. */
 export function Orbit({ size = 92, logo = 80 }: { size?: number; logo?: number }) {
@@ -15,7 +16,7 @@ export function Orbit({ size = 92, logo = 80 }: { size?: number; logo?: number }
             const a = (i / RING.length) * Math.PI * 2
             return (
               <motion.span
-                key={id}
+                key={i}
                 className="absolute flex h-10 w-10 items-center justify-center rounded-full border border-line bg-surface shadow-sm"
                 style={{ left: `calc(50% + ${Math.cos(a) * R}px - 20px)`, top: `calc(50% + ${Math.sin(a) * R}px - 20px)` }}
                 animate={{ rotate: -360 }}
