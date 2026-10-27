@@ -109,7 +109,8 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
     api.dashboard().then((d) => setProjects(d.sessions.filter((s) => (s.builds ?? []).length > 0))).catch(() => {})
   }, [])
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (cfg?.link?.database_id && notion?.set) loadTickets() }, [cfg?.link?.database_id, cfg?.link?.build_id, notion?.set, showAll])
+  const projKey = JSON.stringify(cfg?.link?.projects ?? null)  // the per-feature mapping changes which tickets are resolvable
+  useEffect(() => { if (cfg?.link?.database_id && notion?.set) loadTickets() }, [cfg?.link?.database_id, cfg?.link?.build_id, projKey, notion?.set, showAll])
   useEffect(() => { try { localStorage.setItem('tickets.groupBy', groupBy) } catch { /* ignore */ } }, [groupBy])
   useEffect(() => { try { localStorage.setItem('tickets.project', projFilter) } catch { /* ignore */ } }, [projFilter])
   useEffect(() => { if (notion?.set && (setup || !cfg?.link?.database_id)) api.notionDatabases().then((d) => setDbs(d.databases)).catch((e) => setErr((e as Error).message)) }, [notion?.set, setup, cfg?.link?.database_id])
