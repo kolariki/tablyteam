@@ -37,6 +37,8 @@ with _db() as _c:
             user_id TEXT NOT NULL, page_id TEXT NOT NULL, title TEXT, session_id TEXT, build_id TEXT, status TEXT NOT NULL, base_commit TEXT,
             branch TEXT, pr_url TEXT, council_session TEXT, error TEXT, started REAL NOT NULL, updated REAL NOT NULL, PRIMARY KEY (user_id, page_id))"""
     )
+    if "projects" not in {r[1] for r in _c.execute("PRAGMA table_info(notion_links)")}:
+        _c.execute("ALTER TABLE notion_links ADD COLUMN projects TEXT")
 
 
 class NotionError(Exception):
@@ -183,12 +185,19 @@ def schema(token: str, database_id: str) -> dict:
     """The properties that matter (title, status, priority, assignee, due, PR url) guessed from the database, plus the status options."""
     d = _call(token, "GET", f"/databases/{database_id}")
     props = d.get("properties") or {}
-    found: dict[str, str | None] = {"title": None, "status": None, "priority": None, "assignee": None, "due": None, "pr": None}
+    found: dict[str, str | None] = {"title": None, "status": None, "priority": None, "assignee": None, "due": None, "pr": None, "project": None}
     status_options: list[str] = []
     status_type = None
+    project_props: list[dict] = []  # select/multi_select properties that can tell which repo/app a ticket belongs to
+    best_rank = 99
     for name, p in props.items():
         t = p.get("type")
         low = name.lower()
+        if t in ("select", "multi_select"):
+            project_props.append({"name": name, "options": [o["name"] for o in (p.get(t) or {}).get("options", [])]})
+            rank = next((i for i, rx in enumerate(_PROJECT_RANK) if rx.search(low)), None)
+            if rank is not None and rank < best_rank:
+                found["project"], best_rank = name, rank
         if t == "title":
             found["title"] = name
         elif t == "status" and not found["status"]:
@@ -208,7 +217,65 @@ def schema(token: str, database_id: str) -> dict:
     if not found["due"]:
         found["due"] = next((n for n, p in props.items() if p.get("type") == "date"), None)
     status_map = {k: next((o for o in status_options if rx.search(o)), None) for k, rx in _STATUS_RX.items()}
-    return {"title": _rich(d.get("title") or []), "props": found, "status_type": status_type, "status_options": status_options, "status_map": status_map, "url": d.get("url")}
+    return {"title": _rich(d.get("title") or []), "props": found, "status_type": status_type, "status_options": status_options, "status_map": status_map, "url": d.get("url"),
+            "project_props": project_props}
+
+
+# the property most likely to say which repo/app a ticket belongs to, best guess first ("Feature" beats "Área")
+_PROJECT_RANK = [re.compile(x, re.I) for x in (r"feature", r"repo", r"proyect|project", r"producto|product", r"m[oó]dulo|module", r"component", r"servicio|service", r"\bapp\b", r"sistema|system", r"area|área")]
+
+
+def project_values(fields: dict, prop: str | None) -> list[str]:
+    """The ticket's project value(s): a multi_select comes back as "A, B"."""
+    if not prop or not fields.get(prop):
+        return []
+    return [v.strip() for v in str(fields[prop]).split(",") if v.strip()]
+
+
+def project_for_ticket(link: dict, fields: dict) -> dict:
+    """Which Tably project resolves this ticket. With a project property configured, the ticket's value decides, strictly:
+    a value without an assigned project cannot be resolved (so a Codifier ticket never lands on the Preprocessor).
+    Without one, the single default project applies."""
+    pr = link.get("projects") or {}
+    prop = pr.get("prop")
+    if not prop:
+        if link.get("build_id") and link.get("session_id"):
+            return {"ok": True, "key": None, "session_id": link["session_id"], "build_id": link["build_id"], "repo_url": link.get("repo_url")}
+        return {"ok": False, "key": None, "reason": "sin_proyecto"}
+    vals = project_values(fields, prop)
+    if not vals:
+        return {"ok": False, "key": None, "reason": "ticket_sin_valor", "prop": prop}
+    for v in vals:
+        m = (pr.get("map") or {}).get(v)
+        if m and m.get("build_id") and m.get("session_id"):
+            return {"ok": True, "key": v, "session_id": m["session_id"], "build_id": m["build_id"], "repo_url": m.get("repo_url")}
+    return {"ok": False, "key": vals[0], "reason": "valor_sin_proyecto", "prop": prop}
+
+
+def project_by_build(link: dict, build_id: str) -> dict | None:
+    """The mapping entry (default or per value) that points at this build: where its repo_url lives."""
+    pr = link.get("projects") or {}
+    for key, m in (pr.get("map") or {}).items():
+        if m.get("build_id") == build_id:
+            return {"key": key, **m}
+    if link.get("build_id") == build_id:
+        return {"key": None, "session_id": link.get("session_id"), "build_id": build_id, "repo_url": link.get("repo_url")}
+    return None
+
+
+def set_repo_url(user_id: str, build_id: str, repo_url: str | None) -> None:
+    link = get_link(user_id) or {}
+    pr = dict(link.get("projects") or {})
+    mp = dict(pr.get("map") or {})
+    hit = False
+    for key, m in mp.items():
+        if m.get("build_id") == build_id:
+            mp[key] = {**m, "repo_url": repo_url}
+            hit = True
+    if hit:
+        save_link(user_id, projects={**pr, "map": mp})
+    if link.get("build_id") == build_id:
+        save_link(user_id, repo_url=repo_url)
 
 
 _PRIO = [
@@ -307,7 +374,8 @@ def tickets(token: str, database_id: str, props: dict) -> list[dict]:
             fields = {n: _prop_text(v) for n, v in pp.items() if v.get("type") != "title" and _prop_text(v)}
             extra = {n: v for n, v in fields.items() if n not in props.values() and pp[n].get("type") in ("select", "multi_select", "rich_text", "number", "checkbox", "unique_id", "formula")}
             out.append({"id": pg["id"], "title": title, "status": status, "priority": prio, "assignee": get("assignee"), "due": due, "pr": get("pr"), "url": pg.get("url"),
-                        "bucket": bucket(prio, due), "created": pg.get("created_time"), "edited": pg.get("last_edited_time"), "extra": dict(list(extra.items())[:4]), "fields": fields})
+                        "bucket": bucket(prio, due), "created": pg.get("created_time"), "edited": pg.get("last_edited_time"), "extra": dict(list(extra.items())[:4]), "fields": fields,
+                        "project_value": ", ".join(project_values(fields, props.get("project"))) or None})
         if not r.get("has_more"):
             break
         cursor = r.get("next_cursor")
@@ -415,18 +483,19 @@ def get_link(user_id: str) -> dict | None:
     d = dict(r)
     d["props"] = json.loads(d.get("props") or "{}")
     d["status_map"] = json.loads(d.get("status_map") or "{}")
+    d["projects"] = json.loads(d.get("projects") or "{}")
     return d
 
 
 def save_link(user_id: str, **fields) -> dict:
-    cur = get_link(user_id) or {"user_id": user_id, "database_id": None, "database_title": None, "props": {}, "status_map": {}, "session_id": None, "build_id": None, "repo_url": None, "assignee": None}
+    cur = get_link(user_id) or {"user_id": user_id, "database_id": None, "database_title": None, "props": {}, "status_map": {}, "session_id": None, "build_id": None, "repo_url": None, "assignee": None, "projects": {}}
     cur.update({k: v for k, v in fields.items() if k in cur or k in ("status_type",)})
     with _db() as c:
         c.execute(
-            """INSERT OR REPLACE INTO notion_links (user_id, database_id, database_title, props, status_map, session_id, build_id, repo_url, assignee, updated)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT OR REPLACE INTO notion_links (user_id, database_id, database_title, props, status_map, session_id, build_id, repo_url, assignee, projects, updated)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (user_id, cur.get("database_id"), cur.get("database_title"), json.dumps(cur.get("props") or {}), json.dumps(cur.get("status_map") or {}),
-             cur.get("session_id"), cur.get("build_id"), cur.get("repo_url"), cur.get("assignee"), time.time()),
+             cur.get("session_id"), cur.get("build_id"), cur.get("repo_url"), cur.get("assignee"), json.dumps(cur.get("projects") or {}), time.time()),
         )
     return get_link(user_id) or cur
 

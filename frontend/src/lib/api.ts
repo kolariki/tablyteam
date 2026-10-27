@@ -278,12 +278,14 @@ export interface CloudStatus {
   public_url: string
 }
 /** Notion tickets resolved by the team. */
-export interface Ticket { id: string; title: string; status: string | null; priority: string | null; assignee: string | null; due: string | null; pr: string | null; url: string | null; bucket: 'urgent' | 'high' | 'medium' | 'low' | 'none'; created: string; edited: string; extra: Record<string, string>; fields?: Record<string, string> }
+export interface Ticket { id: string; title: string; status: string | null; priority: string | null; assignee: string | null; due: string | null; pr: string | null; url: string | null; bucket: 'urgent' | 'high' | 'medium' | 'low' | 'none'; created: string; edited: string; extra: Record<string, string>; fields?: Record<string, string>; project_value?: string | null; project?: TicketProject }
+export interface TicketProject { ok: boolean; key: string | null; session_id?: string; build_id?: string; repo_url?: string | null; reason?: 'sin_proyecto' | 'ticket_sin_valor' | 'valor_sin_proyecto'; prop?: string }
+export interface ProjectMapEntry { session_id: string | null; build_id: string | null; repo_url: string | null }
 export interface GroupableProp { name: string; type: string; options: { name: string; color: string | null }[] }
 export interface TicketRun { user_id: string; page_id: string; title: string | null; session_id: string | null; build_id: string | null; status: 'queued' | 'building' | 'reviewing' | 'built' | 'changes' | 'pr' | 'approved' | string; base_commit: string | null; branch: string | null; pr_url: string | null; council_session: string | null; error: string | null; started: number; updated: number }
 export interface TicketsConfig {
-  link: { user_id?: string; database_id: string | null; database_title: string | null; props: Record<string, string | null>; status_map: Partial<Record<'todo' | 'in_progress' | 'review' | 'done', string | null>>; session_id: string | null; build_id: string | null; repo_url: string | null; assignee: string | null } | null
-  schema: { title: string; props: Record<string, string | null>; status_type: string | null; status_options: string[]; status_map: Record<string, string | null>; url: string | null } | { error: string } | null
+  link: { user_id?: string; database_id: string | null; database_title: string | null; props: Record<string, string | null>; status_map: Partial<Record<'todo' | 'in_progress' | 'review' | 'done', string | null>>; session_id: string | null; build_id: string | null; repo_url: string | null; assignee: string | null; projects?: { prop?: string | null; map?: Record<string, ProjectMapEntry> } } | null
+  schema: { title: string; props: Record<string, string | null>; status_type: string | null; status_options: string[]; status_map: Record<string, string | null>; url: string | null; project_props?: { name: string; options: string[] }[] } | { error: string } | null
   github: { set: boolean; last4: string | null }
 }
 /** Growth levels: the strict ladder (1 En línea → 4 Monetizado) and how far the project is from the next step. */

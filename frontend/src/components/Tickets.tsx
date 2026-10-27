@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { AlertTriangle, Check, ChevronDown, ExternalLink, GitPullRequest, Hammer, Loader2, Search, Settings2, Users, X } from 'lucide-react'
 import { marked } from 'marked'
 import { useEffect, useMemo, useState } from 'react'
-import { api, type DashboardSession, type GroupableProp, type Ticket, type TicketRun, type TicketsConfig } from '../lib/api'
+import { api, type ProjectMapEntry, type DashboardSession, type GroupableProp, type Ticket, type TicketRun, type TicketsConfig } from '../lib/api'
 import { useT } from '../lib/i18n'
 import { useArena } from '../store'
 import PageHeader from './PageHeader'
@@ -120,7 +120,17 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
   const link = cfg?.link
   const schema = cfg?.schema && !('error' in cfg.schema) ? cfg.schema : null
   const ready = !!(notion?.set && link?.database_id)  // tickets show as soon as the database is set
-  const canResolve = !!link?.build_id  // resolving needs a Tably project to work on
+  // the project property (Feature, Repo, …): with one set, each value of it needs its own Tably project and tickets go strictly there
+  const projProp = link?.projects?.prop ?? schema?.props?.project ?? ''
+  const projMap = link?.projects?.map ?? {}
+  const projOptions = useMemo(() => {
+    const fromSchema = schema?.project_props?.find((p) => p.name === projProp)?.options ?? []
+    const seen = new Set((data?.tickets ?? []).flatMap((x) => (x.project_value ?? '').split(',').map((v) => v.trim()).filter(Boolean)))
+    return [...new Set([...fromSchema, ...seen, ...Object.keys(projMap)])]
+  }, [schema, projProp, data, projMap])
+  const strict = !!link?.projects?.prop
+  const canResolve = strict ? Object.values(projMap).some((m) => m.build_id) : !!link?.build_id
+  const saveProjects = (prop: string | null, map: Record<string, ProjectMapEntry>) => saveCfg({ projects: { prop, map } })
   const showSetup = setup || !ready
 
   const saveToken = async () => {
@@ -204,17 +214,46 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
                   {cfg?.schema && 'error' in cfg.schema && <div className="mt-1 text-[12px] text-danger">{cfg.schema.error}</div>}
                 </div>
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">3 · {T('Proyecto de Tably que resuelve los tickets', 'Tably project that resolves the tickets')}</div>
-                  <select value={link?.build_id ? `${link.session_id}|${link.build_id}` : ''} onChange={(e) => { const [s, b] = e.target.value.split('|'); saveCfg({ session_id: s || null, build_id: b || null }) }} className={`${SELECT} mt-2 w-full`}>
-                    <option value="">{T('Elegí el proyecto…', 'Pick the project…')}</option>
-                    {projects.map((p) => (p.builds ?? []).map((b) => <option key={b.id} value={`${p.id}|${b.id}`}>{p.title || p.topic} · v{b.version ?? 1}</option>))}
-                  </select>
-                  <div className="mt-1 text-[11.5px] text-ink-3">{T('El equipo trabaja sobre el código de ese proyecto. Para un repo tuyo: auditá el proyecto primero («Auditar un proyecto») y elegilo acá.', 'The team works on that project\'s code. For a repo of yours: audit it first ("Audit a project") and pick it here.')}</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">3 · {T('Qué proyecto de Tably resuelve cada ticket', 'Which Tably project resolves each ticket')}</div>
+                  {(schema?.project_props?.length ?? 0) > 0 && (
+                    <label className="mt-2 block text-[12px] text-ink-2">{T('Propiedad que dice de qué proyecto es el ticket', 'Property that says which project a ticket belongs to')}
+                      <select value={projProp} onChange={(e) => saveProjects(e.target.value || null, projMap)} className={`${SELECT} mt-1 w-full`}>
+                        <option value="">{T('Ninguna: un solo proyecto para todos', 'None: one project for every ticket')}</option>
+                        {schema!.project_props!.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
+                      </select>
+                    </label>
+                  )}
+                  {projProp ? (
+                    <div className="mt-2 overflow-hidden rounded-xl border border-line">
+                      {projOptions.map((opt) => {
+                        const m = projMap[opt]
+                        return (
+                          <div key={opt} className="grid grid-cols-[1fr_1.4fr_1.2fr] items-center gap-2 border-b border-line bg-paper px-3 py-1.5 last:border-b-0">
+                            <span className="truncate text-[12.5px] font-medium text-ink">{opt}</span>
+                            <select value={m?.build_id ? `${m.session_id}|${m.build_id}` : ''} onChange={(e) => { const [sid, bid] = e.target.value.split('|'); saveProjects(projProp, { ...projMap, [opt]: { session_id: sid || null, build_id: bid || null, repo_url: m?.repo_url ?? null } }) }} className={`${SELECT} h-8 w-full text-[12px]`}>
+                              <option value="">{T('Sin proyecto: no se resuelve', 'No project: not resolvable')}</option>
+                              {projects.map((p) => (p.builds ?? []).map((b) => <option key={b.id} value={`${p.id}|${b.id}`}>{p.title || p.topic} · v{b.version ?? 1}</option>))}
+                            </select>
+                            <input defaultValue={m?.repo_url ?? ''} key={`${opt}-${m?.repo_url ?? ''}`} onBlur={(e) => { if ((e.target.value || '') !== (m?.repo_url ?? '')) saveProjects(projProp, { ...projMap, [opt]: { session_id: m?.session_id ?? null, build_id: m?.build_id ?? null, repo_url: e.target.value.trim() || null } }) }} placeholder={T('repo en GitHub (vacío: Tably lo crea)', 'GitHub repo (empty: Tably creates it)')} className="h-8 w-full rounded-lg border border-line bg-surface px-2 font-mono text-[11px] outline-none focus:border-accent" />
+                          </div>
+                        )
+                      })}
+                      {projOptions.length === 0 && <div className="px-3 py-2 text-[12px] text-ink-3">{T('Esa propiedad no tiene valores todavía.', 'That property has no values yet.')}</div>}
+                    </div>
+                  ) : (
+                    <select value={link?.build_id ? `${link.session_id}|${link.build_id}` : ''} onChange={(e) => { const [s, b] = e.target.value.split('|'); saveCfg({ session_id: s || null, build_id: b || null }) }} className={`${SELECT} mt-2 w-full`}>
+                      <option value="">{T('Elegí el proyecto…', 'Pick the project…')}</option>
+                      {projects.map((p) => (p.builds ?? []).map((b) => <option key={b.id} value={`${p.id}|${b.id}`}>{p.title || p.topic} · v{b.version ?? 1}</option>))}
+                    </select>
+                  )}
+                  <div className="mt-1 text-[11.5px] text-ink-3">{projProp
+                    ? T(`Cada ticket va al proyecto de su «${projProp}». Un valor sin proyecto asignado no se puede resolver: así un ticket del Codifier nunca cae en el Preprocessor.`, `Each ticket goes to the project of its "${projProp}". A value without an assigned project cannot be resolved, so a Codifier ticket never lands on the Preprocessor.`)
+                    : T('El equipo trabaja sobre el código de ese proyecto. Para un repo tuyo: auditá el proyecto primero («Auditar un proyecto») y elegilo acá.', 'The team works on that project\'s code. For a repo of yours: audit it first ("Audit a project") and pick it here.')}</div>
                 </div>
                 <div>
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-3"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-surface ring-1 ring-black/10"><ProviderLogo provider="github" size={12} /></span> 4 · GitHub</div>
                   <div className="mt-2 text-[13px]">{cfg?.github?.set ? <span className="flex items-center gap-1 text-ok"><Check size={13} /> {T('Token cargado: el PR se abre solo', 'Token set: the PR opens by itself')}</span> : <span className="text-ink-2">{T('Sin token: el ticket se construye y se revisa, pero no hay PR.', 'No token: the ticket is built and reviewed, but no PR.')} <button onClick={() => useArena.getState().set({ view: 'settings' })} className="text-accent hover:underline">{T('Cargar en Modelos y API keys', 'Add it in Models & API keys')}</button></span>}</div>
-                  <input value={link?.repo_url ?? ''} onChange={(e) => setCfg((c) => (c ? { ...c, link: { ...(c.link ?? {}), repo_url: e.target.value } as TicketsConfig['link'] } : c))} onBlur={(e) => saveCfg({ repo_url: e.target.value })} placeholder={T('https://github.com/usuario/repo (vacío: Tably lo crea)', 'https://github.com/user/repo (empty: Tably creates it)')} className="mt-2 h-9 w-full rounded-xl border border-line bg-paper px-3 font-mono text-[12px] outline-none focus:border-accent" />
+                  {!projProp && <input value={link?.repo_url ?? ''} onChange={(e) => setCfg((c) => (c ? { ...c, link: { ...(c.link ?? {}), repo_url: e.target.value } as TicketsConfig['link'] } : c))} onBlur={(e) => saveCfg({ repo_url: e.target.value })} placeholder={T('https://github.com/usuario/repo (vacío: Tably lo crea)', 'https://github.com/user/repo (empty: Tably creates it)')} className="mt-2 h-9 w-full rounded-xl border border-line bg-paper px-3 font-mono text-[12px] outline-none focus:border-accent" />}
                 </div>
               </div>
             </motion.div>
@@ -225,7 +264,8 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
           <>
             <div className="mt-6 flex flex-wrap items-center gap-2">
               <span className="text-[11px] uppercase tracking-[0.25em] text-ink-3">{link?.database_title}</span>
-              {build && <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11.5px] text-ink-2"><Hammer size={11} className="mr-1 inline" />{project?.title || project?.topic} · v{build.version ?? 1}</span>}
+              {strict ? <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11.5px] text-ink-2"><Hammer size={11} className="mr-1 inline" />{T(`proyecto por ${projProp}`, `project per ${projProp}`)} · {Object.values(projMap).filter((m) => m.build_id).length}</span>
+                : build && <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11.5px] text-ink-2"><Hammer size={11} className="mr-1 inline" />{project?.title || project?.topic} · v{build.version ?? 1}</span>}
               <div className="ml-auto flex items-center gap-2">
                 <label className="flex items-center gap-1.5 text-[12px] text-ink-3">{T('Agrupar por', 'Group by')}
                   <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} className={SELECT}>
@@ -256,6 +296,13 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
                     {items.map((t) => {
                       const run = data!.runs[t.id]
                       const working = run && (run.status === 'building' || run.status === 'reviewing')
+                      const tp = t.project
+                      const tproj = tp?.ok ? projects.find((p) => p.id === tp.session_id) : undefined
+                      const tbuild = tproj?.builds?.find((b) => b.id === tp?.build_id)
+                      const noProject = tp ? !tp.ok : !canResolve
+                      const noProjectMsg = !tp || tp.reason === 'sin_proyecto' ? T('Elegí primero el proyecto de Tably', 'Pick the Tably project first')
+                        : tp.reason === 'ticket_sin_valor' ? T(`El ticket no tiene «${tp.prop}» en Notion`, `The ticket has no "${tp.prop}" in Notion`)
+                        : T(`«${tp.key}» no tiene proyecto asignado`, `"${tp.key}" has no project assigned`)
                       const lbl = run ? RUN_LABEL[run.status] : null
                       const detail = open[t.id]
                       return (
@@ -275,6 +322,9 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
                                 {t.url && <a href={t.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-accent"><ExternalLink size={11} /> Notion</a>}
                                 {lbl && <span className={`flex items-center gap-1 font-semibold ${lbl[2]}`}>{working && <Loader2 size={11} className="animate-spin" />}{run.status === 'pr' && <GitPullRequest size={11} />}{en ? lbl[1] : lbl[0]}{run.error && run.status !== 'pr' ? ` · ${run.error}` : ''}</span>}
                                 {run?.pr_url && <a href={run.pr_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-accent hover:underline"><GitPullRequest size={11} /> {T('Ver PR', 'View PR')}</a>}
+                                {strict && (tp?.ok
+                                  ? <span className="flex items-center gap-1 text-ink-2"><Hammer size={11} /> {tp.key} → {tproj?.title || tproj?.topic || '…'}{tbuild ? ` · v${tbuild.version ?? 1}` : ''}</span>
+                                  : <span className="flex items-center gap-1 text-danger"><AlertTriangle size={11} /> {noProjectMsg} <button onClick={() => setSetup(true)} className="text-accent hover:underline">{T('asignar', 'assign')}</button></span>)}
                               </div>
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
@@ -282,7 +332,7 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
                                 <button onClick={() => useArena.getState().set({ pendingBuild: { buildId: run.build_id!, sessionId: run.session_id! } })} className={PILL}>{run.status === 'changes' ? T('Ver veredicto', 'See verdict') : T('Ver al equipo', 'Watch the team')}</button>
                               )}
                               {run?.status !== 'pr' && (
-                                <button onClick={() => resolve(t)} disabled={!!busy || !!working || active || !canResolve} className={PRIMARY} title={!canResolve ? T('Elegí primero el proyecto de Tably', 'Pick the Tably project first') : active ? T('El equipo ya está con otro ticket', 'The team is already on another ticket') : undefined}>
+                                <button onClick={() => resolve(t)} disabled={!!busy || !!working || active || noProject} className={PRIMARY} title={noProject ? noProjectMsg : active ? T('El equipo ya está con otro ticket', 'The team is already on another ticket') : undefined}>
                                   {busy === t.id ? <Loader2 size={14} className="animate-spin" /> : <Hammer size={14} />} {run?.status === 'changes' || run?.status === 'approved' ? T('Resolver de nuevo', 'Resolve again') : T('Resolver ticket', 'Resolve ticket')}
                                 </button>
                               )}

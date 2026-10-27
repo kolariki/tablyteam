@@ -2094,6 +2094,21 @@ def tickets_config_save(body: dict, user: User = CurrentUser):
         fields["assignee"] = body.get("assignee") or None
     if "repo_url" in body:
         fields["repo_url"] = (body.get("repo_url") or "").strip() or None
+    if "projects" in body:
+        # {"prop": "Feature", "map": {"Codifier": {"session_id", "build_id", "repo_url"}, ...}}: one Tably project per value of that property
+        pr = body.get("projects") if isinstance(body.get("projects"), dict) else {}
+        prop = (pr.get("prop") or "").strip() or None
+        mp: dict = {}
+        for key, m in (pr.get("map") or {}).items() if isinstance(pr.get("map"), dict) else []:
+            if not isinstance(m, dict):
+                continue
+            sid, bid = m.get("session_id") or None, m.get("build_id") or None
+            if sid and bid:
+                _build_any(user, sid, bid)  # must be the user's
+            entry = {"session_id": sid if bid else None, "build_id": bid if sid else None, "repo_url": (m.get("repo_url") or "").strip() or None}
+            if entry["build_id"] or entry["repo_url"]:
+                mp[str(key)] = entry
+        fields["projects"] = {"prop": prop, "map": mp}
     link = ticketsmod.save_link(user.id, **fields)
     return tickets_config(user)
 
@@ -2129,8 +2144,14 @@ def tickets_list(all: bool = False, user: User = CurrentUser):
     if not all:
         items = [t for t in items if not ((done and t.get("status") == done) or (t.get("status") and _CLOSED_RX.search(t["status"])))]
     runs = ticketsmod.runs(user.id)
-    b = BUILDS.get(link.get("build_id") or "")
-    out_runs = {pid: _ticket_status(r, b if b and b.user.id == user.id and r.get("build_id") == b.id else None) for pid, r in runs.items()}
+    out_runs = {}
+    for pid, r in runs.items():
+        b = BUILDS.get(r.get("build_id") or "")
+        out_runs[pid] = _ticket_status(r, b if b and b.user.id == user.id else None)
+    pprop = (link.get("projects") or {}).get("prop")
+    for t in items:  # which Tably project takes each ticket (strict: a Feature without an assigned project is not resolvable)
+        t["project"] = ticketsmod.project_for_ticket(link, t.get("fields") or {})
+        t["project_value"] = ", ".join(ticketsmod.project_values(t.get("fields") or {}, pprop)) or None
     return {"link": link, "tickets": items, "runs": out_runs, "groupable": groupable}
 
 
@@ -2147,28 +2168,35 @@ async def ticket_resolve(page_id: str, user: User = CurrentUser):
     """The team takes the ticket: its page becomes the change request for the builder; the council verifies against it;
     on approval the branch is pushed and the PR opened (see ticket_on_verdict)."""
     link = ticketsmod.get_link(user.id)
-    if not link or not link.get("build_id") or not link.get("session_id"):
-        raise HTTPException(400, "Vinculá un proyecto de Tably a los tickets primero.")
+    if not link or not link.get("database_id"):
+        raise HTTPException(400, "Vinculá la base de Notion primero.")
     token = _notion_token(user)
-    b = _build(user, link["build_id"], link["session_id"])
+    try:
+        page = ticketsmod.page_markdown(token, page_id)
+    except ticketsmod.NotionError as e:
+        raise HTTPException(400, str(e))
+    proj = ticketsmod.project_for_ticket(link, page.get("fields") or {})
+    if not proj["ok"]:
+        if proj["reason"] == "sin_proyecto":
+            raise HTTPException(400, "Vinculá un proyecto de Tably a los tickets primero.")
+        if proj["reason"] == "ticket_sin_valor":
+            raise HTTPException(400, f"El ticket no tiene «{proj['prop']}»: completalo en Notion para saber a qué proyecto va.")
+        raise HTTPException(400, f"«{proj['prop']}: {proj['key']}» no tiene un proyecto de Tably asignado: asignalo en la configuración de Tickets.")
+    b = _build(user, proj["build_id"], proj["session_id"])
     if b.status in ("running", "reviewing", "design_review"):
         raise HTTPException(409, "El equipo ya está trabajando en este proyecto; esperá a que termine.")
     busy = ticketsmod.run_for_build(user.id, b.id)
     if busy and busy["page_id"] != page_id and busy["status"] in ("building", "reviewing"):
         raise HTTPException(409, f"El equipo ya está con el ticket «{busy.get('title')}».")
     _check_capacity(user.id)
-    try:
-        page = ticketsmod.page_markdown(token, page_id)
-    except ticketsmod.NotionError as e:
-        raise HTTPException(400, str(e))
     root = _cloud_root(user, b)
     gh = keystore.get_key(user.id, "github")
-    repo_url = link.get("repo_url")
+    repo_url = proj.get("repo_url")
     if gh and not repo_url:
         res = gitserver.push_github(user.id, b.id, gh, b.title or b.id, private=True, root=root)
         if res.get("ok"):
             repo_url = res["url"]
-            ticketsmod.save_link(user.id, repo_url=repo_url)
+            ticketsmod.set_repo_url(user.id, b.id, repo_url)
             b.emit("cloud.github", url=repo_url)
         else:
             log.warning("ticket: could not create the GitHub repo: %s", res.get("error"))
@@ -2179,7 +2207,7 @@ async def ticket_resolve(page_id: str, user: User = CurrentUser):
     b.council_priorities = f"Ticket «{page['title']}»: todo lo que pide el ticket tiene que estar resuelto y verificable (pantallas, endpoints, datos, casos borde). Ticket:\n{page['markdown'][:1800]}"
     b.review_plan = {"max_rounds": len(b.council_sessions) + 1}
     branch = f"tably/{ticketsmod._slug(page['title'])}-{page_id.replace('-', '')[:6]}"
-    ticketsmod.save_run(user.id, page_id, title=page["title"], session_id=link["session_id"], build_id=b.id, status="building", base_commit=base, branch=branch, pr_url=None, council_session=None, error=None, started=time.time())
+    ticketsmod.save_run(user.id, page_id, title=page["title"], session_id=proj["session_id"], build_id=b.id, status="building", base_commit=base, branch=branch, pr_url=None, council_session=None, error=None, started=time.time())
     props, smap = link.get("props") or {}, link.get("status_map") or {}
     try:
         ticketsmod.set_status(token, page_id, props.get("status") or "", props.get("status_type"), smap.get("in_progress"))
@@ -2187,7 +2215,7 @@ async def ticket_resolve(page_id: str, user: User = CurrentUser):
     except ticketsmod.NotionError as e:
         log.warning("notion status update failed: %s", e)
     b.apply_council(changes, "")
-    return {"ok": True, "build_id": b.id, "session_id": link["session_id"], "branch": branch, "repo_url": repo_url}
+    return {"ok": True, "build_id": b.id, "session_id": proj["session_id"], "branch": branch, "repo_url": repo_url}
 
 
 def ticket_on_verdict(b, session_id: str, approved: bool, changes: int) -> None:
@@ -2208,12 +2236,14 @@ def ticket_on_verdict(b, session_id: str, approved: bool, changes: int) -> None:
         return
     gh = keystore.get_key(b.user.id, "github")
     pr_url, err = None, None
-    if gh and link.get("repo_url"):
+    proj = ticketsmod.project_by_build(link, b.id) or {}
+    repo_url = proj.get("repo_url") or link.get("repo_url")
+    if gh and repo_url:
         root = _cloud_root(b.user, b)
         body = (f"Resuelve el ticket de Notion **{run.get('title')}**" + (f" ({run.get('page_url')})" if run.get("page_url") else "") + "\n\n"
                 f"Construido y revisado por el equipo de Tably Team (consejo: {len(b.council_sessions)} ronda(s), versión v{len(b.versions)}).\n\n"
                 + "\n".join(f"- {s.get('text', '')[:200]}" for s in (b.stages or [])[-6:]))
-        res = ticketsmod.open_pull_request(root, gh, link["repo_url"], run["branch"] or "tably/ticket", f"{run.get('title')}", body)
+        res = ticketsmod.open_pull_request(root, gh, repo_url, run["branch"] or "tably/ticket", f"{run.get('title')}", body)
         pr_url, err = res.get("url"), res.get("error")
     else:
         err = "Sin token de GitHub o repositorio vinculado: no se abrió el PR."
