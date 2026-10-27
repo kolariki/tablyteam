@@ -1,7 +1,8 @@
 import PageHeader from './PageHeader'
 import HomeLoader from './HomeLoader'
 import { AnimatePresence } from 'framer-motion'
-import { FileArchive, Gavel, Loader2, Plus, Puzzle, Trash2, UploadCloud } from 'lucide-react'
+import { FileArchive, FolderOpen, Gavel, Loader2, Plus, Puzzle, Trash2, UploadCloud } from 'lucide-react'
+import { zipFromDrop, zipFromFileList, type ZipStats } from '../lib/projectZip'
 import { useEffect, useRef, useState } from 'react'
 import { api, type EngineStatus } from '../lib/api'
 import { PALETTE, brandTheme } from '../lib/brand'
@@ -46,6 +47,9 @@ export default function AuditSetup({ onBack, onStart }: Props) {
   const [busy, setBusy] = useState(false)
   const [drag, setDrag] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const dirRef = useRef<HTMLInputElement>(null)
+  const [stats, setStats] = useState<ZipStats | null>(null)
+  const [packing, setPacking] = useState<string | null>(null)
 
   const rolesRef = useRef(roles)
   rolesRef.current = roles
@@ -87,21 +91,50 @@ export default function AuditSetup({ onBack, onStart }: Props) {
   const isEngine = !!engines.find((e) => e.id === provider)
   const pick = (f: File | null) => {
     if (!f) return
-    if (!/\.zip$/i.test(f.name)) return setError(tr('Subí un archivo .zip del proyecto', 'Upload a .zip of the project'))
+    if (!/\.zip$/i.test(f.name)) return setError(tr('Subí un archivo .zip del proyecto o elegí la carpeta', 'Upload a .zip of the project or pick the folder'))
     setError(null)
+    setStats(null)
     setFile(f)
     if (!name) setName(f.name.replace(/\.zip$/i, ''))
+  }
+  /** The browser walks the folder, drops node_modules/.git/builds/binaries and zips only the code, so the upload is a few MB. */
+  const pack = async (run: (onProgress: (scanned: number, kept: number) => void) => Promise<{ file: File; stats: ZipStats }>) => {
+    setError(null)
+    setPacking(tr('Leyendo la carpeta…', 'Reading the folder…'))
+    try {
+      const r = await run((scanned, kept) => setPacking(tr(`Leyendo la carpeta… ${scanned} archivos, ${kept} útiles`, `Reading the folder… ${scanned} files, ${kept} kept`)))
+      setFile(r.file)
+      setStats(r.stats)
+      if (!name) setName(r.stats.root)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setPacking(null)
+    }
+  }
+  const pickFolder = (list: FileList | null) => {
+    if (!list?.length) return
+    void pack((p) => zipFromFileList(list, p))
+  }
+  const drop = async (dt: DataTransfer) => {
+    const hasDir = Array.from(dt.items ?? []).some((it) => it.webkitGetAsEntry?.()?.isDirectory)
+    if (hasDir) return pack(async (p) => {
+      const r = await zipFromDrop(dt, p)
+      if (!r || !('file' in r)) throw new Error(tr('No pude leer la carpeta', 'Could not read the folder'))
+      return r
+    })
+    pick(dt.files[0] ?? null)
   }
   const updateAgent = (i: number, patch: Partial<AgentConfig>) => setTeam((t) => t.map((a, j) => (j === i ? { ...a, ...patch } : a)))
 
   const start = async () => {
-    if (!file) return setError(tr('Falta el .zip del proyecto', 'The project .zip is missing'))
+    if (!file) return setError(tr('Falta la carpeta o el .zip del proyecto', 'The project folder or .zip is missing'))
     if (!team.length) return setError(tr('Elegí al menos un rol', 'Pick at least one role'))
     setBusy(true)
     setError(null)
     const fd = new FormData()
     fd.append('file', file)
-    fd.append('name', name || file.name)
+    fd.append('name', name || file.name.replace(/\.zip$/i, ''))
     fd.append('description', description)
     fd.append('team', JSON.stringify(team))
     fd.append('provider', provider)
@@ -138,19 +171,33 @@ export default function AuditSetup({ onBack, onStart }: Props) {
               onDrop={(e) => {
                 e.preventDefault()
                 setDrag(false)
-                pick(e.dataTransfer.files[0] ?? null)
+                void drop(e.dataTransfer)
               }}
-              onClick={() => inputRef.current?.click()}
+              onClick={() => dirRef.current?.click()}
               className={`cursor-pointer rounded-2xl border-2 border-dashed p-6 text-center transition ${drag ? 'border-accent bg-accent-soft' : 'border-line hover:border-accent/50'}`}
             >
               <input ref={inputRef} type="file" accept=".zip,application/zip" className="hidden" onChange={(e) => pick(e.target.files?.[0] ?? null)} />
-              {file ? (
-                <div className="flex items-center justify-center gap-3"><FileArchive className="text-accent" /> <span className="font-medium">{file.name}</span> <span className="text-xs text-ink-3">{(file.size / 1024 / 1024).toFixed(1)} MB</span></div>
+              {/* webkitdirectory is not in React's typings: set through the ref */}
+              <input ref={(el) => { dirRef.current = el; if (el) el.setAttribute('webkitdirectory', ''); }} type="file" multiple className="hidden" onChange={(e) => { pickFolder(e.target.files); e.target.value = '' }} />
+              {packing ? (
+                <div className="flex items-center justify-center gap-3 text-ink-2"><Loader2 className="animate-spin text-accent" size={18} /> <span className="font-medium">{packing}</span></div>
+              ) : file ? (
+                <div>
+                  <div className="flex items-center justify-center gap-3"><FileArchive className="text-accent" /> <span className="font-medium">{file.name}</span> <span className="text-xs text-ink-3">{(file.size / 1024 / 1024).toFixed(1)} MB</span></div>
+                  {stats && (
+                    <div className="mt-1.5 text-xs text-ink-3">
+                      {T(`${stats.files} archivos de código (${(stats.bytes / 1024 / 1024).toFixed(1)} MB) · ${stats.skipped} descartados: node_modules, .git, builds, binarios y archivos > 400 KB`, `${stats.files} code files (${(stats.bytes / 1024 / 1024).toFixed(1)} MB) · ${stats.skipped} dropped: node_modules, .git, builds, binaries and files > 400 KB`)}
+                      {stats.truncated && <span className="text-danger"> · {T('se cortó en 2500 archivos / 25 MB', 'capped at 2500 files / 25 MB')}</span>}
+                    </div>
+                  )}
+                  <div className="mt-2 text-[11px] text-ink-3">{T('Hacé clic o arrastrá otra carpeta para cambiarla', 'Click or drop another folder to change it')}</div>
+                </div>
               ) : (
                 <>
                   <UploadCloud className="mx-auto text-ink-3" size={30} />
-                  <div className="mt-2 font-medium">{T('Arrastrá el .zip del proyecto o hacé clic', 'Drag the project .zip here or click')}</div>
-                  <div className="mt-1 text-xs text-ink-3">{T('Se ignoran node_modules, .git, binarios y archivos > 400 KB. Hasta 1 GB (sin node_modules sube mucho más rápido).', 'node_modules, .git, binaries and files > 400 KB are ignored. Up to 1 GB (much faster without node_modules).')}</div>
+                  <div className="mt-2 font-medium">{T('Arrastrá la carpeta del proyecto o hacé clic para elegirla', 'Drop the project folder here or click to pick it')}</div>
+                  <div className="mt-1 text-xs text-ink-3">{T('Tably descarta node_modules, .git, builds y binarios acá mismo y sube solo el código: no hace falta preparar nada.', 'Tably drops node_modules, .git, builds and binaries right here and uploads only the code: nothing to prepare.')}</div>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }} className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1 text-[12px] text-ink-2 transition hover:border-accent hover:text-accent"><FolderOpen size={12} /> {T('…o subir un .zip', '…or upload a .zip')}</button>
                 </>
               )}
             </div>
