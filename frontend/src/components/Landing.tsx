@@ -193,7 +193,7 @@ export function MuseBadge({ className = '', big = false }: { className?: string;
     : 'items-center gap-1.5 rounded-full border border-[#BBD5FA] bg-[#EEF5FF] py-1 pl-1.5 pr-2.5 text-[11px] font-semibold text-[#0B2E66] transition hover:border-[#0082FB]'
   return (
     <span className={`relative ${big ? 'inline-block' : 'inline-flex'} ${className}`}>
-      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className={`${pill} ${open ? 'border-[#0082FB]' : ''}`}>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className={`muse-ring ${pill} ${open ? 'border-[#0082FB]' : ''}`}>
         <img src="/logos/meta.png" alt="" aria-hidden className={big ? 'h-7 w-7' : 'h-4 w-4'} draggable={false} />
         powered by <span className="font-bold">Muse</span>{big && <span className="text-[#0B2E66]/60">· Meta</span>}
       </button>
