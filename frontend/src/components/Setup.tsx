@@ -12,7 +12,7 @@ import HomeLoader from './HomeLoader'
 import LaneCards from './LaneCards'
 import AgentAvatar from './AgentAvatar'
 import { isMuseReco, museReco, museTeam } from '../lib/muse'
-import { MUSE_FIRST } from '../lib/flags'
+import { HACKATHON_MODE, MUSE_FIRST } from '../lib/flags'
 import { readCache, writeCache } from '../lib/cache'
 import ModelSelect, { invalidateModels } from './ModelSelect'
 import ArenaIntro, { ICON_STEP, PLAY_OUT, iconExitAt, introTeam } from './ArenaIntro'
@@ -215,7 +215,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   /** Benchmark the references first, with the reverse-engineering screen; then the team intro; then the council. */
   const [directBusy, setDirectBusy] = useState(false)
   // how the user wants to build: alone with the builder (direct) or with the whole team (council first)
-  const [lane, setLaneState] = useState<'direct' | 'team' | null>(() => { try { const v = localStorage.getItem('tably.lane'); return v === 'direct' || v === 'team' ? v : null } catch { return null } })
+  const [lane, setLaneState] = useState<'direct' | 'team' | null>(() => { if (HACKATHON_MODE) return 'team'; try { const v = localStorage.getItem('tably.lane'); return v === 'direct' || v === 'team' ? v : null } catch { return null } })  // hackathon edition: only the development-team lane
   const [showAllProviders, setShowAllProviders] = useState(false)  // Muse first: the other providers' chips stay behind a link
   const [editAgent, setEditAgent] = useState<number | null>(null)  // direct lane: the role being edited in its dialog
   const [laneAsk, setLaneAsk] = useState(false)  // «crear el primer proyecto»: direct or team, then the form scrolls into view
@@ -224,7 +224,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
     setLane(l)
     setTimeout(() => document.querySelector('[data-lane]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
   }
-  const setLane = (l: 'direct' | 'team' | null) => { setLaneState(l); try { if (l) localStorage.setItem('tably.lane', l); else localStorage.removeItem('tably.lane') } catch { /* private mode */ } }
+  const setLane = (l: 'direct' | 'team' | null) => { if (HACKATHON_MODE) l = 'team'; setLaneState(l); try { if (l) localStorage.setItem('tably.lane', l); else localStorage.removeItem('tably.lane') } catch { /* private mode */ } }
   const research = async (direct = false) => {
     if (!validate()) return
     let context = cfg.context ?? null
@@ -574,7 +574,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
         </motion.div>
 
         {/* the two ways in: the builder alone (one good prompt) or the whole team (council first) */}
-        {lane === null ? (
+        {HACKATHON_MODE ? null : lane === null ? (
           <LaneCards onPick={setLane} />
         ) : (
           <div className="mt-8 flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
@@ -583,7 +583,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
               <div className="mt-1 text-[22px] leading-tight">{lane === 'direct' ? T('Constructor directo', 'Direct builder') : T('Constructor con equipo de desarrollo', 'Builder with a development team')}</div>
               <div className="mt-1 text-[13px] text-ink-2">{lane === 'direct' ? T('Tu pedido pasa por prompt engineering y va directo al constructor, sin consejo previo.', 'Your request goes through prompt engineering and straight to the builder, with no council first.') : T('El equipo debate tu idea, acuerda el brief y recién entonces construye.', 'The team debates your idea, agrees on the brief and only then builds.')}</div>
             </div>
-            <button type="button" onClick={() => setLane(null)} className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-[13px] font-medium text-ink shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent"><ArrowLeftRight size={14} /> {T('Cambiar de modo', 'Change mode')}</button>
+            {!HACKATHON_MODE && <button type="button" onClick={() => setLane(null)} className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-[13px] font-medium text-ink shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent"><ArrowLeftRight size={14} /> {T('Cambiar de modo', 'Change mode')}</button>}
           </div>
         )}
         {lane === 'team' && presets.some((p) => p.custom) && (
@@ -909,7 +909,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
         </div>
         )}
 
-        <Dashboard onCreate={() => setLaneAsk(true)} onOpen={(id, mode) => { if (mode !== 'run') setOpening(mode === 'arena' ? T('Convocando al equipo…', 'Gathering the team…') : T('Abriendo el constructor…', 'Opening the builder…')); return onOpen(id, mode) }} onCouncil={(id) => { setOpening(T('Abriendo el consejo…', 'Opening the council…')); useArena.getState().set({ pendingLive: id }) }} onReplay={onReplay} onSettings={onSettings} onAudit={onAudit} onLoaded={() => mark('dashboard')} />
+        <Dashboard onCreate={() => (HACKATHON_MODE ? pickLaneAndGo('team') : setLaneAsk(true))} onOpen={(id, mode) => { if (mode !== 'run') setOpening(mode === 'arena' ? T('Convocando al equipo…', 'Gathering the team…') : T('Abriendo el constructor…', 'Opening the builder…')); return onOpen(id, mode) }} onCouncil={(id) => { setOpening(T('Abriendo el consejo…', 'Opening the council…')); useArena.getState().set({ pendingLive: id }) }} onReplay={onReplay} onSettings={onSettings} onAudit={onAudit} onLoaded={() => mark('dashboard')} />
       </div>
     </div>
   )
