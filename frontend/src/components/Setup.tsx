@@ -543,8 +543,8 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
             <button onClick={onAudit} title={T('Subí un proyecto existente y el equipo lo revisa desde cada rol', 'Upload an existing project and the team reviews it from every role')} className="flex h-10 items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-md transition hover:brightness-110 hover:shadow-lg">
               <Gavel size={16} /> {T('Auditar un proyecto', 'Audit a project')}
             </button>
-            <button onClick={() => useArena.getState().set({ view: 'agents' })} title={T('Tus proyectos y conversaciones de Claude Code y Codex, tal como están en esta máquina', 'Your Claude Code and Codex projects and conversations, as they are on this machine')} className="flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent">
-              <span className="flex items-center -space-x-1.5"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-white ring-1 ring-black/10"><ProviderLogo provider="anthropic" size={13} /></span><span className="flex h-6 w-6 items-center justify-center rounded-full bg-white ring-1 ring-black/10"><ProviderLogo provider="openai" size={13} /></span></span> {T('Mis sesiones', 'My sessions')}
+            <button onClick={() => useArena.getState().set({ view: 'agents' })} title={T('Tus proyectos y conversaciones de Muse Code, tal como están en esta máquina', 'Your Muse Code projects and conversations, as they are on this machine')} className="flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white ring-1 ring-black/10"><ProviderLogo provider="meta" size={15} /></span> {T('Mis sesiones', 'My sessions')}
             </button>
             <button onClick={onSettings} title={T('Conectá tus IAs, elegí modelos por defecto, deploy y trazas', 'Connect your AIs, pick default models, deploy and tracing')} className="flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-medium text-ink-2 shadow-sm transition hover:bg-accent-soft hover:border-accent hover:text-accent hover:shadow-md">
               <Settings2 size={16} /> {T('Modelos y API keys', 'Models & API keys')}
@@ -910,7 +910,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                   <motion.span animate={launching ? { x: 220, opacity: 0 } : { x: 0, opacity: 1 }} transition={{ duration: PLAY_OUT, ease: 'easeIn' }} className="inline-flex">
                     <Play size={20} className="group-hover:translate-x-0.5 transition" />
                   </motion.span>
-                  {launching ? tr('Entrando a la arena…', 'Entering the arena…') : busy ? tr('Investigando referencias…', 'Researching references…') : HACKATHON_MODE ? tr('Empezar a construir', 'Start building') : tr('Iniciar experimento', 'Start experiment')}
+                  {launching ? tr('Reuniendo el equipo…', 'Gathering the team…') : busy ? tr('Investigando referencias…', 'Researching references…') : HACKATHON_MODE ? tr('Empezar a construir', 'Start building') : tr('Iniciar experimento', 'Start experiment')}
                 </button>
                 )}
                 </>

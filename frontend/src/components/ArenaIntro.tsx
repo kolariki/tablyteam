@@ -118,7 +118,7 @@ export default function ArenaIntro({ team, onDone }: { team: IntroCompany[]; onD
         transition={{ duration: 0.5, delay: dim ? 0.45 : 0 }}
       >
         <div className="text-lg text-ink-2">
-          {T('Entrando a la arena', 'Entering the arena')}<motion.span animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1.1 }}>…</motion.span>
+          {T('Reuniendo el equipo', 'Gathering the team')}<motion.span animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1.1 }}>…</motion.span>
         </div>
         <div className="mt-3 h-[5px] w-72 overflow-hidden rounded-full bg-black/10">
           <motion.div
