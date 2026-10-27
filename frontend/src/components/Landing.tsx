@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Pause, Play, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { countTo, gsap, heroIntro, sceneIn, scrollReveal, useGSAP } from '../lib/anim'
 import { useLang, useT } from '../lib/i18n'
@@ -182,21 +182,70 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
   )
 }
 
-/** The "powered by Muse" seal: Meta's model behind every role. */
+/** The "powered by Muse" seal: Meta's model behind every role. Click opens what Muse is and what each piece does in Tably. */
 export function MuseBadge({ className = '', big = false }: { className?: string; big?: boolean }) {
-  if (big) {
-    return (
-      <span className={`inline-flex items-center gap-2.5 rounded-full border border-[#BBD5FA] bg-[#EEF5FF] py-2 pl-2 pr-4 text-[14px] font-medium text-[#0B2E66] shadow-sm ${className}`}>
-        <img src="/logos/meta.png" alt="" aria-hidden className="h-7 w-7" draggable={false} />
-        powered by <span className="font-bold">Muse</span><span className="text-[#0B2E66]/60">· Meta</span>
-      </span>
-    )
-  }
+  const [open, setOpen] = useState(false)
+  const T = useT()
+  const title = T('Qué es Muse y qué hace en Tably', 'What Muse is and what it does in Tably')
   return (
-    <span className={`items-center gap-1.5 rounded-full border border-[#BBD5FA] bg-[#EEF5FF] py-1 pl-1.5 pr-2.5 text-[11px] font-semibold text-[#0B2E66] ${className}`}>
-      <img src="/logos/meta.png" alt="" aria-hidden className="h-4 w-4" draggable={false} />
-      powered by <span className="font-bold">Muse</span>
-    </span>
+    <>
+      {big ? (
+        <button type="button" onClick={() => setOpen(true)} title={title} className={`inline-flex items-center gap-2.5 rounded-full border border-[#BBD5FA] bg-[#EEF5FF] py-2 pl-2 pr-4 text-[14px] font-medium text-[#0B2E66] shadow-sm transition hover:border-[#0082FB] hover:shadow-md ${className}`}>
+          <img src="/logos/meta.png" alt="" aria-hidden className="h-7 w-7" draggable={false} />
+          powered by <span className="font-bold">Muse</span><span className="text-[#0B2E66]/60">· Meta</span>
+        </button>
+      ) : (
+        <button type="button" onClick={() => setOpen(true)} title={title} className={`items-center gap-1.5 rounded-full border border-[#BBD5FA] bg-[#EEF5FF] py-1 pl-1.5 pr-2.5 text-[11px] font-semibold text-[#0B2E66] transition hover:border-[#0082FB] ${className}`}>
+          <img src="/logos/meta.png" alt="" aria-hidden className="h-4 w-4" draggable={false} />
+          powered by <span className="font-bold">Muse</span>
+        </button>
+      )}
+      <AnimatePresence>{open && <MuseModal onClose={() => setOpen(false)} />}</AnimatePresence>
+    </>
+  )
+}
+
+/** What Muse is and which piece of it does what in Tably, in plain words. */
+function MuseModal({ onClose }: { onClose: () => void }) {
+  const T = useT()
+  const pieces: { id: string; name: string; what: string; what_en: string; tably: string; tably_en: string }[] = [
+    { id: 'muse-wonder-1.0', name: 'Muse Wonder', what: 'El modelo más capaz de Meta: razonamiento largo, cambios en muchos archivos, subagentes y 1M de tokens de contexto.', what_en: "Meta's most capable model: long reasoning, multi-file changes, sub-agents and a 1M-token context window.", tably: 'CEO y Head of Engineering del consejo, y el constructor de proyectos grandes.', tably_en: 'The council\'s CEO and Head of Engineering, and the builder on large projects.' },
+    { id: 'muse-spark-1.3', name: 'Muse Spark', what: 'El modelo agéntico de Meta para trabajo rápido y barato: tool calling en paralelo, razonamiento entre turnos, visión.', what_en: "Meta's agentic model for fast, cheap work: parallel tool calling, reasoning across turns, vision.", tably: 'CTO, Product, Diseño y QA, el prompt engineering y el brief.', tably_en: 'CTO, Product, Design and QA, prompt engineering and the brief.' },
+    { id: 'muse-code', name: 'Muse Code', what: 'El agente de programación de Meta para la terminal: planifica, edita archivos y corre comandos en un sandbox.', what_en: "Meta's coding agent for the terminal: it plans, edits files and runs commands in a sandbox.", tably: 'Escribe el código de tu app, archivo por archivo, y corrige lo que falla al compilar.', tably_en: 'Writes your app\'s code file by file and fixes what fails to compile.' },
+    { id: 'muse-image-1.0', name: 'Muse Image', what: 'Genera y edita imágenes a partir de texto, y las refina turno a turno.', what_en: 'Generates and edits images from text, refining them turn by turn.', tably: 'El diseñador arma el mockup, los íconos y la portada de tu app.', tably_en: 'The designer makes your app\'s mockup, icons and cover.' },
+    { id: 'sam-3.1', name: 'SAM 3.1', what: 'Segment Anything: encuentra y recorta objetos en imágenes y video a partir de una frase.', what_en: 'Segment Anything: finds and outlines objects in images and video from a short phrase.', tably: 'Separa en componentes las capturas de las apps de referencia antes de diseñar.', tably_en: 'Breaks the reference apps\' screenshots into components before designing.' },
+    { id: 'muse-voice-transcribe-1.0', name: 'Muse Voice Transcribe', what: 'Voz a texto en tiempo real, con detección de turnos y hablantes.', what_en: 'Real-time speech to text, with turn and speaker detection.', tably: 'Dictás tu pedido en vez de escribirlo.', tably_en: 'Dictate your request instead of typing it.' },
+  ]
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[400] flex items-center justify-center bg-ink/45 p-4 backdrop-blur-sm" onClick={onClose}>
+      <motion.div initial={{ opacity: 0, y: 14, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8 }} transition={{ type: 'spring', stiffness: 260, damping: 24 }} className="max-h-[90vh] w-full max-w-[760px] overflow-y-auto rounded-3xl border border-line bg-surface p-7 shadow-2xl scroll-thin" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-4">
+          <img src="/logos/meta.png" alt="" aria-hidden className="h-12 w-12 shrink-0" draggable={false} />
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] uppercase tracking-[0.3em] text-[#0064E0]">powered by Muse</div>
+            <h3 className="serif mt-1 text-[28px] leading-tight">{T('Muse es la familia de modelos de IA de Meta', "Muse is Meta's family of AI models")}</h3>
+            <p className="mt-2 text-[14.5px] leading-relaxed text-ink-2">{T('Tably Team usa Muse como motor: cada rol del equipo, el diseñador, el constructor y la investigación de referencias corren sobre modelos de Meta a través de la Meta Model API. Esto es lo que hace cada pieza.', 'Tably Team runs on Muse: every role on the team, the designer, the builder and the reference research run on Meta models through the Meta Model API. This is what each piece does.')}</p>
+          </div>
+          <button type="button" onClick={onClose} className="shrink-0 rounded-full p-1.5 text-ink-3 transition hover:bg-surface-2 hover:text-ink" aria-label={T('Cerrar', 'Close')}><X size={18} /></button>
+        </div>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          {pieces.map((p) => (
+            <div key={p.id} className="rounded-2xl border border-line bg-paper p-4">
+              <div className="flex items-baseline justify-between gap-2">
+                <div className="text-[15px] font-semibold">{p.name}</div>
+                <code className="truncate font-mono text-[10px] text-ink-3">{p.id}</code>
+              </div>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2">{T(p.what, p.what_en)}</p>
+              <p className="mt-2 text-[13px] leading-relaxed text-[#0B2E66]"><span className="font-semibold">{T('En Tably: ', 'In Tably: ')}</span>{T(p.tably, p.tably_en)}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-[12.5px] text-ink-3">
+          <span>{T('Tus pedidos no se usan para entrenar modelos (modo estándar de la Meta Model API).', 'Your requests are not used to train models (Meta Model API standard mode).')}</span>
+          <a href="https://dev.meta.ai/docs/overview" target="_blank" rel="noreferrer" className="rounded-full border border-line bg-surface px-3 py-1.5 text-ink-2 transition hover:border-[#0082FB] hover:text-[#0064E0]">{T('Documentación de Muse', 'Muse documentation')} ↗</a>
+        </div>
+      </motion.div>
+    </motion.div>
   )
 }
 
