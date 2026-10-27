@@ -11,7 +11,7 @@ import Dashboard from './Dashboard'
 import HomeLoader from './HomeLoader'
 import LaneCards from './LaneCards'
 import AgentAvatar from './AgentAvatar'
-import { isMuseReco, museReco, museTeam } from '../lib/muse'
+import { isMuseReco, museReco, museTeam, museTeamFor } from '../lib/muse'
 import { HACKATHON_MODE, MUSE_FIRST } from '../lib/flags'
 import { readCache, writeCache } from '../lib/cache'
 import ModelSelect, { invalidateModels } from './ModelSelect'
@@ -147,12 +147,19 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
     const title = pick(p, 'title')
     const topic = pick(p, 'topic')
     const language = defaultLanguage()
-    const agents = p.agents.map((a, i) => ({ ...a, name: pick(a, 'name') || a.name, persona: pick(a, 'persona') || a.persona, color: a.provider === 'mock' ? BRAND_COLOR[a.wanted_provider ?? ''] ?? PALETTE[i % PALETTE.length] : null }))
+    const base = p.agents.map((a, i) => ({ ...a, name: pick(a, 'name') || a.name, persona: pick(a, 'persona') || a.persona, color: a.provider === 'mock' ? BRAND_COLOR[a.wanted_provider ?? ''] ?? PALETTE[i % PALETTE.length] : null }))
+    // Muse first: every seat of the preset lands on the Muse model recommended for its role (simulated until the Meta key is loaded)
+    const agents = MUSE_FIRST ? museTeamFor(base, !!providers.find((x) => x.id === 'meta')?.configured) : base
     baseline.current = { preset: p, title, topic, language, agents: Object.fromEntries(agents.map((a) => [a.id, { name: a.name, persona: a.persona }])) }
     setIdea(topic)
     setPromptMd(null)
     setCfg((c) => ({ ...c, topic, title, language, mode: p.mode, max_turns: p.max_turns, agents }))
   }
+  // Muse first: as soon as the Meta key is connected, the seats that were waiting for it (simulated) move to Muse with their recommended model
+  useEffect(() => {
+    if (!MUSE_FIRST || !providers.find((x) => x.id === 'meta')?.configured) return
+    setCfg((c) => (c.agents.some((a) => a.provider === 'mock' && a.wanted_provider === 'meta') ? { ...c, agents: c.agents.map((a) => (a.provider === 'mock' && a.wanted_provider === 'meta' ? { ...a, provider: 'meta', wanted_provider: undefined, model: museReco(a).model, color: null } : a)) } : c))
+  }, [providers])
   useEffect(() => {
     // language switched: swap every default that is still untouched to the other language
     const b = baseline.current
@@ -778,7 +785,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
             {/* the logos live under the fields and follow the scroll (sticky) until the box ends; they never rise above this point */}
             <div className="team-only relative mt-2 flex-1 min-h-[150px]">
               <div className="sticky top-24">
-                <BrandLogoRow providers={cfg.agents.map((a) => a.wanted_provider ?? a.provider)} align="start" />
+                <BrandLogoRow providers={cfg.agents.map((a) => ({ provider: a.wanted_provider ?? a.provider, model: a.model }))} align="start" />
               </div>
             </div>
           </div>

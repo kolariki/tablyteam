@@ -34,6 +34,21 @@ export function museReco(agent: Pick<AgentConfig, 'role' | 'id'>): MuseReco {
   return { model, why, why_en, tool: TOOL[role] }
 }
 
+/** «muse-wonder-1.0» → «Muse Wonder», «muse-spark-1.3» → «Muse Spark 1.3». Other models come back as they are. */
+export function museLabel(model: string | undefined | null): string {
+  if (!model) return ''
+  const m = model.match(/^muse-(wonder|spark|image|code|glimmer)-?([\d.]+)?(-contributor)?$/)
+  if (!m) return model
+  const name = m[1][0].toUpperCase() + m[1].slice(1)
+  const ver = m[2] && m[2] !== '1.0' ? ` ${m[2]}` : ''
+  return `Muse ${name}${ver}${m[3] ? ' (contributor)' : ''}`
+}
+
+/** The same team on Muse, but through the simulated provider when the Meta key is not loaded yet (the card still shows Muse and its model). */
+export function museTeamFor(agents: AgentConfig[], metaConfigured: boolean): AgentConfig[] {
+  return agents.map((a) => (metaConfigured ? { ...a, provider: 'meta', wanted_provider: undefined, model: museReco(a).model, color: null } : { ...a, provider: 'mock', wanted_provider: 'meta', model: 'mock-1' }))
+}
+
 /** The same team, every seat on Muse with the recommended model for its role. */
 export function museTeam(agents: AgentConfig[]): AgentConfig[] {
   return agents.map((a) => ({ ...a, provider: 'meta', model: museReco(a).model, wanted_provider: undefined, color: null }))

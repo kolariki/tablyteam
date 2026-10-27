@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { brandTheme } from '../lib/brand'
+import { museLabel } from '../lib/muse'
 import ProviderLogo from './ProviderLogo'
 import { useT } from '../lib/i18n'
 
@@ -8,17 +9,22 @@ export interface IntroCompany {
   provider: string
   label: string
   roles: string[]
+  key?: string
   count: number
   total: number
 }
 
 /** The companies in a team, grouped by provider, with their share and the roles each one plays. */
-export function introTeam(agents: { provider: string; wanted_provider?: string; name: string; roleLabel?: string }[], labelOf: (p: string) => string): IntroCompany[] {
+export function introTeam(agents: { provider: string; wanted_provider?: string; model?: string; name: string; roleLabel?: string }[], labelOf: (p: string) => string): IntroCompany[] {
   const total = agents.length
-  const order = [...new Set(agents.map((a) => a.wanted_provider ?? a.provider))]
-  return order.map((p) => {
-    const mine = agents.filter((a) => (a.wanted_provider ?? a.provider) === p)
-    return { provider: p, label: labelOf(p), roles: mine.map((a) => a.roleLabel || a.name), count: mine.length, total }
+  // one card per company, or per model when the company is Meta (Muse Wonder and Muse Spark are different seats)
+  const keyOf = (a: { provider: string; wanted_provider?: string; model?: string }) => { const p = a.wanted_provider ?? a.provider; return p === 'meta' && a.model ? `${p}|${a.model}` : p }
+  const order = [...new Set(agents.map(keyOf))]
+  return order.map((k) => {
+    const p = k.split('|')[0]
+    const mine = agents.filter((a) => keyOf(a) === k)
+    const model = mine[0]?.model
+    return { key: k, provider: p, label: p === 'meta' && model ? museLabel(model) : labelOf(p), roles: mine.map((a) => a.roleLabel || a.name), count: mine.length, total }
   })
 }
 
@@ -83,7 +89,7 @@ export default function ArenaIntro({ team, onDone }: { team: IntroCompany[]; onD
           const t = brandTheme(c.provider)
           return (
             <motion.div
-              key={c.provider}
+              key={c.key ?? c.provider}
               className="flex w-[180px] min-h-[270px] flex-col items-center rounded-2xl border px-3 py-4 text-center shadow-md"
               style={{ background: 'rgba(255,255,255,0.86)', borderColor: t.border }}
               initial={{ opacity: 0, x: 140, scale: 0.6, filter: 'blur(6px)' }}

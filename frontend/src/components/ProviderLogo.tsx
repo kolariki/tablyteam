@@ -1,5 +1,6 @@
 import { brandTheme } from '../lib/brand'
 import { GLYPH } from '../lib/brand'
+import { museLabel } from '../lib/muse'
 
 /** Company logos live in /public/logos/<provider>.png (transparent, 256px). */
 const HAS_LOGO = new Set(['meta', 'anthropic', 'openai', 'deepseek', 'gemini', 'xai', 'groq', 'mistral', 'openrouter', 'ollama', 'kimi', 'mock', 'vercel', 'railway', 'langfuse'])
@@ -57,17 +58,22 @@ export function BrandStripes({ providers, opacity = 1, logos = true, compact = f
 }
 
 /** One column per company (equal widths): logo, share of the team and "N de T". Fills its container; place it where the logos must live. */
-export function BrandLogoRow({ providers, align = 'center', compact = false }: { providers: string[]; align?: 'center' | 'start'; compact?: boolean }) {
-  const all = providers.length ? providers : ['anthropic', 'openai', 'gemini', 'deepseek']
+export function BrandLogoRow({ providers, align = 'center', compact = false }: { providers: (string | { provider: string; model?: string })[]; align?: 'center' | 'start'; compact?: boolean }) {
+  // a band per company, or per model when the item names one (Muse Wonder vs Muse Spark are different seats at the table)
+  const items = (providers.length ? providers : ['anthropic', 'openai', 'gemini', 'deepseek']).map((x) => (typeof x === 'string' ? { provider: x, model: undefined as string | undefined } : x))
+  const keyOf = (x: { provider: string; model?: string }) => (x.model ? `${x.provider}|${x.model}` : x.provider)
+  const all = items.map(keyOf)
   const order = [...new Set(all)]
   const n = order.length
   const total = all.length
   const logo = n <= 4 ? 88 : n <= 6 ? 64 : 48  // same for every band; shrinks only when there are many companies
   return (
     <div aria-hidden className="pointer-events-none flex h-full w-full">
-      {order.map((p, i) => {
+      {order.map((k, i) => {
+        const p = k.split('|')[0]
+        const model = items.find((x) => keyOf(x) === k)?.model
         const url = logoUrl(p)
-        const count = all.filter((x) => x === p).length
+        const count = all.filter((x) => x === k).length
         const pct = Math.round((count / total) * 100)
         const t = brandTheme(p)
         if (compact) {
@@ -83,6 +89,7 @@ export function BrandLogoRow({ providers, align = 'center', compact = false }: {
           <div key={`${p}-${i}`} className={`flex-1 min-w-0 flex flex-col items-center gap-1 select-none ${align === 'start' ? 'justify-start pt-1' : 'justify-center'}`}>
             {url && <img src={url} alt="" draggable={false} style={{ width: logo, height: logo, objectFit: 'contain', opacity: 0.26 }} />}
             <div className="font-mono leading-none font-semibold" style={{ fontSize: n > 6 ? 14 : 20, color: t.ink, opacity: 0.22 }}>{pct}%</div>
+            {model && model.startsWith('muse-') && <div className="whitespace-nowrap font-semibold" style={{ fontSize: n > 6 ? 9 : 11, color: t.ink, opacity: 0.45 }}>{museLabel(model)}</div>}
             <div className="uppercase tracking-[0.2em] whitespace-nowrap" style={{ fontSize: n > 6 ? 7 : 9, color: t.ink, opacity: 0.35 }}>{count} de {total}</div>
           </div>
         )
