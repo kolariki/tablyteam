@@ -183,7 +183,7 @@ export const api = {
   notionDatabases: () => j<{ databases: { id: string; title: string; url: string | null }[] }>(authed('/api/notion/databases')),
   ticketsConfig: () => j<TicketsConfig>(authed('/api/tickets/config')),
   saveTicketsConfig: (body: Record<string, unknown>) => j<TicketsConfig>(authed('/api/tickets/config', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })),
-  tickets: () => j<{ link: TicketsConfig['link']; tickets: Ticket[]; runs: Record<string, TicketRun> }>(authed('/api/tickets')),
+  tickets: (all = false) => j<{ link: TicketsConfig['link']; tickets: Ticket[]; runs: Record<string, TicketRun>; groupable: GroupableProp[] }>(authed(`/api/tickets${all ? '?all=true' : ''}`)),
   ticket: (pageId: string) => j<{ id: string; title: string; url: string | null; fields: Record<string, string>; markdown: string }>(authed(`/api/tickets/${pageId}`)),
   ticketResolve: (pageId: string) => j<{ ok: boolean; build_id: string; session_id: string; branch: string; repo_url: string | null }>(post(`/api/tickets/${pageId}/resolve`, {})),
   levels: (sessionId: string, id: string) => j<LevelsPayload>(authed(`/api/sessions/${sessionId}/builds/${id}/levels`)),
@@ -278,7 +278,8 @@ export interface CloudStatus {
   public_url: string
 }
 /** Notion tickets resolved by the team. */
-export interface Ticket { id: string; title: string; status: string | null; priority: string | null; assignee: string | null; due: string | null; pr: string | null; url: string | null; bucket: 'urgent' | 'high' | 'medium' | 'low' | 'none'; created: string; edited: string; extra: Record<string, string> }
+export interface Ticket { id: string; title: string; status: string | null; priority: string | null; assignee: string | null; due: string | null; pr: string | null; url: string | null; bucket: 'urgent' | 'high' | 'medium' | 'low' | 'none'; created: string; edited: string; extra: Record<string, string>; fields?: Record<string, string> }
+export interface GroupableProp { name: string; type: string; options: { name: string; color: string | null }[] }
 export interface TicketRun { user_id: string; page_id: string; title: string | null; session_id: string | null; build_id: string | null; status: 'queued' | 'building' | 'reviewing' | 'built' | 'changes' | 'pr' | 'approved' | string; base_commit: string | null; branch: string | null; pr_url: string | null; council_session: string | null; error: string | null; started: number; updated: number }
 export interface TicketsConfig {
   link: { user_id?: string; database_id: string | null; database_title: string | null; props: Record<string, string | null>; status_map: Partial<Record<'todo' | 'in_progress' | 'review' | 'done', string | null>>; session_id: string | null; build_id: string | null; repo_url: string | null; assignee: string | null } | null

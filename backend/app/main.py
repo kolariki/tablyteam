@@ -2096,21 +2096,28 @@ def _ticket_status(run: dict | None, b=None) -> dict | None:
     return {**run, "status": st}
 
 
+_CLOSED_RX = re.compile(r"cancel|archiv|\bold\b|descart|won'?t|duplic", re.I)
+
+
 @app.get("/api/tickets")
-def tickets_list(user: User = CurrentUser):
+def tickets_list(all: bool = False, user: User = CurrentUser):
+    """Open tickets (done, cancelled and archived ones are left out unless `all`), with the properties the screen can group by."""
     link = ticketsmod.get_link(user.id)
     if not link or not link.get("database_id"):
-        return {"link": link, "tickets": [], "runs": {}}
+        return {"link": link, "tickets": [], "runs": {}, "groupable": []}
     try:
-        items = ticketsmod.tickets(_notion_token(user), link["database_id"], link.get("props") or {})
+        token = _notion_token(user)
+        items = ticketsmod.tickets(token, link["database_id"], link.get("props") or {})
+        groupable = ticketsmod.groupable_props(token, link["database_id"])
     except ticketsmod.NotionError as e:
         raise HTTPException(400, str(e))
     done = (link.get("status_map") or {}).get("done")
-    items = [t for t in items if not (done and t.get("status") == done)]
+    if not all:
+        items = [t for t in items if not ((done and t.get("status") == done) or (t.get("status") and _CLOSED_RX.search(t["status"])))]
     runs = ticketsmod.runs(user.id)
     b = BUILDS.get(link.get("build_id") or "")
     out_runs = {pid: _ticket_status(r, b if b and b.user.id == user.id and r.get("build_id") == b.id else None) for pid, r in runs.items()}
-    return {"link": link, "tickets": items, "runs": out_runs}
+    return {"link": link, "tickets": items, "runs": out_runs, "groupable": groupable}
 
 
 @app.get("/api/tickets/{page_id}")

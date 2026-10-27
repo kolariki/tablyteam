@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { AlertTriangle, Check, ChevronDown, ExternalLink, GitPullRequest, Hammer, Loader2, Search, Settings2, Users, X } from 'lucide-react'
 import { marked } from 'marked'
 import { useEffect, useMemo, useState } from 'react'
-import { api, type DashboardSession, type Ticket, type TicketRun, type TicketsConfig } from '../lib/api'
+import { api, type DashboardSession, type GroupableProp, type Ticket, type TicketRun, type TicketsConfig } from '../lib/api'
 import { useT } from '../lib/i18n'
 import { useArena } from '../store'
 import PageHeader from './PageHeader'
@@ -34,6 +34,46 @@ const RUN_LABEL: Record<string, [string, string, string]> = {
   queued: ['En cola', 'Queued', 'text-ink-3'],
 }
 
+const NOTION_COLOR: Record<string, string> = { default: '#9aa39e', gray: '#9aa39e', brown: '#92400e', orange: '#ea580c', yellow: '#ca8a04', green: '#059669', blue: '#0082FB', purple: '#7c3aed', pink: '#db2777', red: '#dc2626' }
+
+type Group = { key: string; label: string; color: string; items: Ticket[] }
+
+function dayDiff(due: string) {
+  const d = new Date(due.slice(0, 10) + 'T12:00:00')
+  const today = new Date(); today.setHours(12, 0, 0, 0)
+  return Math.round((d.getTime() - today.getTime()) / 86400000)
+}
+
+/** Groups in a meaningful order: urgency buckets, due-date horizons, or the property's own options in Notion's order. */
+function groupTickets(tickets: Ticket[], by: string, groupable: GroupableProp[], en: boolean): Group[] {
+  const sorted = [...tickets].sort((a, b) => (a.due ?? '9999').localeCompare(b.due ?? '9999') || (b.edited ?? '').localeCompare(a.edited ?? ''))
+  const mk = (defs: { key: string; label: string; color: string }[], keyOf: (t: Ticket) => string, other: { key: string; label: string; color: string }) => {
+    const map = new Map<string, Ticket[]>()
+    sorted.forEach((t) => { const k = keyOf(t); map.set(k, [...(map.get(k) ?? []), t]) })
+    const out: Group[] = defs.filter((d) => map.has(d.key)).map((d) => ({ ...d, items: map.get(d.key)! }))
+    const known = new Set(defs.map((d) => d.key))
+    for (const [k, items] of map) if (!known.has(k) && k !== other.key) out.push({ key: k, label: k, color: '#9aa39e', items })
+    if (map.has(other.key)) out.push({ ...other, items: map.get(other.key)! })
+    return out
+  }
+  if (by === 'urgency') return mk(BUCKETS.map((b) => ({ key: b.id, label: en ? b.en : b.es, color: b.color })).filter((b) => b.key !== 'none'), (t) => t.bucket, { key: 'none', label: en ? 'No priority' : 'Sin prioridad', color: '#9aa39e' })
+  if (by === 'due') {
+    const defs = [
+      { key: 'overdue', label: en ? 'Overdue' : 'Vencidos', color: '#dc2626' }, { key: 'today', label: en ? 'Today' : 'Hoy', color: '#ea580c' },
+      { key: 'week', label: en ? 'This week' : 'Esta semana', color: '#d97706' }, { key: 'month', label: en ? 'This month' : 'Este mes', color: '#0082FB' },
+      { key: 'later', label: en ? 'Later' : 'Más adelante', color: '#059669' },
+    ]
+    return mk(defs, (t) => { if (!t.due) return 'none'; const d = dayDiff(t.due); return d < 0 ? 'overdue' : d === 0 ? 'today' : d <= 7 ? 'week' : d <= 31 ? 'month' : 'later' }, { key: 'none', label: en ? 'No date' : 'Sin fecha', color: '#9aa39e' })
+  }
+  if (by === 'assignee') return mk([], (t) => t.assignee || 'none', { key: 'none', label: en ? 'Unassigned' : 'Sin asignar', color: '#9aa39e' })
+  const prop = groupable.find((g) => `prop:${g.name}` === by || (by === 'status' && g.type === 'status') || (by === 'priority' && /priorit|priorid|urgen/i.test(g.name)))
+  if (prop) {
+    const defs = prop.options.map((o) => ({ key: o.name, label: o.name, color: NOTION_COLOR[o.color ?? 'default'] ?? '#9aa39e' }))
+    return mk(defs, (t) => t.fields?.[prop.name] || 'none', { key: 'none', label: en ? 'Empty' : 'Vacío', color: '#9aa39e' })
+  }
+  return mk([], () => 'all', { key: 'all', label: en ? 'All' : 'Todos', color: '#9aa39e' })
+}
+
 function overdue(due: string | null | undefined) {
   if (!due) return false
   const d = new Date(due.slice(0, 10) + 'T23:59:59')
@@ -49,22 +89,26 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
   const [cfg, setCfg] = useState<TicketsConfig | null>(null)
   const [dbs, setDbs] = useState<{ id: string; title: string }[] | null>(null)
   const [projects, setProjects] = useState<DashboardSession[]>([])
-  const [data, setData] = useState<{ tickets: Ticket[]; runs: Record<string, TicketRun> } | null>(null)
+  const [data, setData] = useState<{ tickets: Ticket[]; runs: Record<string, TicketRun>; groupable: GroupableProp[] } | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [setup, setSetup] = useState(false)
   const [q, setQ] = useState('')
   const [who, setWho] = useState<string>('')
+  const [groupBy, setGroupBy] = useState<string>(() => { try { return localStorage.getItem('tickets.groupBy') || 'urgency' } catch { return 'urgency' } })
+  const [showAll, setShowAll] = useState(false)
   const [open, setOpen] = useState<Record<string, { markdown: string; fields: Record<string, string> } | 'loading' | undefined>>({})
 
   const loadStatus = () => api.notionStatus().then(setNotion).catch(() => {})
   const loadCfg = () => api.ticketsConfig().then(setCfg).catch(() => {})
-  const loadTickets = () => api.tickets().then((d) => { setData({ tickets: d.tickets, runs: d.runs }); setErr(null) }).catch((e) => setErr((e as Error).message))
+  const loadTickets = () => api.tickets(showAll).then((d) => { setData({ tickets: d.tickets, runs: d.runs, groupable: d.groupable ?? [] }); setErr(null) }).catch((e) => setErr((e as Error).message))
   useEffect(() => {
     loadStatus(); loadCfg()
     api.dashboard().then((d) => setProjects(d.sessions.filter((s) => (s.builds ?? []).length > 0))).catch(() => {})
   }, [])
-  useEffect(() => { if (cfg?.link?.database_id && notion?.set) loadTickets() }, [cfg?.link?.database_id, cfg?.link?.build_id, notion?.set])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (cfg?.link?.database_id && notion?.set) loadTickets() }, [cfg?.link?.database_id, cfg?.link?.build_id, notion?.set, showAll])
+  useEffect(() => { try { localStorage.setItem('tickets.groupBy', groupBy) } catch { /* ignore */ } }, [groupBy])
   useEffect(() => { if (notion?.set && (setup || !cfg?.link?.database_id)) api.notionDatabases().then((d) => setDbs(d.databases)).catch((e) => setErr((e as Error).message)) }, [notion?.set, setup, cfg?.link?.database_id])
   const active = useMemo(() => Object.values(data?.runs ?? {}).some((r) => r.status === 'building' || r.status === 'reviewing'), [data])
   useEffect(() => {
@@ -75,7 +119,8 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
 
   const link = cfg?.link
   const schema = cfg?.schema && !('error' in cfg.schema) ? cfg.schema : null
-  const ready = !!(notion?.set && link?.database_id && link?.build_id)
+  const ready = !!(notion?.set && link?.database_id)  // tickets show as soon as the database is set
+  const canResolve = !!link?.build_id  // resolving needs a Tably project to work on
   const showSetup = setup || !ready
 
   const saveToken = async () => {
@@ -182,22 +227,31 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
               <span className="text-[11px] uppercase tracking-[0.25em] text-ink-3">{link?.database_title}</span>
               {build && <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11.5px] text-ink-2"><Hammer size={11} className="mr-1 inline" />{project?.title || project?.topic} · v{build.version ?? 1}</span>}
               <div className="ml-auto flex items-center gap-2">
+                <label className="flex items-center gap-1.5 text-[12px] text-ink-3">{T('Agrupar por', 'Group by')}
+                  <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} className={SELECT}>
+                    <option value="urgency">{T('Urgencia', 'Urgency')}</option>
+                    <option value="due">{T('Fecha de vencimiento', 'Due date')}</option>
+                    <option value="assignee">{T('Asignado', 'Assignee')}</option>
+                    {(data?.groupable ?? []).filter((g) => g.type !== 'people' && g.type !== 'date').map((g) => <option key={g.name} value={`prop:${g.name}`}>{g.name}</option>)}
+                  </select>
+                </label>
                 {people.length > 0 && (
                   <select value={who} onChange={(e) => setWho(e.target.value)} className={SELECT}><option value="">{T('Todos', 'Everyone')}</option>{people.map((p) => <option key={p} value={p}>{p}</option>)}</select>
                 )}
+                <label className="flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[12px] text-ink-2"><input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> {T('incluir cerrados', 'include closed')}</label>
                 <label className="flex h-9 items-center gap-2 rounded-full border border-line bg-surface px-3 text-[13px]"><Search size={13} className="text-ink-3" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder={T('buscar…', 'search…')} className="w-36 bg-transparent outline-none" /></label>
                 <button onClick={loadTickets} className={PILL}>{T('Actualizar', 'Refresh')}</button>
               </div>
             </div>
+            {!canResolve && !showSetup && <div className="mt-4 flex items-center gap-2 rounded-xl border border-gold/30 bg-gold/10 px-4 py-2.5 text-[13px] text-ink-2"><Hammer size={14} className="text-gold" /> {T('Para resolver tickets falta elegir el proyecto de Tably que los trabaja.', 'To resolve tickets, pick the Tably project that works on them.')} <button onClick={() => setSetup(true)} className="ml-auto text-accent hover:underline">{T('Elegir proyecto', 'Pick project')}</button></div>}
             {err && <div className="mt-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{err}</div>}
             {!data && !err && <div className="mt-10 flex justify-center text-ink-3"><Loader2 size={18} className="animate-spin" /></div>}
             {data && visible.length === 0 && <div className="mt-8 rounded-2xl border border-dashed border-line bg-surface px-6 py-10 text-center text-sm text-ink-2">{T('No hay tickets abiertos en esta base.', 'No open tickets in this database.')}</div>}
-            {BUCKETS.map((bk) => {
-              const items = visible.filter((t) => t.bucket === bk.id)
-              if (!items.length) return null
+            {groupTickets(visible, groupBy, data?.groupable ?? [], en).map((bk) => {
+              const items = bk.items
               return (
-                <section key={bk.id} className="mt-6">
-                  <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ background: bk.color }} /><h2 className="text-[13px] font-semibold uppercase tracking-wide" style={{ color: bk.color }}>{en ? bk.en : bk.es}</h2><span className="font-mono text-[11px] text-ink-3">{items.length}</span></div>
+                <section key={bk.key} className="mt-6">
+                  <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ background: bk.color }} /><h2 className="text-[13px] font-semibold uppercase tracking-wide" style={{ color: bk.color }}>{bk.label}</h2><span className="font-mono text-[11px] text-ink-3">{items.length}</span></div>
                   <div className="mt-2 flex flex-col gap-2">
                     {items.map((t) => {
                       const run = data!.runs[t.id]
@@ -228,7 +282,7 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
                                 <button onClick={() => useArena.getState().set({ pendingBuild: { buildId: run.build_id!, sessionId: run.session_id! } })} className={PILL}>{run.status === 'changes' ? T('Ver veredicto', 'See verdict') : T('Ver al equipo', 'Watch the team')}</button>
                               )}
                               {run?.status !== 'pr' && (
-                                <button onClick={() => resolve(t)} disabled={!!busy || !!working || active} className={PRIMARY} title={active ? T('El equipo ya está con otro ticket', 'The team is already on another ticket') : undefined}>
+                                <button onClick={() => resolve(t)} disabled={!!busy || !!working || active || !canResolve} className={PRIMARY} title={!canResolve ? T('Elegí primero el proyecto de Tably', 'Pick the Tably project first') : active ? T('El equipo ya está con otro ticket', 'The team is already on another ticket') : undefined}>
                                   {busy === t.id ? <Loader2 size={14} className="animate-spin" /> : <Hammer size={14} />} {run?.status === 'changes' || run?.status === 'approved' ? T('Resolver de nuevo', 'Resolve again') : T('Resolver ticket', 'Resolve ticket')}
                                 </button>
                               )}

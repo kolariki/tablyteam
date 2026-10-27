@@ -254,7 +254,41 @@ def _prop_text(p: dict) -> str | None:
         return str(p.get("number")) if p.get("number") is not None else None
     if t == "checkbox":
         return "✓" if p.get("checkbox") else None
+    if t == "unique_id":
+        u = p.get("unique_id") or {}
+        return f"{u.get('prefix') + '-' if u.get('prefix') else ''}{u.get('number')}" if u.get("number") is not None else None
+    if t == "formula":
+        f = p.get("formula") or {}
+        v = f.get(f.get("type") or "")
+        return (str(v) if not isinstance(v, dict) else v.get("start")) if v not in (None, "") else None
+    if t == "created_time":
+        return (p.get("created_time") or "")[:10] or None
+    if t == "last_edited_time":
+        return (p.get("last_edited_time") or "")[:10] or None
     return None
+
+
+GROUPABLE = ("select", "status", "multi_select", "people", "date", "checkbox")
+
+
+def groupable_props(token: str, database_id: str) -> list[dict]:
+    """The properties the screen can group by: name, type and (for selects) the options in Notion's order with their colour."""
+    d = _call(token, "GET", f"/databases/{database_id}")
+    out = []
+    for name, p in (d.get("properties") or {}).items():
+        t = p.get("type")
+        if t not in GROUPABLE:
+            continue
+        opts = []
+        if t in ("select", "multi_select"):
+            opts = [{"name": o["name"], "color": o.get("color")} for o in (p.get(t) or {}).get("options", [])]
+        elif t == "status":
+            groups = (p.get("status") or {}).get("groups", [])
+            order = [oid for g in groups for oid in g.get("option_ids", [])]
+            by_id = {o.get("id") or o["name"]: o for o in (p.get("status") or {}).get("options", [])}
+            opts = [{"name": by_id[i]["name"], "color": by_id[i].get("color")} for i in order if i in by_id] or [{"name": o["name"], "color": o.get("color")} for o in by_id.values()]
+        out.append({"name": name, "type": t, "options": opts})
+    return out
 
 
 def tickets(token: str, database_id: str, props: dict) -> list[dict]:
@@ -270,9 +304,10 @@ def tickets(token: str, database_id: str, props: dict) -> list[dict]:
             get = lambda key: _prop_text(pp.get(props.get(key) or "", {})) if props.get(key) else None  # noqa: E731
             title = get("title") or next((_prop_text(v) for v in pp.values() if v.get("type") == "title"), None) or "(sin título)"
             status, prio, due = get("status"), get("priority"), get("due")
-            extra = {n: _prop_text(v) for n, v in pp.items() if n not in props.values() and v.get("type") in ("select", "multi_select", "rich_text", "number", "checkbox") and _prop_text(v)}
+            fields = {n: _prop_text(v) for n, v in pp.items() if v.get("type") != "title" and _prop_text(v)}
+            extra = {n: v for n, v in fields.items() if n not in props.values() and pp[n].get("type") in ("select", "multi_select", "rich_text", "number", "checkbox", "unique_id", "formula")}
             out.append({"id": pg["id"], "title": title, "status": status, "priority": prio, "assignee": get("assignee"), "due": due, "pr": get("pr"), "url": pg.get("url"),
-                        "bucket": bucket(prio, due), "created": pg.get("created_time"), "edited": pg.get("last_edited_time"), "extra": dict(list(extra.items())[:4])})
+                        "bucket": bucket(prio, due), "created": pg.get("created_time"), "edited": pg.get("last_edited_time"), "extra": dict(list(extra.items())[:4]), "fields": fields})
         if not r.get("has_more"):
             break
         cursor = r.get("next_cursor")
