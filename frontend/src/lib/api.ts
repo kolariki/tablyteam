@@ -174,6 +174,9 @@ export const api = {
     j<{ set: boolean; last4: string | null }>(authed('/api/settings/github', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, clear }) })),
   cloud: (sessionId: string, id: string) => j<CloudInfo>(authed(`/api/sessions/${sessionId}/builds/${id}/cloud`)),
   notionStatus: () => j<{ set: boolean; last4: string | null; me: { name: string; workspace: string | null } | null; error: string | null; oauth?: boolean }>(authed('/api/notion/status')),
+  notionApp: () => j<{ admin: boolean; client_id: string | null; has_secret: boolean; configured: boolean; redirect_uri: string; from_env: boolean }>(authed('/api/settings/notion-app')),
+  saveNotionApp: (body: { client_id?: string; client_secret?: string; clear?: boolean }) =>
+    j<{ admin: boolean; client_id: string | null; has_secret: boolean; configured: boolean; redirect_uri: string; from_env: boolean }>(authed('/api/settings/notion-app', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })),
   notionOauthUrl: () => j<{ url: string | null }>(authed('/api/notion/oauth/url')),
   saveNotionToken: (token: string | null, clear = false) =>
     j<{ set: boolean; last4: string | null; me: { name: string; workspace: string | null } | null; error: string | null }>(authed('/api/settings/notion', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, clear }) })),

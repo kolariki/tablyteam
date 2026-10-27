@@ -47,21 +47,54 @@ class NotionError(Exception):
 # Operator env: NOTION_CLIENT_ID + NOTION_CLIENT_SECRET (a public integration at notion.so/my-integrations) and the redirect URL
 # registered there: <TABLY_CLOUD_URL>/api/notion/callback. Without them the screen falls back to pasting an internal token.
 
+with _db() as _c:
+    _c.execute("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value BLOB, updated REAL NOT NULL)")
+
+
+def _setting(key: str) -> str | None:
+    from . import keystore
+
+    with _db() as c:
+        r = c.execute("SELECT value FROM app_settings WHERE key = ?", (key,)).fetchone()
+    if not r or not r["value"]:
+        return None
+    try:
+        return keystore._fernet.decrypt(r["value"]).decode()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def set_setting(key: str, value: str | None) -> None:
+    from . import keystore
+
+    with _db() as c:
+        if value:
+            c.execute("INSERT OR REPLACE INTO app_settings (key, value, updated) VALUES (?, ?, ?)", (key, keystore._fernet.encrypt(value.encode()), time.time()))
+        else:
+            c.execute("DELETE FROM app_settings WHERE key = ?", (key,))
+
+
+def oauth_creds() -> tuple[str | None, str | None]:
+    """The app's Notion OAuth client: what the admin saved from the UI, else the env."""
+    return (_setting("notion_client_id") or os.environ.get("NOTION_CLIENT_ID") or None, _setting("notion_client_secret") or os.environ.get("NOTION_CLIENT_SECRET") or None)
+
+
 def oauth_configured() -> bool:
-    return bool(os.environ.get("NOTION_CLIENT_ID") and os.environ.get("NOTION_CLIENT_SECRET"))
+    cid, sec = oauth_creds()
+    return bool(cid and sec)
 
 
 def oauth_url(redirect_uri: str, state: str) -> str:
     from urllib.parse import urlencode
 
-    return "https://api.notion.com/v1/oauth/authorize?" + urlencode({"client_id": os.environ.get("NOTION_CLIENT_ID", ""), "response_type": "code", "owner": "user", "redirect_uri": redirect_uri, "state": state})
+    return "https://api.notion.com/v1/oauth/authorize?" + urlencode({"client_id": oauth_creds()[0] or "", "response_type": "code", "owner": "user", "redirect_uri": redirect_uri, "state": state})
 
 
 def oauth_exchange(code: str, redirect_uri: str) -> dict:
     """code → {access_token, workspace_name, ...}."""
     import base64
 
-    cid, sec = os.environ.get("NOTION_CLIENT_ID", ""), os.environ.get("NOTION_CLIENT_SECRET", "")
+    cid, sec = oauth_creds()
     req = urllib.request.Request("https://api.notion.com/v1/oauth/token", method="POST", data=json.dumps({"grant_type": "authorization_code", "code": code, "redirect_uri": redirect_uri}).encode(),
                                  headers={"Authorization": "Basic " + base64.b64encode(f"{cid}:{sec}".encode()).decode(), "Content-Type": "application/json", "Notion-Version": NOTION_VERSION})
     try:

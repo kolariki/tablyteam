@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check, CloudUpload, Database, ExternalLink, Globe, KeyRound, Loader2, Server, ShieldCheck, Trash2 } from 'lucide-react'
+import { Check, CloudUpload, Copy, Database, ExternalLink, Globe, KeyRound, Loader2, Server, ShieldCheck, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api, type ProviderSetting } from '../lib/api'
 import { tr, useT } from '../lib/i18n'
@@ -101,6 +101,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
           </details>
         )}
         <TablyCloudSettings />
+        <NotionAppSettings />
         <DeploySettings />
         <LangfuseSettings />
       </div>
@@ -175,6 +176,47 @@ function TablyCloudSettings() {
           </ul>
         </div>
       )}
+    </div>
+  )
+}
+
+/** The app's Notion OAuth client (one per installation, set once by the admin): with it, every user connects Notion with one click. */
+function NotionAppSettings() {
+  const T = useT()
+  const [st, setSt] = useState<Awaited<ReturnType<typeof api.notionApp>> | null>(null)
+  const [cid, setCid] = useState('')
+  const [sec, setSec] = useState('')
+  const [msg, setMsg] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const load = () => { api.notionApp().then((s) => { setSt(s); setCid(s.client_id ?? '') }).catch(() => {}) }
+  useEffect(load, [])
+  if (!st || !st.admin) return null
+  const input = 'h-10 w-full rounded-xl border border-line bg-paper px-3 font-mono text-[12.5px] outline-none focus:border-accent'
+  return (
+    <div className="mt-3 rounded-2xl border border-line bg-surface p-5">
+      <div className="flex items-center gap-3">
+        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-sm ring-1 ring-black/10"><ProviderLogo provider="notion" size={22} /></span>
+        <div>
+          <div className="text-[15px] font-semibold">{T('Conexión de Notion para toda la app', 'Notion connection for the whole app')}</div>
+          <a href="https://www.notion.so/profile/integrations" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[12px] text-ink-3 hover:text-accent">{T('crear una integración pública (OAuth) en Notion', 'create a public (OAuth) integration in Notion')} <ExternalLink size={11} /></a>
+        </div>
+        <span className={`ml-auto inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11.5px] font-medium ${st.configured ? 'border-ok/30 bg-ok/10 text-ok' : 'border-line bg-surface text-ink-3'}`}>{st.configured ? T('Configurada', 'Configured') : T('Sin configurar', 'Not configured')}{st.from_env ? ' · .env' : ''}</span>
+      </div>
+      <p className="mt-2 text-[12.5px] text-ink-2">{T('Se carga una sola vez. Con esto, cada usuario conecta su Notion desde «Tickets» con un clic y Tably recibe un token propio de esa persona. El secret queda cifrado en el servidor; nunca llega a ningún navegador.', 'Set once. With it, every user connects their Notion from "Tickets" with one click and Tably receives a token of their own. The secret stays encrypted on the server; it never reaches any browser.')}</p>
+      <div className="mt-3 flex items-center gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2 text-[12px]">
+        <span className="text-ink-3">{T('Redirect URI en Notion:', 'Redirect URI in Notion:')}</span>
+        <code className="min-w-0 flex-1 truncate font-mono text-ink">{st.redirect_uri}</code>
+        <button onClick={async () => { try { await navigator.clipboard.writeText(st.redirect_uri); setCopied(true); setTimeout(() => setCopied(false), 1400) } catch { /* ignore */ } }} className="flex items-center gap-1 rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] text-ink-2 hover:border-accent hover:text-accent">{copied ? <Check size={12} /> : <Copy size={12} />} {copied ? T('Copiado', 'Copied') : T('Copiar', 'Copy')}</button>
+      </div>
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        <label className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">Client ID<input value={cid} onChange={(e) => setCid(e.target.value)} placeholder="406d872b-…" className={`${input} mt-1`} /></label>
+        <label className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">Client secret<input type="password" autoComplete="off" value={sec} onChange={(e) => setSec(e.target.value)} placeholder={st.has_secret ? '••••••••••••  (guardado)' : 'secret_…'} className={`${input} mt-1`} /></label>
+      </div>
+      <div className="mt-3 flex gap-2">
+        <button disabled={!cid.trim() && !sec.trim()} onClick={async () => { try { setSt(await api.saveNotionApp({ client_id: cid.trim() || undefined, client_secret: sec.trim() || undefined })); setSec(''); setMsg(tr('Conexión de Notion guardada', 'Notion connection saved')) } catch (e) { setMsg((e as Error).message) } }} className="flex h-10 items-center gap-1.5 rounded-full bg-accent px-4 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40"><Check size={14} /> {T('Guardar', 'Save')}</button>
+        {st.configured && !st.from_env && <button onClick={async () => { setSt(await api.saveNotionApp({ clear: true })); setCid(''); setMsg(tr('Conexión borrada', 'Connection removed')) }} className="flex h-10 items-center gap-1.5 rounded-full border border-line bg-surface px-4 text-[13px] text-ink-2 hover:text-danger"><Trash2 size={14} /> {T('Borrar', 'Remove')}</button>}
+      </div>
+      {msg && <div className="mt-2 text-[12px] text-ok">{msg}</div>}
     </div>
   )
 }

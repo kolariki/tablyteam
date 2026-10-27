@@ -1942,6 +1942,41 @@ def _notion_redirect() -> str:
     return (env("NOTION_REDIRECT_URI") or f"{cloudmod.public_url()}/api/notion/callback")
 
 
+def _is_admin(user: User) -> bool:
+    """Who may set installation-wide settings: the emails in TABLY_ADMIN_EMAILS, else the first account created."""
+    admins = [e.strip().lower() for e in (env("TABLY_ADMIN_EMAILS") or "").split(",") if e.strip()]
+    if admins:
+        return user.email.lower() in admins
+    with auth._db() as c:
+        first = c.execute("SELECT id FROM users ORDER BY created ASC LIMIT 1").fetchone()
+    return bool(first and first["id"] == user.id)
+
+
+@app.get("/api/settings/notion-app")
+def notion_app_get(user: User = CurrentUser):
+    """The app's Notion OAuth client (one per installation): set from the UI by the admin, never sent to other browsers."""
+    cid, sec = ticketsmod.oauth_creds()
+    return {"admin": _is_admin(user), "client_id": cid if _is_admin(user) else None, "has_secret": bool(sec), "configured": bool(cid and sec), "redirect_uri": _notion_redirect(),
+            "from_env": bool(env("NOTION_CLIENT_ID")) and not ticketsmod._setting("notion_client_id")}
+
+
+@app.put("/api/settings/notion-app")
+def notion_app_set(body: dict, user: User = CurrentUser):
+    if not _is_admin(user):
+        raise HTTPException(403, "Solo quien administra esta instalación puede cargar la conexión de Notion.")
+    if body.get("clear"):
+        ticketsmod.set_setting("notion_client_id", None)
+        ticketsmod.set_setting("notion_client_secret", None)
+        return notion_app_get(user)
+    cid = str(body.get("client_id") or "").strip()
+    sec = str(body.get("client_secret") or "").strip()
+    if cid:
+        ticketsmod.set_setting("notion_client_id", cid)
+    if sec:
+        ticketsmod.set_setting("notion_client_secret", sec)
+    return notion_app_get(user)
+
+
 @app.get("/api/notion/oauth/url")
 def notion_oauth_url(user: User = CurrentUser):
     """«Conectar con Notion» with one click (needs the operator's public integration); null when not configured."""
