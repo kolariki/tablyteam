@@ -192,18 +192,27 @@ export function MuseBadge({ className = '', big = false }: { className?: string;
     ? 'inline-flex items-center gap-2.5 rounded-full border border-[#BBD5FA] bg-[#EEF5FF] py-2 pl-2 pr-4 text-[14px] font-medium text-[#0B2E66] shadow-sm transition hover:border-[#0082FB] hover:shadow-md'
     : 'items-center gap-1.5 rounded-full border border-[#BBD5FA] bg-[#EEF5FF] py-1 pl-1.5 pr-2.5 text-[11px] font-semibold text-[#0B2E66] transition hover:border-[#0082FB]'
   return (
-    <span className={`relative ${big ? 'inline-block' : 'inline-flex'} ${className}`}>
+    <span className={`relative ${big ? 'block' : 'inline-flex'} ${className}`}>
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className={`muse-ring ${pill} ${open ? 'border-[#0082FB]' : ''}`}>
         <img src="/logos/meta.png" alt="" aria-hidden className={big ? 'h-7 w-7' : 'h-4 w-4'} draggable={false} />
         powered by <span className="font-bold">Muse</span>{big && <span className="text-[#0B2E66]/60">· Meta</span>}
       </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15 }} className="absolute left-0 top-full z-[300] mt-2 w-max max-w-[min(92vw,460px)] rounded-xl border border-[#BBD5FA] bg-surface px-3.5 py-2.5 text-left shadow-lg">
+      <AnimatePresence initial={false}>
+        {open && (big ? (
+          /* big seal (hero, login): the note opens in the flow and pushes what follows down */
+          <motion.div key="note" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.22, ease: 'easeOut' }} className="overflow-hidden">
+            <div className="mt-2 max-w-[460px] rounded-xl border border-[#BBD5FA] bg-surface px-3.5 py-2.5 text-left shadow-sm">
+              <div className="text-[13px] font-semibold text-[#0B2E66]">{T('Muse son los modelos de IA de Meta.', "Muse is Meta's family of AI models.")}</div>
+              <div className="mt-0.5 text-[12px] leading-snug text-ink-2">Muse Wonder · Muse Spark · Muse Code · Muse Image · SAM 3.1 · Muse Voice Transcribe</div>
+            </div>
+          </motion.div>
+        ) : (
+          /* small seal (app header): a popover, so the bar keeps its height */
+          <motion.div key="pop" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15 }} className="absolute left-0 top-full z-[300] mt-2 w-max max-w-[min(92vw,460px)] rounded-xl border border-[#BBD5FA] bg-surface px-3.5 py-2.5 text-left shadow-lg">
             <div className="text-[13px] font-semibold text-[#0B2E66]">{T('Muse son los modelos de IA de Meta.', "Muse is Meta's family of AI models.")}</div>
             <div className="mt-0.5 text-[12px] leading-snug text-ink-2">Muse Wonder · Muse Spark · Muse Code · Muse Image · SAM 3.1 · Muse Voice Transcribe</div>
           </motion.div>
-        )}
+        ))}
       </AnimatePresence>
     </span>
   )
