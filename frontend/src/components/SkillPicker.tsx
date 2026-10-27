@@ -119,7 +119,7 @@ export default function SkillPicker({ value, onChange, compact = false, busy = f
         </div>
       )}
       {open && createPortal(
-        <div ref={popRef} style={{ position: 'fixed', top: pos.up ? undefined : pos.top, bottom: pos.up ? window.innerHeight - pos.top : undefined, left: pos.left }} className="z-[200] flex w-[420px] max-h-[460px] flex-col rounded-xl border border-line bg-paper shadow-lg text-[12.5px]">
+        <div ref={popRef} style={{ position: 'fixed', top: pos.up ? undefined : pos.top, bottom: pos.up ? window.innerHeight - pos.top : undefined, left: pos.left }} className="z-[420] flex w-[420px] max-h-[460px] flex-col rounded-xl border border-line bg-paper shadow-lg text-[12.5px]">
           {/* search + category filter over everything (your skills, templates and the public catalog) */}
           <div className="border-b border-line p-2">
             <div className="flex items-center gap-2 rounded-lg border border-line bg-surface px-2 py-1">
@@ -256,7 +256,7 @@ function SkillChip({ skill, onRemove }: { skill: Partial<CatalogSkill> & SkillSu
         <button type="button" onClick={(e) => { e.stopPropagation(); onRemove() }} className="ml-0.5 rounded-full p-0.5 text-accent/60 hover:bg-accent hover:text-white" title={T('Quitar esta skill', 'Remove this skill')} aria-label={T('Quitar esta skill', 'Remove this skill')}><X size={10} /></button>
       </span>
       {show && createPortal(
-        <div role="tooltip" style={{ position: 'fixed', top: pos.top, left: pos.left }} className="pointer-events-none z-[300] w-[330px] rounded-xl border border-line bg-surface p-3 text-[12px] leading-snug text-ink shadow-[0_18px_40px_-16px_rgba(30,38,34,.45)]">
+        <div role="tooltip" style={{ position: 'fixed', top: pos.top, left: pos.left }} className="pointer-events-none z-[450] w-[330px] rounded-xl border border-line bg-surface p-3 text-[12px] leading-snug text-ink shadow-[0_18px_40px_-16px_rgba(30,38,34,.45)]">
           <div className="flex items-center gap-1.5 font-semibold"><Puzzle size={12} className="text-accent" /> {pick(skill, 'name')}</div>
           <div className="mt-1 text-ink-2">{desc || T('Esta skill no trae descripción; su contenido se suma al prompt del rol tal cual.', 'This skill has no description; its content is added to the role prompt as is.')}</div>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[10.5px] text-ink-3">

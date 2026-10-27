@@ -318,6 +318,24 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   )
   const input = 'w-full rounded-lg bg-surface border border-line px-3 py-2 text-sm outline-none focus:border-accent transition'
 
+  /** The catalog picks skills for one role from the task (same call as «Sugerir skills», applied to a single seat). */
+  const suggestSkillsFor = async (i: number) => {
+    const a = cfg.agents[i]
+    if (!a || !cfg.topic.trim()) { toast.error(tr('Contá primero qué querés construir', 'Describe what you want to build first')); return }
+    setSuggesting(true)
+    try {
+      const role = roles.roles.find((x) => x.id === a.role)
+      const r = await api.suggestSkills(cfg.topic, [{ id: a.id, label: role?.label ?? a.name, group: role?.group, mandate: role?.mandate }], 3)
+      const sug = (r.per_role[a.id] ?? []).filter((x) => (x.score ?? 0) >= 15 && !(a.skills ?? []).includes(x.id)).map((x) => x.id)
+      if (sug.length) updateAgent(i, { skills: [...(a.skills ?? []), ...sug] })
+      toast.ok(sug.length ? `${sug.length} ${sug.length === 1 ? tr('skill sugerida para', 'skill suggested for') : tr('skills sugeridas para', 'skills suggested for')} ${pick(a, 'name')}` : tr('Sin sugerencias claras para este rol', 'No clear suggestions for this role'))
+    } catch (e) {
+      toast.error(tr('No se pudieron sugerir skills', 'Could not suggest skills'), (e as Error).message)
+    } finally {
+      setSuggesting(false)
+    }
+  }
+
   /** One role's card: company, model, name, role, persona and skills. Used by the team list and by the role dialog of the direct lane. */
   const renderAgentCard = (a: AgentConfig, i: number) => {
     const p = providers.find((x) => x.id === a.provider)
@@ -426,7 +444,10 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
               <button type="button" onClick={() => setEditAgent(null)} className="rounded-full p-1.5 text-ink-3 transition hover:bg-surface-2 hover:text-ink" aria-label={T('Cerrar', 'Close')}><X size={18} /></button>
             </div>
             {renderAgentCard(cfg.agents[editAgent], editAgent)}
-            <div className="mt-4 flex justify-end"><button type="button" onClick={() => setEditAgent(null)} className="rounded-full bg-accent px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-110">{T('Listo', 'Done')}</button></div>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <button type="button" disabled={suggesting} onClick={() => suggestSkillsFor(editAgent)} className="flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-3.5 py-2 text-[13px] font-semibold text-accent transition hover:bg-accent hover:text-white disabled:opacity-40" title={T('Elegir del catálogo las skills que mejor encajan con la tarea para este rol', 'Pick from the catalog the skills that best fit the task for this role')}>{suggesting ? <Loader2 size={14} className="animate-spin" /> : <Puzzle size={14} />} {T('Sugerir skills para este rol', 'Suggest skills for this role')}</button>
+              <button type="button" onClick={() => setEditAgent(null)} className="rounded-full bg-accent px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-110">{T('Listo', 'Done')}</button>
+            </div>
           </div>
         </div>
       )}
