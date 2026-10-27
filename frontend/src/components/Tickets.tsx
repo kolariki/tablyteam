@@ -97,6 +97,8 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
   const [who, setWho] = useState<string>('')
   const [groupBy, setGroupBy] = useState<string>(() => { try { return localStorage.getItem('tickets.groupBy') || 'urgency' } catch { return 'urgency' } })
   const [showAll, setShowAll] = useState(false)
+  // which project's tickets to show: 'mine' = every Feature value with an assigned project, a value, or 'all'
+  const [projFilter, setProjFilter] = useState<string>(() => { try { return localStorage.getItem('tickets.project') || 'mine' } catch { return 'mine' } })
   const [open, setOpen] = useState<Record<string, { markdown: string; fields: Record<string, string> } | 'loading' | undefined>>({})
 
   const loadStatus = () => api.notionStatus().then(setNotion).catch(() => {})
@@ -109,6 +111,7 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (cfg?.link?.database_id && notion?.set) loadTickets() }, [cfg?.link?.database_id, cfg?.link?.build_id, notion?.set, showAll])
   useEffect(() => { try { localStorage.setItem('tickets.groupBy', groupBy) } catch { /* ignore */ } }, [groupBy])
+  useEffect(() => { try { localStorage.setItem('tickets.project', projFilter) } catch { /* ignore */ } }, [projFilter])
   useEffect(() => { if (notion?.set && (setup || !cfg?.link?.database_id)) api.notionDatabases().then((d) => setDbs(d.databases)).catch((e) => setErr((e as Error).message)) }, [notion?.set, setup, cfg?.link?.database_id])
   const active = useMemo(() => Object.values(data?.runs ?? {}).some((r) => r.status === 'building' || r.status === 'reviewing'), [data])
   useEffect(() => {
@@ -160,7 +163,10 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
   }
 
   const people = useMemo(() => [...new Set((data?.tickets ?? []).map((t) => t.assignee).filter(Boolean) as string[])], [data])
-  const visible = (data?.tickets ?? []).filter((t) => (!q || t.title.toLowerCase().includes(q.toLowerCase())) && (!who || (t.assignee ?? '').includes(who)))
+  const mapped = Object.entries(projMap).filter(([, m]) => m.build_id)
+  const inProject = (t: Ticket) => !strict || projFilter === 'all' || (projFilter === 'mine' ? !!t.project?.ok : t.project?.key === projFilter)
+  const hidden = strict ? (data?.tickets ?? []).filter((t) => !inProject(t)).length : 0
+  const visible = (data?.tickets ?? []).filter((t) => inProject(t) && (!q || t.title.toLowerCase().includes(q.toLowerCase())) && (!who || (t.assignee ?? '').includes(who)))
   const project = projects.find((p) => p.id === link?.session_id)
   const build = project?.builds?.find((b) => b.id === link?.build_id)
 
@@ -248,7 +254,7 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
                   )}
                   <div className="mt-1 text-[11.5px] text-ink-3">{projProp
                     ? T(`Cada ticket va al proyecto de su «${projProp}». Un valor sin proyecto asignado no se puede resolver: así un ticket del Codifier nunca cae en el Preprocessor.`, `Each ticket goes to the project of its "${projProp}". A value without an assigned project cannot be resolved, so a Codifier ticket never lands on the Preprocessor.`)
-                    : T('El equipo trabaja sobre el código de ese proyecto. Para un repo tuyo: auditá el proyecto primero («Auditar un proyecto») y elegilo acá.', 'The team works on that project\'s code. For a repo of yours: audit it first ("Audit a project") and pick it here.')}</div>
+                    : T('El equipo trabaja sobre el código de ese proyecto. Para un repo tuyo: auditá el proyecto primero («Auditar un proyecto») y elegilo acá. Si la base mezcla tickets de varios repos, elegí arriba la propiedad que los distingue y asigná un proyecto a cada valor: así solo ves los tickets del proyecto en el que estás.', 'The team works on that project\'s code. For a repo of yours: audit it first ("Audit a project") and pick it here. If the database mixes tickets from several repos, pick the property that tells them apart above and assign a project to each value: then you only see the tickets of the project you are on.')}</div>
                 </div>
                 <div>
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-3"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-surface ring-1 ring-black/10"><ProviderLogo provider="github" size={12} /></span> 4 · GitHub</div>
@@ -264,8 +270,15 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
           <>
             <div className="mt-6 flex flex-wrap items-center gap-2">
               <span className="text-[11px] uppercase tracking-[0.25em] text-ink-3">{link?.database_title}</span>
-              {strict ? <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11.5px] text-ink-2"><Hammer size={11} className="mr-1 inline" />{T(`proyecto por ${projProp}`, `project per ${projProp}`)} · {Object.values(projMap).filter((m) => m.build_id).length}</span>
-                : build && <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11.5px] text-ink-2"><Hammer size={11} className="mr-1 inline" />{project?.title || project?.topic} · v{build.version ?? 1}</span>}
+              {strict ? (
+                <label className="flex items-center gap-1.5 text-[12px] text-ink-3"><Hammer size={11} />
+                  <select value={projFilter} onChange={(e) => setProjFilter(e.target.value)} className={SELECT}>
+                    <option value="mine">{T('Mis proyectos', 'My projects')} · {mapped.length}</option>
+                    {mapped.map(([k, m]) => { const p = projects.find((x) => x.id === m.session_id); return <option key={k} value={k}>{k} → {p?.title || p?.topic || '…'}</option> })}
+                    <option value="all">{T('Todos los tickets de la base', 'Every ticket in the database')}</option>
+                  </select>
+                </label>
+              ) : build && <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11.5px] text-ink-2"><Hammer size={11} className="mr-1 inline" />{project?.title || project?.topic} · v{build.version ?? 1}</span>}
               <div className="ml-auto flex items-center gap-2">
                 <label className="flex items-center gap-1.5 text-[12px] text-ink-3">{T('Agrupar por', 'Group by')}
                   <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} className={SELECT}>
@@ -286,7 +299,8 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
             {!canResolve && !showSetup && <div className="mt-4 flex items-center gap-2 rounded-xl border border-gold/30 bg-gold/10 px-4 py-2.5 text-[13px] text-ink-2"><Hammer size={14} className="text-gold" /> {T('Para resolver tickets falta elegir el proyecto de Tably que los trabaja.', 'To resolve tickets, pick the Tably project that works on them.')} <button onClick={() => setSetup(true)} className="ml-auto text-accent hover:underline">{T('Elegir proyecto', 'Pick project')}</button></div>}
             {err && <div className="mt-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{err}</div>}
             {!data && !err && <div className="mt-10 flex justify-center text-ink-3"><Loader2 size={18} className="animate-spin" /></div>}
-            {data && visible.length === 0 && <div className="mt-8 rounded-2xl border border-dashed border-line bg-surface px-6 py-10 text-center text-sm text-ink-2">{T('No hay tickets abiertos en esta base.', 'No open tickets in this database.')}</div>}
+            {data && visible.length === 0 && <div className="mt-8 rounded-2xl border border-dashed border-line bg-surface px-6 py-10 text-center text-sm text-ink-2">{hidden > 0 ? T(`No hay tickets abiertos de este proyecto. Hay ${hidden} de otros proyectos o sin proyecto asignado.`, `No open tickets for this project. ${hidden} belong to other projects or have none assigned.`) : T('No hay tickets abiertos en esta base.', 'No open tickets in this database.')} {hidden > 0 && <button onClick={() => setProjFilter('all')} className="text-accent hover:underline">{T('Ver todos', 'Show all')}</button>}</div>}
+            {data && visible.length > 0 && hidden > 0 && <div className="mt-3 text-[11.5px] text-ink-3">{T(`${hidden} ticket(s) de otros proyectos o sin proyecto asignado no se muestran.`, `${hidden} ticket(s) from other projects or without a project are hidden.`)} <button onClick={() => setProjFilter('all')} className="text-accent hover:underline">{T('Ver todos', 'Show all')}</button></div>}
             {groupTickets(visible, groupBy, data?.groupable ?? [], en).map((bk) => {
               const items = bk.items
               return (
