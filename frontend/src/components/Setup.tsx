@@ -10,6 +10,8 @@ import { fmtUsd } from '../lib/parse'
 import Dashboard from './Dashboard'
 import HomeLoader from './HomeLoader'
 import LaneCards from './LaneCards'
+import AgentAvatar from './AgentAvatar'
+import { isMuseReco, museReco, museTeam } from '../lib/muse'
 import { MUSE_FIRST } from '../lib/flags'
 import { readCache, writeCache } from '../lib/cache'
 import ModelSelect, { invalidateModels } from './ModelSelect'
@@ -550,6 +552,31 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                 </div>
               </div>
             )}
+            {/* the direct lane does not debate, but the team is who reviews and audits afterwards: show each role with its Muse model */}
+            {lane === 'direct' && cfg.agents.length > 0 && (
+              <div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="flex items-center gap-1 text-xs uppercase tracking-widest text-ink-3">{T('Tu equipo', 'Your team')} <Hint text={T('En el constructor directo el equipo no debate antes, pero es quien revisa y audita después. Cada rol con el modelo de Muse recomendado para su trabajo.', 'In the direct builder the team does not debate first, but it reviews and audits afterwards. Every role with the Muse model recommended for its job.')} /></span>
+                  {!cfg.agents.every(isMuseReco) && <button type="button" onClick={() => setCfg((c) => ({ ...c, agents: museTeam(c.agents) }))} className="flex items-center gap-1.5 rounded-full border border-[#BBD5FA] bg-[#EEF5FF] px-3 py-1 text-[12px] font-semibold text-[#0B2E66] transition hover:border-[#0082FB]"><ProviderLogo provider="meta" size={13} /> {T('Usar los modelos recomendados', 'Use the recommended models')}</button>}
+                </div>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {cfg.agents.map((a) => {
+                    const r = museReco(a)
+                    const ok = isMuseReco(a)
+                    return (
+                      <div key={a.id} className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${ok ? 'border-[#BBD5FA] bg-[#EEF5FF]/60' : 'border-line bg-surface'}`}>
+                        <AgentAvatar agent={a} size={38} ring={false} logo={0.34} chip />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[13px] font-semibold">{pick(a, 'name')}</div>
+                          <div className="truncate font-mono text-[10.5px] text-ink-3">{ok ? a.model : `${a.provider} · ${a.model}`}</div>
+                          <div className="truncate text-[10.5px] text-[#0064E0]" title={T(r.why, r.why_en)}>{ok ? '✓ ' + T('Muse recomendado', 'Muse recommended') : `${T('Recomendado', 'Recommended')}: ${r.model}`}{r.tool ? ` · ${r.tool}` : ''}</div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
             {/* what gets built: the brief, the designer, the builder and «Correr la app» all follow this */}
             <div>
               <span className="flex items-center gap-1 text-xs uppercase tracking-widest text-ink-3">{T('Plataforma', 'Platform')} <Hint text={T('Qué construye el equipo: una web app, una app móvil para iOS y Android (con Expo, se corre en el simulador y el emulador desde acá) o las dos con un solo código.', 'What the team builds: a web app, a mobile app for iOS and Android (with Expo, run on the simulator and the emulator from here) or both from one codebase.')} /></span>
@@ -665,6 +692,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                 className="ml-auto flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft px-3 py-1.5 text-[13px] font-semibold text-accent shadow-sm transition hover:bg-accent hover:text-white disabled:opacity-40 disabled:hover:bg-accent-soft disabled:hover:text-accent"
                 title={T('Elegir del catálogo las skills que mejor encajan con la tarea, rol por rol', 'Pick from the catalog the skills that best fit the task, role by role')}
               >{suggesting ? <Loader2 size={14} className="animate-spin" /> : <Puzzle size={14} />} {T('Sugerir skills', 'Suggest skills')}</button>
+              <button type="button" onClick={() => setCfg((c) => ({ ...c, agents: museTeam(c.agents) }))} disabled={cfg.agents.every(isMuseReco)} className="ml-2 flex items-center gap-1.5 rounded-lg border border-[#BBD5FA] bg-[#EEF5FF] px-3 py-1.5 text-[13px] font-semibold text-[#0B2E66] shadow-sm transition hover:border-[#0082FB] disabled:opacity-40" title={T('Cada rol con el modelo de Muse que mejor hace su trabajo: Wonder para dirección e ingeniería, Spark para producto, diseño y QA', 'Every role on the Muse model that does its job best: Wonder for direction and engineering, Spark for product, design and QA')}><ProviderLogo provider="meta" size={14} /> {T('Equipo recomendado con Muse', 'Recommended Muse team')}</button>
               <button disabled={cfg.agents.length >= 8} onClick={addAgent} className="ml-2 flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40" title={T('Sumar un rol al equipo (hasta 8)', 'Add a role to the team (up to 8)')}><Plus size={15} />{T('Agregar rol', 'Add role')}</button>
             </div>
             <div className="mt-3 space-y-3">
@@ -705,7 +733,14 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                         />
                       ) : (
                         <>
-                          <ModelSelect provider={a.provider} value={a.model} onChange={(m) => updateAgent(i, { model: m })} enabled={!!p?.configured} className="text-xs" />
+                          <div className="min-w-0">
+                            <ModelSelect provider={a.provider} value={a.model} onChange={(m) => updateAgent(i, { model: m })} enabled={!!p?.configured} className="text-xs" />
+                            {isMuseReco(a) ? (
+                              <div className="mt-1 truncate text-[10.5px] font-semibold text-[#0064E0]" title={T(museReco(a).why, museReco(a).why_en)}>✓ {T('Muse recomendado', 'Muse recommended')}{museReco(a).tool ? ` · ${museReco(a).tool}` : ''}</div>
+                            ) : (
+                              <button type="button" onClick={() => updateAgent(i, { provider: 'meta', model: museReco(a).model, wanted_provider: undefined, color: null })} className="mt-1 block max-w-full truncate text-[10.5px] text-[#0064E0] underline-offset-2 hover:underline" title={T(museReco(a).why, museReco(a).why_en)}>{T('Recomendado', 'Recommended')}: Muse {museReco(a).model.replace('muse-', '').replace('-1.0', '').replace('-1.3', ' 1.3')}</button>
+                            )}
+                          </div>
                           <button onClick={() => setCfg({ ...cfg, agents: cfg.agents.filter((_, j) => j !== i) })} disabled={cfg.agents.length <= 2} className="text-ink-3 hover:text-danger disabled:opacity-20"><Trash2 size={16} /></button>
                         </>
                       )}

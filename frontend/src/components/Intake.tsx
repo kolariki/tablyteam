@@ -9,6 +9,7 @@ import { brandTheme } from '../lib/brand'
 import { fmtUsd } from '../lib/parse'
 import type { Provider } from '../types'
 import ModelSelect from './ModelSelect'
+import { MUSE_PROMPT_RECO } from '../lib/muse'
 import ProviderLogo from './ProviderLogo'
 import { toast } from './Toast'
 import { tr, useT } from '../lib/i18n'
@@ -287,6 +288,11 @@ export default function Intake({ idea, onIdea, providers, onPrompt, promptActive
                 {usable.map((p) => <option key={p.id} value={p.id}>{p.label.split(' · ')[0]}</option>)}
               </select>
               <div className="min-w-0 flex-1 max-w-[190px]"><ModelSelect provider={provider} value={model} onChange={setModel} className="text-[11px] py-1" /></div>
+              {provider === 'meta' && (model === MUSE_PROMPT_RECO.model ? (
+                <span className="shrink-0 rounded-full border border-[#BBD5FA] bg-[#EEF5FF] px-2 py-0.5 text-[10.5px] font-semibold text-[#0B2E66]" title={T(MUSE_PROMPT_RECO.why, MUSE_PROMPT_RECO.why_en)}>✓ {T('Muse recomendado', 'Muse recommended')}</span>
+              ) : (
+                <button type="button" onClick={() => setModel(MUSE_PROMPT_RECO.model)} className="shrink-0 rounded-full border border-dashed border-[#BBD5FA] px-2 py-0.5 text-[10.5px] text-[#0064E0] transition hover:bg-[#EEF5FF]" title={T(MUSE_PROMPT_RECO.why, MUSE_PROMPT_RECO.why_en)}>{T('Recomendado', 'Recommended')}: {MUSE_PROMPT_RECO.model}</button>
+              ))}
             </div>
           ) : (
             <span className="text-[12px] text-gold">{T('Conectá una IA arriba para poder analizar tu texto.', 'Connect an AI above to analyse your text.')}</span>
