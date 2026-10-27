@@ -150,7 +150,7 @@ export default function AuditSetup({ onBack, onStart }: Props) {
                 <>
                   <UploadCloud className="mx-auto text-ink-3" size={30} />
                   <div className="mt-2 font-medium">{T('Arrastrá el .zip del proyecto o hacé clic', 'Drag the project .zip here or click')}</div>
-                  <div className="mt-1 text-xs text-ink-3">{T('Se ignoran node_modules, .git, binarios y archivos > 400 KB. Máximo 120 MB.', 'node_modules, .git, binaries and files > 400 KB are ignored. Max 120 MB.')}</div>
+                  <div className="mt-1 text-xs text-ink-3">{T('Se ignoran node_modules, .git, binarios y archivos > 400 KB. Hasta 1 GB (sin node_modules sube mucho más rápido).', 'node_modules, .git, binaries and files > 400 KB are ignored. Up to 1 GB (much faster without node_modules).')}</div>
                 </>
               )}
             </div>

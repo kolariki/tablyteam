@@ -19,6 +19,7 @@ All session endpoints are scoped to the signed-in user.
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 import copy
 import json
@@ -984,14 +985,17 @@ AUDIT_SKIP = {"node_modules", ".git", ".next", "dist", "dist-lhci", "dist-previe
 AUDIT_MAX_FILES, AUDIT_MAX_TOTAL, AUDIT_MAX_FILE = 2500, 25_000_000, 400_000
 
 
-def _extract_zip(data: bytes) -> dict[str, str]:
-    import io
+AUDIT_MAX_ZIP = int(os.environ.get("TABLY_AUDIT_MAX_ZIP_MB", "1024")) * 1_000_000
+
+
+def _extract_zip(src) -> dict[str, str]:
+    """`src` is a path or a file object: the zip is read from disk, never fully loaded in memory (node_modules/.git inflate zips to hundreds of MB)."""
     import re as _re
     import zipfile
 
     out: dict[str, str] = {}
     total = 0
-    with zipfile.ZipFile(io.BytesIO(data)) as z:
+    with zipfile.ZipFile(src) as z:
         names = [n for n in z.namelist() if not n.endswith("/")]
         # strip a single common top-level folder (what `zip -r folder` produces)
         roots = {n.split("/")[0] for n in names}
@@ -1031,13 +1035,23 @@ async def create_audit(
 
     from .auth import user_dir
 
-    data = await file.read()
-    if len(data) > 120_000_000:
-        raise HTTPException(413, "El zip supera 120 MB")
-    try:
-        files = _extract_zip(data)
-    except Exception:
-        raise HTTPException(400, "No pude leer el .zip")
+    import tempfile
+
+    # streamed to a temp file in chunks: a 1 GB zip must not sit in memory (the text/code files are picked out afterwards)
+    size = 0
+    with tempfile.NamedTemporaryFile(suffix=".zip") as tmp:
+        while chunk := await file.read(4 * 1024 * 1024):
+            size += len(chunk)
+            if size > AUDIT_MAX_ZIP:
+                raise HTTPException(413, f"El zip supera {AUDIT_MAX_ZIP // 1_000_000} MB: sacá node_modules, .git, builds y binarios y volvé a comprimir")
+            tmp.write(chunk)
+        tmp.flush()
+        try:
+            files = _extract_zip(tmp.name)
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(400, "No pude leer el .zip")
     if not files:
         raise HTTPException(400, "El zip no contiene archivos de texto/código legibles")
     try:
