@@ -120,7 +120,6 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
       <header className="sticky top-0 z-20 flex items-center gap-3 px-6 h-14 border-b border-line bg-paper/80 backdrop-blur">
         <img data-brand-icon src="/icon.svg" alt="" aria-hidden className="h-7 w-7 rounded-lg shadow-sm" draggable={false} />
         <span className="serif text-lg"><span data-brand-text>Tably</span> <em data-brand-text className="text-accent">Team</em></span>
-        <MuseBadge className="ml-1 hidden sm:inline-flex" />
         <div className="ml-auto flex items-center gap-2">
           <LangSwitch className="mr-1" />
           {!HACKATHON_MODE && <a href={`${prefix}/blog`} className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-2 hover:text-ink sm:inline">{T('Blog', 'Blog')}</a>}
