@@ -5,10 +5,8 @@ import { countTo, gsap, heroIntro, sceneIn, scrollReveal, useGSAP } from '../lib
 import { useLang, useT } from '../lib/i18n'
 import LangSwitch from './LangSwitch'
 import AgentAvatar from './AgentAvatar'
-import LogoMarquee from './LogoMarquee'
 import TeamBackdrop from './TeamBackdrop'
 import ProviderLogo, { LogoWatermark } from './ProviderLogo'
-import ProviderRow from './ProviderRow'
 import { brandTheme } from '../lib/brand'
 
 /* ------------------------------------------------------------------ the looping demo
@@ -16,7 +14,7 @@ import { brandTheme } from '../lib/brand'
  * so the animation is deterministic and loops cleanly.
  */
 /* ------------------------------------------------------------------ demo data: a weather app, from the idea to the built product */
-const PROVIDERS_ALL: [string, string][] = [['meta', 'Meta · Muse'], ['anthropic', 'Anthropic · Claude'], ['openai', 'OpenAI · GPT'], ['deepseek', 'DeepSeek'], ['gemini', 'Google · Gemini'], ['xai', 'xAI · Grok'], ['groq', 'Groq · Llama'], ['kimi', 'Moonshot · Kimi'], ['mistral', 'Mistral'], ['openrouter', 'OpenRouter · 300+ modelos'], ['ollama', 'Ollama · modelos locales']]
+const PROVIDERS_ALL: [string, string][] = [['meta', 'Meta · Muse']]
 const IDEA = 'Una app del clima para Argentina que me diga si llevo paraguas, con alertas oficiales y pronóstico por horas.'
 const IDEA_EN = 'A weather app for Argentina that tells me whether to take an umbrella, with official alerts and an hourly forecast.'
 const QUESTIONS: [string, string][] = [
@@ -140,7 +138,7 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
           <span data-fuse-spark className="absolute left-0 top-0 h-3.5 w-3.5 rounded-full bg-accent opacity-0" style={{ boxShadow: '0 0 20px 8px rgba(47,107,93,.65)' }} />
         </div>
         <div>
-          <div data-hero-kicker className="text-xs uppercase tracking-[0.5em] text-accent">{T('tu equipo que diseña y construye · powered by Muse', 'your team that designs and builds · powered by Muse')}</div>
+          <div data-hero-kicker className="text-xs uppercase tracking-[0.5em] text-accent">{T('tu equipo que diseña y construye', 'your team that designs and builds')}</div>
           <h1 key={lang} data-hero-title className="mt-3 text-6xl md:text-7xl leading-[0.95] tracking-tight opacity-0">
             {T('Escribí tu idea.', 'Write your idea.')} <em data-hero-word className="text-accent">Tably</em> {T('la construye.', 'builds it.')}
           </h1>
@@ -155,7 +153,7 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
               <Play size={16} /> {T('Ver cómo funciona', 'See how it works')}
             </a>
           </div>
-          <div data-hero-row><ProviderRow className="mt-8" size="sm" /></div>
+          <div data-hero-row className="mt-8"><MuseBadge big /></div>
         </div>
 
         <div id="demo" data-hero-demo>
@@ -177,7 +175,6 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
         ))}
       </section>
 
-      <LogoMarquee />
       <Resources />
       </div>
       <MadeWith />
@@ -186,7 +183,15 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
 }
 
 /** The "powered by Muse" seal: Meta's model behind every role. */
-export function MuseBadge({ className = '' }: { className?: string }) {
+export function MuseBadge({ className = '', big = false }: { className?: string; big?: boolean }) {
+  if (big) {
+    return (
+      <span className={`inline-flex items-center gap-2.5 rounded-full border border-[#BBD5FA] bg-[#EEF5FF] py-2 pl-2 pr-4 text-[14px] font-medium text-[#0B2E66] shadow-sm ${className}`}>
+        <img src="/logos/meta.png" alt="" aria-hidden className="h-7 w-7" draggable={false} />
+        powered by <span className="font-bold">Muse</span><span className="text-[#0B2E66]/60">· Meta</span>
+      </span>
+    )
+  }
   return (
     <span className={`items-center gap-1.5 rounded-full border border-[#BBD5FA] bg-[#EEF5FF] py-1 pl-1.5 pr-2.5 text-[11px] font-semibold text-[#0B2E66] ${className}`}>
       <img src="/logos/meta.png" alt="" aria-hidden className="h-4 w-4" draggable={false} />
