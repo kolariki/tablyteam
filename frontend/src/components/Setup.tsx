@@ -217,6 +217,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   // how the user wants to build: alone with the builder (direct) or with the whole team (council first)
   const [lane, setLaneState] = useState<'direct' | 'team' | null>(() => { try { const v = localStorage.getItem('tably.lane'); return v === 'direct' || v === 'team' ? v : null } catch { return null } })
   const [showAllProviders, setShowAllProviders] = useState(false)  // Muse first: the other providers' chips stay behind a link
+  const [editAgent, setEditAgent] = useState<number | null>(null)  // direct lane: the role being edited in its dialog
   const [laneAsk, setLaneAsk] = useState(false)  // «crear el primer proyecto»: direct or team, then the form scrolls into view
   const pickLaneAndGo = (l: 'direct' | 'team') => {
     setLaneAsk(false)
@@ -317,6 +318,79 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   )
   const input = 'w-full rounded-lg bg-surface border border-line px-3 py-2 text-sm outline-none focus:border-accent transition'
 
+  /** One role's card: company, model, name, role, persona and skills. Used by the team list and by the role dialog of the direct lane. */
+  const renderAgentCard = (a: AgentConfig, i: number) => {
+    const p = providers.find((x) => x.id === a.provider)
+    const color = a.color || p?.color || '#8A9299'
+    return (
+      <div key={i} className="relative isolate overflow-hidden rounded-xl border p-3" style={{ background: brandTheme(a.wanted_provider ?? a.provider).bg, borderColor: brandTheme(a.wanted_provider ?? a.provider).border }}>
+        <LogoWatermark provider={a.wanted_provider ?? a.provider} opacity={0.1} />
+        <div className="relative">
+        <div className="grid grid-cols-[auto_auto_1fr_1fr_1.6fr_auto] gap-2 items-center">
+          <ProviderLogo provider={a.wanted_provider ?? a.provider} size={26} />
+          <input type="color" value={color} onChange={(e) => updateAgent(i, { color: e.target.value })} className="w-7 h-7 rounded bg-transparent cursor-pointer" title="color" />
+          <input className={input} value={a.name} onChange={(e) => updateAgent(i, { name: e.target.value, id: slug(e.target.value) })} placeholder={T('nombre', 'name')} />
+          <select
+            className={input}
+            value={a.provider}
+            onChange={(e) => {
+              const np = providers.find((x) => x.id === e.target.value)!
+              updateAgent(i, { provider: np.id, model: np.default_model, wanted_provider: undefined, color: np.id === 'mock' ? a.color : null })
+            }}
+          >
+            {providers.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.label}{x.configured || x.id === 'mock' ? '' : T(' · conectar', ' · connect')}
+              </option>
+            ))}
+          </select>
+          {p && !p.configured && p.id !== 'mock' ? (
+            <InlineKey
+              provider={p}
+              onConnected={(np) => {
+                setProviders((ps) => ps.map((x) => (x.id === np.id ? np : x)))
+                invalidateModels(np.id)
+                setCfg((c) => ({ ...c, agents: c.agents.map((ag) => (ag.provider === np.id ? { ...ag, model: ag.model || np.default_model } : ag)) }))
+              }}
+              trash={<button onClick={() => setCfg({ ...cfg, agents: cfg.agents.filter((_, j) => j !== i) })} disabled={cfg.agents.length <= 2} className="text-ink-3 hover:text-danger disabled:opacity-20"><Trash2 size={16} /></button>}
+            />
+          ) : (
+            <>
+              <div className="min-w-0">
+                <ModelSelect provider={a.provider} value={a.model} onChange={(m) => updateAgent(i, { model: m })} enabled={!!p?.configured} className="text-xs" />
+                {isMuseReco(a) ? (
+                  <div className="mt-1 truncate text-[10.5px] font-semibold text-[#0064E0]" title={T(museReco(a).why, museReco(a).why_en)}>✓ {T('Muse recomendado', 'Muse recommended')}{museReco(a).tool ? ` · ${museReco(a).tool}` : ''}</div>
+                ) : (
+                  <button type="button" onClick={() => updateAgent(i, { provider: 'meta', model: museReco(a).model, wanted_provider: undefined, color: null })} className="mt-1 block max-w-full truncate text-[10.5px] text-[#0064E0] underline-offset-2 hover:underline" title={T(museReco(a).why, museReco(a).why_en)}>{T('Recomendado', 'Recommended')}: Muse {museReco(a).model.replace('muse-', '').replace('-1.0', '').replace('-1.3', ' 1.3')}</button>
+                )}
+              </div>
+              <button onClick={() => setCfg({ ...cfg, agents: cfg.agents.filter((_, j) => j !== i) })} disabled={cfg.agents.length <= 2} className="text-ink-3 hover:text-danger disabled:opacity-20"><Trash2 size={16} /></button>
+            </>
+          )}
+        </div>
+        <div className="mt-2 grid grid-cols-[230px_1fr] gap-2 items-start">
+          <div>
+            <select className={input} value={a.role ?? 'custom'} onChange={(e) => setRole(i, e.target.value)} title={T('Rol en el equipo', 'Role in the team')}>
+              {roles.groups.map((g) => (
+                <optgroup key={g} label={lang === 'en' ? roles.groups_en?.[roles.groups.indexOf(g)] ?? g : g}>
+                  {roles.roles.filter((r) => r.group === g).map((r) => <option key={r.id} value={r.id}>{pick(r, 'label')}</option>)}
+                </optgroup>
+              ))}
+            </select>
+            {(() => {
+              const r = roles.roles.find((x) => x.id === a.role)
+              return r?.mandate ? <div className="mt-1 text-[11px] leading-snug text-ink-3">{T('Debe resolver:', 'Must resolve:')} {pick(r, 'mandate')}</div> : <div className="mt-1 text-[11px] text-ink-4">{T('Sin rol fijo: define la personalidad a la derecha.', 'No fixed role: define the personality on the right.')}</div>
+            })()}
+          </div>
+          <PersonaField value={a.persona} onChange={(v) => updateAgent(i, { persona: v })} placeholder={T('personalidad (opcional, se suma al rol)', 'personality (optional, adds to the role)')} roleLabel={a.name} />
+        </div>
+        <div className="mt-1.5"><SkillPicker value={a.skills ?? []} onChange={(ids) => updateAgent(i, { skills: ids })} /></div>
+        {a.wanted_provider && <div className="mt-1 text-[11px] text-gold">{T('Simulado: falta la key de', 'Simulated: missing the key for')} {a.wanted_provider}. <button className="underline hover:text-accent" onClick={onSettings}>{T('Cargala en Configuración', 'Add it in Settings')}</button>{T(' para usar el modelo real.', ' to use the real model.')}</div>}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-full overflow-y-auto scroll-thin arena-bg">
       <AnimatePresence>{booting ? <HomeLoader key="loader" /> : opening ? <HomeLoader key="opening" caption={opening} /> : null}</AnimatePresence>
@@ -338,6 +412,21 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
               </button>
             </div>
             <div className="mt-4 text-right"><button type="button" onClick={() => setLaneAsk(false)} className="rounded-full px-3 py-1.5 text-[13px] text-ink-3 hover:text-ink">{T('Cancelar', 'Cancel')}</button></div>
+          </div>
+        </div>
+      )}
+      {editAgent !== null && cfg.agents[editAgent] && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm" onClick={() => setEditAgent(null)}>
+          <div className="w-full max-w-[900px] rounded-3xl border border-line bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.3em] text-accent">{T('Rol del equipo', 'Team role')}</div>
+                <h3 className="serif mt-1 text-[24px] leading-tight">{pick(cfg.agents[editAgent], 'name')}</h3>
+              </div>
+              <button type="button" onClick={() => setEditAgent(null)} className="rounded-full p-1.5 text-ink-3 transition hover:bg-surface-2 hover:text-ink" aria-label={T('Cerrar', 'Close')}><X size={18} /></button>
+            </div>
+            {renderAgentCard(cfg.agents[editAgent], editAgent)}
+            <div className="mt-4 flex justify-end"><button type="button" onClick={() => setEditAgent(null)} className="rounded-full bg-accent px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-110">{T('Listo', 'Done')}</button></div>
           </div>
         </div>
       )}
@@ -560,18 +649,19 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                   {!cfg.agents.every(isMuseReco) && <button type="button" onClick={() => setCfg((c) => ({ ...c, agents: museTeam(c.agents) }))} className="flex items-center gap-1.5 rounded-full border border-[#BBD5FA] bg-[#EEF5FF] px-3 py-1 text-[12px] font-semibold text-[#0B2E66] transition hover:border-[#0082FB]"><ProviderLogo provider="meta" size={13} /> {T('Usar los modelos recomendados', 'Use the recommended models')}</button>}
                 </div>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {cfg.agents.map((a) => {
+                  {cfg.agents.map((a, i) => {
                     const r = museReco(a)
                     const ok = isMuseReco(a)
                     return (
-                      <div key={a.id} className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${ok ? 'border-[#BBD5FA] bg-[#EEF5FF]/60' : 'border-line bg-surface'}`}>
+                      <button type="button" key={a.id} onClick={() => setEditAgent(i)} title={T('Editar rol: modelo, prompt y skills', 'Edit role: model, prompt and skills')} className={`flex items-center gap-3 rounded-xl border px-3 py-2 text-left transition hover:border-accent hover:shadow-sm ${ok ? 'border-[#BBD5FA] bg-[#EEF5FF]/60' : 'border-line bg-surface'}`}>
                         <AgentAvatar agent={a} size={38} ring={false} logo={0.34} chip />
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-[13px] font-semibold">{pick(a, 'name')}</div>
                           <div className="truncate font-mono text-[10.5px] text-ink-3">{ok ? a.model : `${a.provider} · ${a.model}`}</div>
                           <div className="truncate text-[10.5px] text-[#0064E0]" title={T(r.why, r.why_en)}>{ok ? '✓ ' + T('Muse recomendado', 'Muse recommended') : `${T('Recomendado', 'Recommended')}: ${r.model}`}{r.tool ? ` · ${r.tool}` : ''}</div>
                         </div>
-                      </div>
+                        <Settings2 size={14} className="shrink-0 text-ink-4" />
+                      </button>
                     )
                   })}
                 </div>
@@ -696,77 +786,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
               <button disabled={cfg.agents.length >= 8} onClick={addAgent} className="ml-2 flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40" title={T('Sumar un rol al equipo (hasta 8)', 'Add a role to the team (up to 8)')}><Plus size={15} />{T('Agregar rol', 'Add role')}</button>
             </div>
             <div className="mt-3 space-y-3">
-              {cfg.agents.map((a, i) => {
-                const p = providers.find((x) => x.id === a.provider)
-                const color = a.color || p?.color || '#8A9299'
-                return (
-                  <div key={i} className="relative isolate overflow-hidden rounded-xl border p-3" style={{ background: brandTheme(a.wanted_provider ?? a.provider).bg, borderColor: brandTheme(a.wanted_provider ?? a.provider).border }}>
-                    <LogoWatermark provider={a.wanted_provider ?? a.provider} opacity={0.1} />
-                    <div className="relative">
-                    <div className="grid grid-cols-[auto_auto_1fr_1fr_1.6fr_auto] gap-2 items-center">
-                      <ProviderLogo provider={a.wanted_provider ?? a.provider} size={26} />
-                      <input type="color" value={color} onChange={(e) => updateAgent(i, { color: e.target.value })} className="w-7 h-7 rounded bg-transparent cursor-pointer" title="color" />
-                      <input className={input} value={a.name} onChange={(e) => updateAgent(i, { name: e.target.value, id: slug(e.target.value) })} placeholder={T('nombre', 'name')} />
-                      <select
-                        className={input}
-                        value={a.provider}
-                        onChange={(e) => {
-                          const np = providers.find((x) => x.id === e.target.value)!
-                          updateAgent(i, { provider: np.id, model: np.default_model, wanted_provider: undefined, color: np.id === 'mock' ? a.color : null })
-                        }}
-                      >
-                        {providers.map((x) => (
-                          <option key={x.id} value={x.id}>
-                            {x.label}{x.configured || x.id === 'mock' ? '' : T(' · conectar', ' · connect')}
-                          </option>
-                        ))}
-                      </select>
-                      {p && !p.configured && p.id !== 'mock' ? (
-                        <InlineKey
-                          provider={p}
-                          onConnected={(np) => {
-                            setProviders((ps) => ps.map((x) => (x.id === np.id ? np : x)))
-                            invalidateModels(np.id)
-                            setCfg((c) => ({ ...c, agents: c.agents.map((ag) => (ag.provider === np.id ? { ...ag, model: ag.model || np.default_model } : ag)) }))
-                          }}
-                          trash={<button onClick={() => setCfg({ ...cfg, agents: cfg.agents.filter((_, j) => j !== i) })} disabled={cfg.agents.length <= 2} className="text-ink-3 hover:text-danger disabled:opacity-20"><Trash2 size={16} /></button>}
-                        />
-                      ) : (
-                        <>
-                          <div className="min-w-0">
-                            <ModelSelect provider={a.provider} value={a.model} onChange={(m) => updateAgent(i, { model: m })} enabled={!!p?.configured} className="text-xs" />
-                            {isMuseReco(a) ? (
-                              <div className="mt-1 truncate text-[10.5px] font-semibold text-[#0064E0]" title={T(museReco(a).why, museReco(a).why_en)}>✓ {T('Muse recomendado', 'Muse recommended')}{museReco(a).tool ? ` · ${museReco(a).tool}` : ''}</div>
-                            ) : (
-                              <button type="button" onClick={() => updateAgent(i, { provider: 'meta', model: museReco(a).model, wanted_provider: undefined, color: null })} className="mt-1 block max-w-full truncate text-[10.5px] text-[#0064E0] underline-offset-2 hover:underline" title={T(museReco(a).why, museReco(a).why_en)}>{T('Recomendado', 'Recommended')}: Muse {museReco(a).model.replace('muse-', '').replace('-1.0', '').replace('-1.3', ' 1.3')}</button>
-                            )}
-                          </div>
-                          <button onClick={() => setCfg({ ...cfg, agents: cfg.agents.filter((_, j) => j !== i) })} disabled={cfg.agents.length <= 2} className="text-ink-3 hover:text-danger disabled:opacity-20"><Trash2 size={16} /></button>
-                        </>
-                      )}
-                    </div>
-                    <div className="mt-2 grid grid-cols-[230px_1fr] gap-2 items-start">
-                      <div>
-                        <select className={input} value={a.role ?? 'custom'} onChange={(e) => setRole(i, e.target.value)} title={T('Rol en el equipo', 'Role in the team')}>
-                          {roles.groups.map((g) => (
-                            <optgroup key={g} label={lang === 'en' ? roles.groups_en?.[roles.groups.indexOf(g)] ?? g : g}>
-                              {roles.roles.filter((r) => r.group === g).map((r) => <option key={r.id} value={r.id}>{pick(r, 'label')}</option>)}
-                            </optgroup>
-                          ))}
-                        </select>
-                        {(() => {
-                          const r = roles.roles.find((x) => x.id === a.role)
-                          return r?.mandate ? <div className="mt-1 text-[11px] leading-snug text-ink-3">{T('Debe resolver:', 'Must resolve:')} {pick(r, 'mandate')}</div> : <div className="mt-1 text-[11px] text-ink-4">{T('Sin rol fijo: define la personalidad a la derecha.', 'No fixed role: define the personality on the right.')}</div>
-                        })()}
-                      </div>
-                      <PersonaField value={a.persona} onChange={(v) => updateAgent(i, { persona: v })} placeholder={T('personalidad (opcional, se suma al rol)', 'personality (optional, adds to the role)')} roleLabel={a.name} />
-                    </div>
-                    <div className="mt-1.5"><SkillPicker value={a.skills ?? []} onChange={(ids) => updateAgent(i, { skills: ids })} /></div>
-                    {a.wanted_provider && <div className="mt-1 text-[11px] text-gold">{T('Simulado: falta la key de', 'Simulated: missing the key for')} {a.wanted_provider}. <button className="underline hover:text-accent" onClick={onSettings}>{T('Cargala en Configuración', 'Add it in Settings')}</button>{T(' para usar el modelo real.', ' to use the real model.')}</div>}
-                    </div>
-                  </div>
-                )
-              })}
+              {cfg.agents.map(renderAgentCard)}
             </div>
             {/* with a small team the panel has room to spare: invite more roles instead of leaving it blank */}
             {cfg.agents.length < 4 && (
