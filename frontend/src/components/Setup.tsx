@@ -344,7 +344,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
       <div key={i} className="relative isolate overflow-hidden rounded-xl border p-3" style={{ background: brandTheme(a.wanted_provider ?? a.provider).bg, borderColor: brandTheme(a.wanted_provider ?? a.provider).border }}>
         <LogoWatermark provider={a.wanted_provider ?? a.provider} opacity={0.1} />
         <div className="relative">
-        <div className="grid grid-cols-[auto_auto_1fr_1fr_1.6fr_auto] gap-2 items-center">
+        <div className="grid grid-cols-[auto_auto_1fr_1fr_1.6fr_auto] gap-2 items-center pt-3">
           <ProviderLogo provider={a.wanted_provider ?? a.provider} size={26} />
           <input type="color" value={color} onChange={(e) => updateAgent(i, { color: e.target.value })} className="w-7 h-7 rounded bg-transparent cursor-pointer" title="color" />
           <input className={input} value={a.name} onChange={(e) => updateAgent(i, { name: e.target.value, id: slug(e.target.value) })} placeholder={T('nombre', 'name')} />
@@ -374,13 +374,14 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
             />
           ) : (
             <>
-              <div className="min-w-0">
-                <ModelSelect provider={a.provider} value={a.model} onChange={(m) => updateAgent(i, { model: m })} enabled={!!p?.configured} className="text-xs" />
+              <div className="relative min-w-0">
+                {/* the Muse hint floats above the select, so the row's controls stay aligned */}
                 {isMuseReco(a) ? (
-                  <div className="mt-1 truncate text-[10.5px] font-semibold text-[#0064E0]" title={T(museReco(a).why, museReco(a).why_en)}>✓ {T('Muse recomendado', 'Muse recommended')}{museReco(a).tool ? ` · ${museReco(a).tool}` : ''}</div>
+                  <div className="absolute -top-[15px] left-1 max-w-full truncate text-[10px] font-semibold leading-none text-[#0064E0]" title={T(museReco(a).why, museReco(a).why_en)}>✓ {T('Muse recomendado', 'Muse recommended')}{museReco(a).tool ? ` · ${museReco(a).tool}` : ''}</div>
                 ) : (
-                  <button type="button" onClick={() => updateAgent(i, { provider: 'meta', model: museReco(a).model, wanted_provider: undefined, color: null })} className="mt-1 block max-w-full truncate text-[10.5px] text-[#0064E0] underline-offset-2 hover:underline" title={T(museReco(a).why, museReco(a).why_en)}>{T('Recomendado', 'Recommended')}: Muse {museReco(a).model.replace('muse-', '').replace('-1.0', '').replace('-1.3', ' 1.3')}</button>
+                  <button type="button" onClick={() => updateAgent(i, { provider: 'meta', model: museReco(a).model, wanted_provider: undefined, color: null })} className="absolute -top-[15px] left-1 max-w-full truncate text-[10px] leading-none text-[#0064E0] underline-offset-2 hover:underline" title={T(museReco(a).why, museReco(a).why_en)}>{T('Recomendado', 'Recommended')}: Muse {museReco(a).model.replace('muse-', '').replace('-1.0', '').replace('-1.3', ' 1.3')}</button>
                 )}
+                <ModelSelect provider={a.provider} value={a.model} onChange={(m) => updateAgent(i, { model: m })} enabled={!!p?.configured} className="text-xs" />
               </div>
               <button onClick={() => setCfg({ ...cfg, agents: cfg.agents.filter((_, j) => j !== i) })} disabled={cfg.agents.length <= 2} className="text-ink-3 hover:text-danger disabled:opacity-20"><Trash2 size={16} /></button>
             </>
