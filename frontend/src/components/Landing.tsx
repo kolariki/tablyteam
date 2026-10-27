@@ -28,6 +28,9 @@ const BRIEF_LINES: [string, string][] = [
   ['## Fuera: radar, cuentas, widgets', '## Out: radar, accounts, widgets'],
   ['## Criterios de aceptación: 12 historias', '## Acceptance criteria: 12 stories'],
 ]
+/** Hackathon mode: the landing shows only the hero and the demo (feature cards, blog and FAQ stay hidden; the pages still exist). */
+const HACKATHON_MODE = true
+
 type Member = { id: string; name: string; name_en: string; role: string; role_en: string; provider: string; model: string; color: string; persona: string; persona_en: string; skills: string[] }
 const TEAM: Member[] = [
   { id: 'ceo', name: 'CEO', name_en: 'CEO', role: 'Dirección', role_en: 'Leadership', provider: 'meta', model: 'muse-wonder-1.0', color: '#C0603F', persona: 'visionario pero concreto', persona_en: 'visionary but concrete' , skills: ['pitch', 'alcance MVP'] },
@@ -120,8 +123,8 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
         <MuseBadge className="ml-1 hidden sm:inline-flex" />
         <div className="ml-auto flex items-center gap-2">
           <LangSwitch className="mr-1" />
-          <a href={`${prefix}/blog`} className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-2 hover:text-ink sm:inline">{T('Blog', 'Blog')}</a>
-          <a href={`${prefix}/faq`} className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-2 hover:text-ink sm:inline">{T('Preguntas frecuentes', 'FAQ')}</a>
+          {!HACKATHON_MODE && <a href={`${prefix}/blog`} className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-2 hover:text-ink sm:inline">{T('Blog', 'Blog')}</a>}
+          {!HACKATHON_MODE && <a href={`${prefix}/faq`} className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-2 hover:text-ink sm:inline">{T('Preguntas frecuentes', 'FAQ')}</a>}
           <button onClick={onLogin} className="rounded-lg px-3 py-1.5 text-sm text-ink-2 hover:text-ink">{T('Iniciar sesión', 'Sign in')}</button>
           <button onClick={onSignup} className="rounded-lg bg-accent text-white px-3.5 py-1.5 text-sm font-medium hover:brightness-110">{T('Crear cuenta', 'Create account')}</button>
         </div>
@@ -162,7 +165,7 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
       </section>
 
       {/* features */}
-      <section className="max-w-[1400px] mx-auto px-6 pb-20 grid md:grid-cols-3 gap-5">
+      {!HACKATHON_MODE && <section className="max-w-[1400px] mx-auto px-6 pb-20 grid md:grid-cols-3 gap-5">
         {[
           { title: T('Un equipo completo, con Muse', 'A full team, on Muse'), text: T('CEO, CTO, Head of Engineering, Product, Diseño y QA, cada uno con Muse Spark o Muse Wonder, su rol, su prompt y sus skills. Debaten tu idea, se contradicen, votan y cierran decisiones con un responsable por cada paso.', 'CEO, CTO, Head of Engineering, Product, Design and QA, each on Muse Spark or Muse Wonder, with their role, prompt and skills. They debate your idea, disagree, vote and close decisions with an owner for every step.') },
           { title: T('Diseñan y construyen', 'They design and build'), text: T('El equipo estudia apps de referencia (SAM 3.1 segmenta cada pantalla en componentes), el diseñador entrega sistema, pantallas y un mockup hecho con Muse Image, y recién cuando lo aprobás Muse Code escribe el código, al nivel de un producto profesional.', 'The team studies reference apps (SAM 3.1 segments every screen into components), the designer delivers system, screens and a Muse Image mockup, and only once you approve does Muse Code write the code, at the level of a professional product.') },
@@ -173,9 +176,9 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
             <p className="mt-2 text-[14.5px] text-ink-2 leading-relaxed">{f.text}</p>
           </div>
         ))}
-      </section>
+      </section>}
 
-      <Resources />
+      {!HACKATHON_MODE && <Resources />}
       </div>
       <MadeWith />
     </div>
