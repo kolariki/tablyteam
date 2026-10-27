@@ -5,3 +5,10 @@
  */
 export const MUSE_FIRST = true
 export const HACKATHON_MODE = true
+/** MUSE_ONLY: the other AI providers and the desktop builders disappear from every picker; only Meta · Muse (and the simulated provider) stay. */
+export const MUSE_ONLY = true
+
+/** The providers a picker may show. */
+export const visibleProviders = <T extends { id: string }>(ps: T[]): T[] => (MUSE_ONLY ? ps.filter((p) => p.id === 'meta' || p.id === 'mock') : ps)
+/** The desktop coding agents a picker may show (none until Muse Code is wired as an engine). */
+export const visibleEngines = <T extends { id: string }>(es: T[]): T[] => (MUSE_ONLY ? es.filter((e) => e.id === 'muse-code') : es)

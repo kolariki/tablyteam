@@ -3,7 +3,7 @@ import { Check, CloudUpload, Database, ExternalLink, Globe, KeyRound, Loader2, S
 import { useEffect, useState } from 'react'
 import { api, type ProviderSetting } from '../lib/api'
 import { tr, useT } from '../lib/i18n'
-import { MUSE_FIRST } from '../lib/flags'
+import { MUSE_FIRST, MUSE_ONLY } from '../lib/flags'
 import ModelSelect, { invalidateModels } from './ModelSelect'
 import ProviderLogo, { LogoWatermark } from './ProviderLogo'
 import PageHeader from './PageHeader'
@@ -74,7 +74,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
           </span>
         </div>
         {error && <div className="mt-4 text-danger text-sm">{error}</div>}
-        <SubscriptionPanel />
+        {!MUSE_ONLY && <SubscriptionPanel />}
         <div className="mt-10">
           <div className="text-xs uppercase tracking-[0.3em] text-ink-3">API keys</div>
           <h2 className="text-3xl mt-1">{MUSE_FIRST ? T('Muse, el motor de Tably', 'Muse, the engine of Tably') : T('Modelos por API, para los debates', 'API models, for the debates')}</h2>
@@ -87,7 +87,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
             </motion.div>
           ))}
         </div>
-        {MUSE_FIRST && items.some((p) => p.id !== 'meta') && (
+        {MUSE_FIRST && !MUSE_ONLY && items.some((p) => p.id !== 'meta') && (
           <details className="mt-6 group">
             <summary className="flex cursor-pointer list-none items-center gap-2 text-[13px] text-ink-3 transition hover:text-ink [&::-webkit-details-marker]:hidden">
               <span className="transition group-open:rotate-90">▸</span>

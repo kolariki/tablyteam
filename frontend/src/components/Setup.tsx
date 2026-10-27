@@ -12,7 +12,7 @@ import HomeLoader from './HomeLoader'
 import LaneCards from './LaneCards'
 import AgentAvatar from './AgentAvatar'
 import { isMuseReco, museReco, museTeam, museTeamFor } from '../lib/muse'
-import { HACKATHON_MODE, MUSE_FIRST } from '../lib/flags'
+import { HACKATHON_MODE, MUSE_FIRST, visibleEngines, visibleProviders } from '../lib/flags'
 import { readCache, writeCache } from '../lib/cache'
 import ModelSelect, { invalidateModels } from './ModelSelect'
 import ArenaIntro, { ICON_STEP, PLAY_OUT, iconExitAt, introTeam } from './ArenaIntro'
@@ -51,7 +51,8 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   const [builder, setBuilderState] = useState<{ provider: string; model: string }>(() => readCache<{ provider: string; model: string }>('direct-builder') ?? { provider: '', model: '' })
   const setBuilder = (b: { provider: string; model: string }) => { setBuilderState(b); writeCache('direct-builder', b) }
   useEffect(() => {
-    api.engines().then((es) => {
+    api.engines().then((all) => {
+      const es = visibleEngines(all)
       setEngines(es)
       setBuilderState((b) => {
         if (b.provider && (es.some((e) => e.id === b.provider && e.ok) || !es.some((e) => e.id === b.provider))) return b
@@ -93,7 +94,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
     return () => window.removeEventListener('keydown', onKey)
   }, [chooser])
   const lang = useLang()
-  const [providers, setProviders] = useState<Provider[]>(() => readCache<Provider[]>('providers') ?? [])
+  const [providers, setProviders] = useState<Provider[]>(() => visibleProviders(readCache<Provider[]>('providers') ?? []))
   const apiProviders = providers.filter((p) => p.id !== 'mock' || !providers.some((x) => x.configured && x.id !== 'mock'))
   const isApiBuilder = !!builder.provider && !engines.some((e) => e.id === builder.provider)
   const [roles, setRoles] = useState<{ groups: string[]; groups_en?: string[]; roles: Role[] }>({ groups: [], roles: [] })
@@ -127,7 +128,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   useEffect(() => {
     const cachedPresets = readCache<Preset[]>('presets')
     if (cachedPresets?.[0]) applyPreset(cachedPresets[0])
-    api.providers().then((p) => { if (writeCache('providers', p)) setProviders(p) }).catch((e) => setError(`${tr('No hay backend', 'No backend')}: ${e.message}`)).finally(() => mark('providers'))
+    api.providers().then((p) => { if (writeCache('providers', p)) setProviders(visibleProviders(p)) }).catch((e) => setError(`${tr('No hay backend', 'No backend')}: ${e.message}`)).finally(() => mark('providers'))
     api.presets().then((p) => {
       const changed = writeCache('presets', p)
       if (changed) setPresets(p)

@@ -38,8 +38,8 @@ export default function CouncilVerdict() {
   const buildProvider = useBuild((b) => b.provider)
   const buildModel = useBuild((b) => b.model)
   useEffect(() => {
-    api.engines().then(setEngines).catch(() => {})
-    api.providers().then((ps) => setProviders(ps.filter((p) => p.configured && p.id !== 'mock') .concat(ps.filter((p) => p.id === 'mock' && p.configured)))).catch(() => {})
+    api.engines().then((es) => setEngines(visibleEngines(es))).catch(() => {})
+    api.providers().then((all) => { const ps = visibleProviders(all); setProviders(ps.filter((p) => p.configured && p.id !== 'mock').concat(ps.filter((p) => p.id === 'mock' && p.configured))) }).catch(() => {})
   }, [])
   useEffect(() => {
     if (bProvider) return
