@@ -681,6 +681,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                           <div className="truncate font-mono text-[10.5px] text-ink-3">{ok ? a.model : `${a.provider} · ${a.model}`}</div>
                           <div className="truncate text-[10.5px] text-[#0064E0]" title={T(r.why, r.why_en)}>{ok ? '✓ ' + T('Muse recomendado', 'Muse recommended') : `${T('Recomendado', 'Recommended')}: ${r.model}`}{r.tool ? ` · ${r.tool}` : ''}</div>
                         </div>
+                        {(a.skills?.length ?? 0) > 0 && <span className="shrink-0 rounded-full border border-line bg-surface px-2 py-0.5 text-[10.5px] text-ink-2" title={(a.skills ?? []).join(' · ')}>🧩 {a.skills!.length} {a.skills!.length === 1 ? 'skill' : 'skills'}</span>}
                         <Settings2 size={14} className="shrink-0 text-ink-4" />
                       </button>
                     )
