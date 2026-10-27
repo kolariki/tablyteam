@@ -474,10 +474,11 @@ function ScenePrompt({ t: raw }: { t: number }) {
   return (
     <motion.div {...sceneProps}>
       <div data-r className="flex items-center gap-3">
-        <motion.div animate={{ scale: pressed ? 0.95 : 1 }} className="flex items-center gap-2 rounded-xl px-4 py-2 text-[13.5px] font-semibold text-white shadow-md" style={{ background: '#C0603F' }}>
-          <ProviderLogo provider="anthropic" size={16} /> {T('Generar prompt engineering a mi texto', 'Prompt-engineer my text')}
+        <motion.div animate={{ scale: pressed ? 0.95 : 1 }} className="relative flex items-center gap-2 overflow-hidden rounded-xl px-4 py-2 text-[13.5px] font-semibold text-white shadow-md" style={{ background: 'linear-gradient(100deg,#0064E0,#0082FB 60%,#00A8FF)' }}>
+          <img src="/logos/meta.png" alt="" aria-hidden className="pointer-events-none absolute -right-2 -bottom-3 h-11 w-11 rotate-[-10deg] opacity-25 brightness-[3]" draggable={false} />
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/90"><ProviderLogo provider="meta" size={13} /></span> {T('Generar prompt engineering a mi texto', 'Prompt-engineer my text')}
         </motion.div>
-        <span className="text-[12px] text-ink-3">{T('con', 'with')} Claude · claude-opus-5-5</span>
+        <span className="text-[12px] text-ink-3">{T('con', 'with')} Muse · muse-spark-1.3</span>
       </div>
       <div className="mt-4 grid h-[calc(100%-60px)] grid-cols-[1fr_1.1fr] gap-4">
         <div className="space-y-2 text-[12.5px]">
@@ -605,8 +606,9 @@ function SceneRefs({ t: raw }: { t: number }) {
         })}
       </div>
       <div className="mt-3 flex items-center justify-end">
-        <motion.div animate={{ scale: launch ? 0.96 : 1 }} className="flex items-center gap-2 rounded-2xl px-5 py-2.5 text-[14px] font-semibold text-white shadow-md" style={{ background: 'linear-gradient(90deg,#C0603F,#17896A,#3D5CC4,#AD7D1A)' }}>
-          ▶ {T('Iniciar experimento', 'Start experiment')}
+        <motion.div animate={{ scale: launch ? 0.96 : 1 }} className="relative flex items-center gap-2 overflow-hidden rounded-2xl px-5 py-2.5 text-[14px] font-semibold text-white shadow-md" style={{ background: 'linear-gradient(100deg,#0064E0,#0082FB 60%,#00A8FF)' }}>
+          <img src="/logos/meta.png" alt="" aria-hidden className="pointer-events-none absolute -right-3 -bottom-4 h-14 w-14 rotate-[-10deg] opacity-25 brightness-[3]" draggable={false} />
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/90"><ProviderLogo provider="meta" size={13} /></span> {T('Iniciar experimento', 'Start experiment')}
         </motion.div>
       </div>
       <Cursor x={launch ? 560 : deep ? 40 : research ? 40 : 200} y={launch ? 420 : deep ? 150 : research ? 122 : 60} click={launch || (t > 2500 && t < 2700) || (t > 3400 && t < 3600)} />
@@ -958,11 +960,11 @@ function SceneAudit({ t }: { t: number }) {
               <circle cx="60" cy="60" r="50" fill="none" stroke="#E6EAE7" strokeWidth="11" />
               <motion.circle cx="60" cy="60" r="50" fill="none" stroke="url(#gauge)" strokeWidth="11" strokeLinecap="round" strokeDasharray={2 * Math.PI * 50} initial={{ strokeDashoffset: 2 * Math.PI * 50 }} animate={{ strokeDashoffset: 2 * Math.PI * 50 * (1 - (scored ? 68 : 0) / 100) }} transition={{ duration: 1.3, ease: [0.22, 1, 0.36, 1] }} filter="url(#gauge-glow)" />
             </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center">
               <div className="font-mono text-[34px] font-bold leading-none text-ink"><span ref={num}>{scored ? '' : '—'}</span><span className="text-[16px]">%</span></div>
-              <div className="text-[10px] uppercase tracking-widest text-ink-3">{T('listo para prod', 'production-ready')}</div>
             </div>
           </div>
+          <div className="mt-2 text-[10px] uppercase tracking-[0.25em] text-ink-3">{T('listo para producción', 'production-ready')}</div>
           <AnimatePresence>
             {scored && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-3 w-full rounded-xl border border-line bg-surface p-3 text-[12px] shadow-[0_18px_40px_-20px_rgba(30,38,34,.4)]">
