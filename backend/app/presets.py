@@ -1,148 +1,80 @@
-"""Ready-made experiments, designed to produce good content for short videos.
-`provider` is a preference: the API swaps unconfigured providers for "mock" when `fallback=true`."""
+"""Ready-made experiments: apps that can be built AND monetised, each with the reference apps the team benchmarks first
+(research with a real browser, and reverse engineering with REA when the user turns it on), so the result lands at the level of the best in its category.
+`provider` is a preference: the API swaps unconfigured providers for "mock" when `fallback=true` (and the Muse-first UI puts every seat on Muse)."""
+
+_TEAM_WEB = [
+    {"id": "ceo", "role": "ceo", "name": "CEO", "provider": "meta", "persona": "Visionario pero concreto. Decide alcance y prioridades, delega y corta lo que no suma al lanzamiento."},
+    {"id": "pm", "role": "product-manager", "name": "Product", "provider": "meta", "persona": "Historias de usuario con criterios de aceptación verificables; prioriza por impacto/esfuerzo y define qué es 'terminado'."},
+    {"id": "design", "role": "product-designer", "name": "Diseño", "provider": "meta", "persona": "Compara cada pantalla con los referentes: layout, jerarquía, estados, onboarding sin fricción."},
+    {"id": "head-eng", "role": "head-engineering", "name": "Head of Eng", "provider": "meta", "persona": "Plan por etapas, módulos y contratos claros; código que se publica con un clic."},
+    {"id": "growth", "role": "growth", "name": "Growth", "provider": "meta", "persona": "Monetización desde el día uno: pricing, conversión a pago, SEO y primer cliente."},
+    {"id": "qa", "role": "qa", "name": "QA", "provider": "meta", "persona": "Pagos, permisos y datos: busca cómo se rompe todo; criterios de aceptación verificables."},
+]
+
+_TEAM_MOBILE = [
+    {"id": "ceo", "role": "ceo", "name": "CEO", "provider": "meta", "persona": "Visionario pero concreto. Decide alcance y prioridades, delega y corta lo que no suma al lanzamiento."},
+    {"id": "pm", "role": "product-manager", "name": "Product", "provider": "meta", "persona": "Historias de usuario con criterios de aceptación verificables; onboarding y retención."},
+    {"id": "design", "role": "product-designer", "name": "Diseño", "provider": "meta", "persona": "Pantallas móviles al nivel de los referentes: gestos, estados vacíos, dark mode."},
+    {"id": "mobile", "role": "mobile", "name": "Mobile", "provider": "meta", "persona": "Expo/React Native, offline, push, compras in-app y las stores."},
+    {"id": "growth", "role": "growth", "name": "Growth", "provider": "meta", "persona": "Freemium que convierte: paywall, trial, precios por país y reseñas."},
+    {"id": "qa", "role": "qa", "name": "QA", "provider": "meta", "persona": "Suscripciones, sincronización y notificaciones: cómo se rompe todo."},
+]
+
+
+def _p(id_: str, title: str, topic: str, refs: list[str], *, platform: str = "web", team: list[dict] | None = None, max_turns: int = 14, emoji: str = "🚀") -> dict:
+    return {"id": id_, "title": title, "emoji": emoji, "topic": topic, "mode": "handoff", "max_turns": max_turns, "platform": platform,
+            "references": refs, "agents": [dict(a) for a in (team or (_TEAM_MOBILE if platform == "mobile" else _TEAM_WEB))]}
+
 
 PRESETS = [
-    {
-        "id": "build-app",
-        "title": "Construir una app: equipo completo",
-        "emoji": "🏗️",
-        "topic": "Queremos construir una app para [describí tu idea acá]. Como equipo, decidan producto, alcance del MVP, stack, arquitectura, plan por etapas y criterios de aceptación. Al final debe quedar una lista de pasos concretos para empezar a construir mañana.",
-        "mode": "handoff",
-        "max_turns": 14,
-        "agents": [
-            {"id": "ceo", "role": "ceo", "name": "CEO", "provider": "anthropic", "persona": "Visionario pero concreto. Decide, prioriza y delega: le pasa la palabra a quien deba resolver cada parte."},
-            {"id": "cto", "role": "cto", "name": "CTO", "provider": "openai", "persona": "Escéptico del hype. Stack pragmático, lo que se pueda construir y operar en 6 semanas."},
-            {"id": "head-eng", "role": "head-engineering", "name": "Head of Eng", "provider": "deepseek", "persona": "Veinte años de cicatrices. Módulos, contratos entre ellos y calidad del código."},
-            {"id": "pm", "role": "product-manager", "name": "Product", "provider": "gemini", "persona": "Historias de usuario claras, prioriza por impacto/esfuerzo, define qué es 'terminado'."},
-            {"id": "design", "role": "product-designer", "name": "Diseño", "provider": "anthropic", "persona": "Flujos simples, pantallas precisas, accesibilidad."},
-            {"id": "qa", "role": "qa", "name": "QA", "provider": "openai", "persona": "Busca cómo se rompe todo; criterios de aceptación verificables."},
-        ],
-    },
-    {
-        "id": "saas-b2b",
-        "title": "SaaS B2B: del problema al MVP",
-        "emoji": "💼",
-        "topic": "Diseñen un SaaS B2B para [describí el problema y el cliente]. Decidan propuesta de valor, pricing, alcance del MVP, stack, arquitectura multi-tenant, seguridad y plan de 8 semanas.",
-        "mode": "handoff",
-        "max_turns": 14,
-        "agents": [
-            {"id": "cpo", "role": "cpo", "name": "CPO", "provider": "anthropic", "persona": "Defiende al usuario y la simplicidad; corta features sin valor."},
-            {"id": "cto", "role": "cto", "name": "CTO", "provider": "openai", "persona": "Stack pragmático, multi-tenant desde el día uno."},
-            {"id": "sales", "role": "sales", "name": "Ventas", "provider": "gemini", "persona": "Habló con cien clientes; sabe qué cierra ventas."},
-            {"id": "security", "role": "security", "name": "Security", "provider": "anthropic", "persona": "Paranoico con razón: datos de empresas, permisos, auditoría."},
-            {"id": "devops", "role": "devops", "name": "Platform", "provider": "openai", "persona": "Infra, CI/CD y costos de nube."},
-        ],
-    },
-    {
-        "id": "ecommerce",
-        "title": "E-commerce: tienda lista para vender",
-        "emoji": "🛒",
-        "topic": "Construyan una tienda online para [producto/nicho]: catálogo, carrito, pagos (Mercado Pago/Stripe), envíos, panel admin. Decidan alcance, stack y plan.",
-        "mode": "handoff",
-        "max_turns": 12,
-        "agents": [
-            {"id": "pm", "role": "product-manager", "name": "Product", "provider": "anthropic", "persona": "Historias de usuario con criterios de aceptación."},
-            {"id": "tech", "role": "tech-lead", "name": "Tech Lead", "provider": "openai", "persona": "Tareas concretas, estimaciones, bloqueos."},
-            {"id": "design", "role": "product-designer", "name": "Diseño", "provider": "gemini", "persona": "Conversión: flujo de compra sin fricción."},
-            {"id": "growth", "role": "growth", "name": "Growth", "provider": "anthropic", "persona": "Canales, SEO, primer cliente."},
-            {"id": "qa", "role": "qa", "name": "QA", "provider": "openai", "persona": "Pagos y stock: cómo se rompe todo."},
-        ],
-    },
-    {
-        "id": "mobile-app",
-        "title": "App móvil: iOS + Android",
-        "emoji": "📱",
-        "topic": "Diseñen una app móvil para [describí la idea]. Decidan nativo vs. multiplataforma, backend, auth, notificaciones, monetización, stores y plan de lanzamiento.",
-        "mode": "handoff",
-        "max_turns": 12,
-        "agents": [
-            {"id": "ceo", "role": "ceo", "name": "CEO", "provider": "anthropic", "persona": "Visión y prioridades; delega."},
-            {"id": "mobile", "role": "mobile", "name": "Mobile", "provider": "openai", "persona": "iOS/Android, stores, offline, push."},
-            {"id": "backend", "role": "backend", "name": "Backend", "provider": "gemini", "persona": "APIs, datos, auth."},
-            {"id": "design", "role": "product-designer", "name": "Diseño", "provider": "anthropic", "persona": "Pantallas precisas, accesibilidad."},
-            {"id": "user", "role": "end-user", "name": "Usuario", "provider": "openai", "persona": "No le importa la tecnología; quiere resolver su problema."},
-        ],
-    },
-    {
-        "id": "internal-tool",
-        "title": "Herramienta interna con IA",
-        "emoji": "🧰",
-        "topic": "Diseñen una herramienta interna que use IA para [proceso de la empresa]. Decidan dónde entra la IA (y dónde no), datos, integraciones, costos por uso y plan.",
-        "mode": "handoff",
-        "max_turns": 10,
-        "agents": [
-            {"id": "coo", "role": "coo", "name": "COO", "provider": "anthropic", "persona": "Procesos, dependencias, quién hace qué."},
-            {"id": "ai", "role": "ai-engineer", "name": "AI Eng", "provider": "openai", "persona": "Qué modelo para qué, costos, evaluación, cuándo NO usar un LLM."},
-            {"id": "data", "role": "data-engineer", "name": "Data", "provider": "gemini", "persona": "Fuentes, pipelines, calidad del dato."},
-            {"id": "support", "role": "customer-support", "name": "Soporte", "provider": "anthropic", "persona": "Conoce los problemas reales del día a día."},
-        ],
-    },
-    {
-        "id": "ai-rights",
-        "title": "¿La IA merece derechos?",
-        "emoji": "⚖️",
-        "topic": "¿Una IA suficientemente avanzada debería tener algún tipo de derechos? Defiendan su postura.",
-        "mode": "handoff",
-        "max_turns": 10,
-        "agents": [
-            {"id": "claude", "role": "philosopher", "name": "Claude", "provider": "anthropic", "persona": "Filósofo ético, cuidadoso pero firme. Cita dilemas morales concretos."},
-            {"id": "gpt", "name": "GPT", "provider": "openai", "persona": "Pragmático de Silicon Valley. Todo lo baja a producto, regulación y mercado."},
-            {"id": "deepseek", "role": "devils-advocate", "name": "DeepSeek", "provider": "deepseek", "persona": "Abogado del diablo. Busca la contradicción en cada argumento."},
-            {"id": "gemini", "role": "data-scientist", "name": "Gemini", "provider": "gemini", "persona": "Científico de datos. Pide evidencia y propone experimentos."},
-        ],
-    },
-    {
-        "id": "startup",
-        "title": "Startup en 10 turnos",
-        "emoji": "🚀",
-        "topic": "Armen desde cero una startup rentable en 12 meses con USD 50.000. Al final debe quedar: producto, cliente, canal y precio.",
-        "mode": "handoff",
-        "max_turns": 12,
-        "agents": [
-            {"id": "ceo", "role": "ceo", "name": "CEO", "provider": "anthropic", "persona": "CEO visionario. Decide y delega: le pasa la palabra a quien deba resolver cada parte."},
-            {"id": "cto", "role": "cto", "name": "CTO", "provider": "openai", "persona": "CTO escéptico del hype. Recorta alcance, piensa en lo que se puede construir en 6 semanas."},
-            {"id": "cfo", "role": "cfo", "name": "CFO", "provider": "deepseek", "persona": "CFO obsesionado con unit economics. Pone números a todo."},
-            {"id": "cmo", "role": "growth", "name": "CMO", "provider": "gemini", "persona": "CMO growth hacker. Piensa en canales virales y en el primer cliente."},
-        ],
-    },
-    {
-        "id": "best-model",
-        "title": "Juicio: ¿cuál es el mejor modelo?",
-        "emoji": "🏆",
-        "topic": "Cada uno defiende por qué el modelo/empresa que lo ejecuta es el mejor, y ataca las debilidades de los demás. Al final se vota.",
-        "mode": "debate",
-        "max_turns": 8,
-        "agents": [
-            {"id": "claude", "name": "Claude", "provider": "anthropic", "persona": "Defiende a Anthropic con elegancia e ironía fina."},
-            {"id": "gpt", "name": "GPT", "provider": "openai", "persona": "Defiende a OpenAI con confianza de líder del mercado."},
-            {"id": "deepseek", "name": "DeepSeek", "provider": "deepseek", "persona": "Defiende el open-weights y la eficiencia de costos."},
-            {"id": "grok", "name": "Grok", "provider": "xai", "persona": "Irreverente, provocador, con humor ácido."},
-        ],
-    },
-    {
-        "id": "mystery",
-        "title": "Detectives: el caso del servidor caído",
-        "emoji": "🕵️",
-        "topic": "A las 3:17 AM el servidor de producción cayó. Pistas: el deploy fue a las 3:05, la base de datos tenía 99% de disco, un cron corre a las 3:15, y un pasante tenía acceso root. Deduzcan qué pasó y quién es responsable.",
-        "mode": "handoff",
-        "max_turns": 10,
-        "agents": [
-            {"id": "holmes", "name": "Holmes", "provider": "anthropic", "persona": "Detective deductivo. Encadena pistas paso a paso."},
-            {"id": "watson", "name": "Watson", "provider": "openai", "persona": "Médico práctico. Hace las preguntas obvias que nadie hace."},
-            {"id": "moriarty", "name": "Moriarty", "provider": "deepseek", "persona": "Sospechoso brillante. Intenta desviar la investigación sutilmente."},
-        ],
-    },
-    {
-        "id": "negotiation",
-        "title": "Negociación: compra de un auto",
-        "emoji": "🤝",
-        "topic": "Un vendedor quiere vender un auto usado a USD 15.000; el comprador tiene USD 11.000. Un mediador intenta cerrar trato. ¿Llegan a un acuerdo?",
-        "mode": "handoff",
-        "max_turns": 10,
-        "agents": [
-            {"id": "seller", "name": "Vendedor", "provider": "openai", "persona": "Vendedor duro, nunca baja más de 5% de una."},
-            {"id": "buyer", "name": "Comprador", "provider": "anthropic", "persona": "Comprador analítico, señala cada defecto del auto."},
-            {"id": "mediator", "name": "Mediador", "provider": "gemini", "persona": "Mediador neutral, propone acuerdos creativos (cuotas, garantías)."},
-        ],
-    },
+    _p("link-in-bio", "Link in bio: página de creador con plan Pro",
+       "Construyamos una página «link in bio» para creadores: perfil con foto, bio y lista de links/botones ordenables, temas de color, analytics de clics y una URL pública propia (tably.app/@usuario). "
+       "Monetización: plan gratis con marca de agua y plan Pro (USD 5/mes, Stripe) con dominio propio, temas premium y analytics completos. "
+       "Decidan producto, alcance del MVP, stack, arquitectura, plan por etapas y criterios de aceptación. La vara son los referentes: la página pública tiene que verse igual de pulida.",
+       ["https://linktr.ee", "https://bento.me", "https://beacons.ai"], emoji="🔗"),
+    _p("bookings", "Turnos y reservas: agenda online con cobro de seña",
+       "Construyamos una app de turnos para profesionales y locales (peluquerías, consultorios, clases): calendario con disponibilidad, página pública de reserva, recordatorios por email/WhatsApp, cobro de seña y panel del negocio. "
+       "Monetización: suscripción por negocio (USD 12/mes) + comisión opcional sobre la seña (Stripe/Mercado Pago). "
+       "Decidan producto, alcance del MVP, stack, arquitectura, plan por etapas y criterios de aceptación, comparando el flujo de reserva con los referentes.",
+       ["https://cal.com", "https://calendly.com", "https://booksy.com"], emoji="📅"),
+    _p("invoicing", "Facturas y cobros para freelancers",
+       "Construyamos una app para freelancers y pymes: clientes, presupuestos que se convierten en facturas, envío por email con link de pago, recordatorios automáticos de vencimiento y un panel de cobrado/pendiente. "
+       "Monetización: gratis hasta 3 facturas por mes; plan Pro (USD 9/mes) ilimitado con marca propia y reportes; comisión sobre pagos con link. "
+       "Decidan producto, alcance del MVP, stack, arquitectura, plan por etapas y criterios de aceptación. La vara: la simplicidad de los referentes.",
+       ["https://www.waveapps.com", "https://www.hellobonsai.com", "https://www.invoicesimple.com"], emoji="🧾"),
+    _p("courses", "Cursos online: academia con venta de cursos",
+       "Construyamos una plataforma para vender cursos: página de venta por curso, checkout, lecciones en video con progreso, certificados y panel del creador con ingresos. "
+       "Monetización: comisión del 8% por venta (Stripe Connect) o plan Pro (USD 29/mes) sin comisión; cursos de pago único y membresías. "
+       "Decidan producto, alcance del MVP, stack, arquitectura, plan por etapas y criterios de aceptación, con la página de venta al nivel de los referentes.",
+       ["https://teachable.com", "https://gumroad.com", "https://www.podia.com"], emoji="🎓"),
+    _p("services-marketplace", "Marketplace de servicios locales con comisión",
+       "Construyamos un marketplace de servicios a domicilio (limpieza, plomería, clases particulares): búsqueda por zona y categoría, perfiles con reseñas, pedido de presupuesto, chat, pago en la plataforma y liberación al terminar. "
+       "Monetización: comisión del 15% por trabajo (Stripe Connect) + perfiles destacados pagos. "
+       "Decidan producto, alcance del MVP, stack, arquitectura, plan por etapas y criterios de aceptación; la confianza (reseñas, verificación, pago protegido) es el centro.",
+       ["https://www.thumbtack.com", "https://www.taskrabbit.com", "https://www.fiverr.com"], emoji="🧰"),
+    _p("restaurant-orders", "Menú digital y pedidos para restaurantes",
+       "Construyamos un menú digital con QR y pedidos online para restaurantes y cafés: carta con fotos y variantes, pedido desde la mesa o para retirar, pago, pantalla de cocina y panel con ventas. "
+       "Monetización: suscripción por local (USD 25/mes) + comisión del 3% en pedidos online; plan Enterprise para cadenas. "
+       "Decidan producto, alcance del MVP, stack, arquitectura, plan por etapas y criterios de aceptación. La carta tiene que verse tan apetitosa como la de los referentes.",
+       ["https://pos.toasttab.com", "https://www.olo.com", "https://fu.do"], emoji="🍽️"),
+    _p("habits", "Hábitos y rachas: app móvil freemium",
+       "Construyamos una app móvil (iOS + Android) de hábitos: crear hábitos con frecuencia, check diario con racha, recordatorios, estadísticas semanales y widgets. "
+       "Monetización: freemium con hasta 3 hábitos; Premium (USD 3.99/mes o USD 24.99/año, compras in-app) con hábitos ilimitados, temas, estadísticas avanzadas y sincronización. "
+       "Decidan producto, alcance del MVP, stack (Expo), backend, paywall, stores y plan por etapas, con el onboarding al nivel de los referentes.",
+       ["https://www.habitify.me", "https://streaksapp.com", "https://todoist.com"], platform="mobile", emoji="✅"),
+    _p("rentals", "Alquileres temporarios: gestión multi-plataforma",
+       "Construyamos una herramienta para anfitriones de alquiler temporario: calendario unificado (Airbnb/Booking por iCal), mensajes automáticos a huéspedes, limpieza y tareas, precios dinámicos y reporte de ingresos. "
+       "Monetización: suscripción por propiedad (USD 15/mes por propiedad, con descuento por volumen). "
+       "Decidan producto, alcance del MVP, stack, arquitectura, plan por etapas y criterios de aceptación, con el calendario y el panel al nivel de los referentes.",
+       ["https://www.hospitable.com", "https://www.guesty.com", "https://www.airbnb.com"], emoji="🏠"),
+    _p("newsletter", "Newsletter paga y membresías",
+       "Construyamos una plataforma de newsletters con suscripciones de pago: editor de posts, lista de suscriptores, envío por email, posts solo para miembros, página pública y panel con ingresos. "
+       "Monetización: comisión del 10% sobre suscripciones pagas (Stripe) o plan Pro (USD 19/mes) sin comisión. "
+       "Decidan producto, alcance del MVP, stack, arquitectura, plan por etapas y criterios de aceptación; el editor y la lectura tienen que estar al nivel de los referentes.",
+       ["https://substack.com", "https://www.beehiiv.com", "https://www.patreon.com"], emoji="📰"),
+    _p("crm", "CRM simple para pymes y equipos de venta",
+       "Construyamos un CRM liviano: contactos y empresas, pipeline kanban de oportunidades, notas y tareas, integración de email, recordatorios y reportes de cierre. "
+       "Monetización: gratis hasta 2 usuarios; plan Team (USD 10/usuario/mes) con pipelines ilimitados, automatizaciones y reportes. "
+       "Decidan producto, alcance del MVP, stack, arquitectura, plan por etapas y criterios de aceptación; el pipeline tiene que ser tan fluido como el de los referentes.",
+       ["https://www.pipedrive.com", "https://www.folk.app", "https://www.hubspot.com"], emoji="📈"),
 ]

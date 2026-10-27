@@ -71,6 +71,8 @@ export interface Preset {
   agents: AgentConfig[]
   title_en?: string
   topic_en?: string
+  platform?: 'web' | 'mobile' | 'both'
+  references?: string[]  // reference apps the team benchmarks first (and reverse-engineers with REA when enabled)
 }
 
 export interface Metrics {

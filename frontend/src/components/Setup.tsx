@@ -154,7 +154,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
     baseline.current = { preset: p, title, topic, language, agents: Object.fromEntries(agents.map((a) => [a.id, { name: a.name, persona: a.persona }])) }
     setIdea(topic)
     setPromptMd(null)
-    setCfg((c) => ({ ...c, topic, title, language, mode: p.mode, max_turns: p.max_turns, agents }))
+    setCfg((c) => ({ ...c, topic, title, language, mode: p.mode, max_turns: p.max_turns, agents, platform: p.platform ?? 'web', references: p.references ?? [] }))
   }
   // Muse first: as soon as the Meta key is connected, the seats that were waiting for it (simulated) move to Muse with their recommended model
   useEffect(() => {
@@ -320,7 +320,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
               )}
               <div className="relative p-4 pt-16">
                 <div className="font-semibold text-sm leading-tight">{pick(p, 'title')}</div>
-                <div className="mt-1 text-[11px] text-ink-3">{p.agents.length} {T('agentes', 'agents')} · {pick(MODE_INFO[p.mode], 'label')}</div>
+                <div className="mt-1 text-[11px] text-ink-3">{p.agents.length} {T('agentes', 'agents')}{p.references?.length ? ` · ${p.references.length} ${T('referentes', 'reference apps')}` : ` · ${pick(MODE_INFO[p.mode], 'label')}`}</div>
               </div>
             </button>
   )
