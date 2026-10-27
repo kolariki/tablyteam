@@ -18,6 +18,7 @@ const KEY_URL: Record<string, string> = {
   gemini: 'https://aistudio.google.com/apikey',
   xai: 'https://console.x.ai',
   groq: 'https://console.groq.com/keys',
+  meta: 'https://dev.meta.ai/',
   kimi: 'https://platform.moonshot.ai/console/api-keys',
   mistral: 'https://console.mistral.ai/api-keys',
   openrouter: 'https://openrouter.ai/keys',

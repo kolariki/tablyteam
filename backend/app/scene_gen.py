@@ -93,7 +93,7 @@ def sanitize(svg: str) -> str | None:
 def _pick_model(user: User, config: dict) -> tuple[str, str, Cred] | None:
     """A real API key to draw with: a company from the project's own team first, then any configured one."""
     eff = keystore.creds(user.id)
-    order = [a.get("provider") for a in config.get("agents", [])] + ["anthropic", "openai", "gemini", "xai", "deepseek", "openrouter", "mistral", "kimi", "groq"]
+    order = [a.get("provider") for a in config.get("agents", [])] + ["anthropic", "openai", "meta", "gemini", "xai", "deepseek", "openrouter", "mistral", "kimi", "groq"]
     seen: set[str] = set()
     for pid in order:
         if not pid or pid in seen or pid not in PROVIDERS or PROVIDERS[pid].kind == "mock":

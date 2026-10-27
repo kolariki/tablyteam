@@ -5,7 +5,7 @@ import { useT } from '../lib/i18n'
 import ProviderLogo from './ProviderLogo'
 
 const LABEL: Record<string, string> = {
-  anthropic: 'Claude', openai: 'GPT', deepseek: 'DeepSeek', gemini: 'Gemini', kimi: 'Kimi', xai: 'Grok', groq: 'Llama', mistral: 'Mistral', openrouter: 'OpenRouter', ollama: 'Ollama', mock: 'Simulado', 'claude-code': 'Claude Code', codex: 'Codex',
+  anthropic: 'Claude', openai: 'GPT', deepseek: 'DeepSeek', gemini: 'Gemini', kimi: 'Kimi', meta: 'Muse', 'muse-code': 'Muse Code', xai: 'Grok', groq: 'Llama', mistral: 'Mistral', openrouter: 'OpenRouter', ollama: 'Ollama', mock: 'Simulado', 'claude-code': 'Claude Code', codex: 'Codex',
 }
 
 /** Full-screen reveal of the chosen builder model, then hands over to the builder UI. */

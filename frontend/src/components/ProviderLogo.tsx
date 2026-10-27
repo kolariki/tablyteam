@@ -4,9 +4,9 @@ import { GLYPH } from '../lib/brand'
 /** Company logos live in /public/logos/<provider>.png (transparent, 256px). */
 const HAS_LOGO = new Set(['anthropic', 'openai', 'deepseek', 'gemini', 'xai', 'groq', 'mistral', 'openrouter', 'ollama', 'kimi', 'mock', 'vercel', 'railway', 'langfuse'])
 
-const ALIAS: Record<string, string> = { 'claude-code': 'anthropic', codex: 'openai' }
+const ALIAS: Record<string, string> = { 'claude-code': 'anthropic', codex: 'openai', 'muse-code': 'meta' }
 
-const HAS_SVG = new Set(['github', 'cloudflare'])
+const HAS_SVG = new Set(['github', 'cloudflare', 'meta'])
 
 export const logoUrl = (provider?: string | null) => {
   const p = provider ? ALIAS[provider] ?? provider : null

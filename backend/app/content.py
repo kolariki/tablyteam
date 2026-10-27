@@ -23,7 +23,8 @@ from .providers import PROVIDERS
 def _brand(provider: str | None) -> tuple[str, str]:
     """(logo path, brand color) for the AI an article is about."""
     spec = PROVIDERS.get(provider or "")
-    return (f"/logos/{provider}.png", spec.color if spec else "#2F6B5D") if provider else ("", "#2F6B5D")
+    ext = "svg" if provider in ("meta", "github", "cloudflare") else "png"
+    return (f"/logos/{provider}.{ext}", spec.color if spec else "#2F6B5D") if provider else ("", "#2F6B5D")
 
 CONTENT_DIR = Path(env("ARENA_CONTENT_DIR", str(Path(__file__).resolve().parents[1] / "content")))
 SITE_URL = (env("ARENA_PUBLIC_URL", "https://tablyteam.com") or "https://tablyteam.com").rstrip("/")

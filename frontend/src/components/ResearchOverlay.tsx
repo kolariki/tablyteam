@@ -7,7 +7,7 @@ import { api } from '../lib/api'
 import { useT } from '../lib/i18n'
 import ProviderLogo from './ProviderLogo'
 
-const RING = ['anthropic', 'openai', 'deepseek', 'gemini', 'xai', 'groq', 'kimi', 'mistral', 'openrouter', 'ollama']
+const RING = ['anthropic', 'openai', 'meta', 'deepseek', 'gemini', 'xai', 'groq', 'kimi', 'mistral', 'openrouter', 'ollama']
 
 /**
  * The team is researching the references before the council: a full screen that holds the user here (every click

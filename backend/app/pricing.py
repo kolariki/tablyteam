@@ -8,6 +8,12 @@ PRICES: dict[str, tuple[float, float]] = {
     "claude-opus": (15.0, 75.0),
     "claude-sonnet": (3.0, 15.0),
     "claude-haiku": (1.0, 5.0),
+    # Meta Model API, list prices Oct 2026 (dev.meta.ai/docs/pricing-rate-limits): Standard mode; Contributor mode is the discounted variant
+    "muse-wonder": (4.0, 20.0),
+    "muse-spark-1.3-contributor": (0.10, 0.20),
+    "muse-spark-1.2-contributor": (0.10, 0.20),
+    "muse-spark": (1.25, 4.25),
+    "muse-image": (0.0, 0.0),  # billed per image ($0.01), not per token
     # OpenAI
     "gpt-5-nano": (0.05, 0.40),
     "gpt-5-mini": (0.25, 2.0),

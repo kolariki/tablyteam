@@ -16,7 +16,7 @@ import { brandTheme } from '../lib/brand'
  * so the animation is deterministic and loops cleanly.
  */
 /* ------------------------------------------------------------------ demo data: a weather app, from the idea to the built product */
-const PROVIDERS_ALL: [string, string][] = [['anthropic', 'Anthropic · Claude'], ['openai', 'OpenAI · GPT'], ['deepseek', 'DeepSeek'], ['gemini', 'Google · Gemini'], ['xai', 'xAI · Grok'], ['groq', 'Groq · Llama'], ['kimi', 'Moonshot · Kimi'], ['mistral', 'Mistral'], ['openrouter', 'OpenRouter · 300+ modelos'], ['ollama', 'Ollama · modelos locales']]
+const PROVIDERS_ALL: [string, string][] = [['anthropic', 'Anthropic · Claude'], ['openai', 'OpenAI · GPT'], ['meta', 'Meta · Muse'], ['deepseek', 'DeepSeek'], ['gemini', 'Google · Gemini'], ['xai', 'xAI · Grok'], ['groq', 'Groq · Llama'], ['kimi', 'Moonshot · Kimi'], ['mistral', 'Mistral'], ['openrouter', 'OpenRouter · 300+ modelos'], ['ollama', 'Ollama · modelos locales']]
 const IDEA = 'Una app del clima para Argentina que me diga si llevo paraguas, con alertas oficiales y pronóstico por horas.'
 const IDEA_EN = 'A weather app for Argentina that tells me whether to take an umbrella, with official alerts and an hourly forecast.'
 const QUESTIONS: [string, string][] = [

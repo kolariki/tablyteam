@@ -6,6 +6,7 @@ const MARQUEE = [
   { id: 'openai', name: 'GPT', company: 'OpenAI' },
   { id: 'deepseek', name: 'DeepSeek', company: 'DeepSeek' },
   { id: 'gemini', name: 'Gemini', company: 'Google' },
+  { id: 'meta', name: 'Muse', company: 'Meta' },
   { id: 'kimi', name: 'Kimi', company: 'Moonshot AI' },
   { id: 'xai', name: 'Grok', company: 'xAI' },
   { id: 'mistral', name: 'Mistral', company: 'Mistral AI' },
