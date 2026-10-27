@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { ChevronDown, Download, Gavel, HardHat, Loader2, MonitorPlay, Pencil, Plus, Search, Trash2, Users, Video } from 'lucide-react'
+import { LevelBadge } from './LevelsPanel'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, getToken, type DashboardData } from '../lib/api'
 import { fmtDur } from '../lib/duration'
@@ -220,6 +221,7 @@ export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refres
                     <div className="mt-1 flex items-center gap-2 text-[11.5px]">
                       <span className={`rounded-full px-2 py-0.5 font-sans font-semibold ${st.cls}`}>{st.label}</span>
                       {latest?.version ? <span className="rounded-full border border-line bg-surface px-2 py-0.5 font-sans font-semibold text-ink">v{latest.version}</span> : null}
+                      {latest?.level != null && <LevelBadge level={latest.level} pct={latest.level_pct ?? 0} next={latest.level_next ?? null} />}
                       {s.runs.length > 0 && <span className="rounded-full border border-line bg-surface px-2 py-0.5 font-sans text-ink-2" title={T('Este experimento se corrió varias veces; las corridas anteriores están en «Ver más info»', 'This experiment ran several times; the earlier runs are under "More info"')}>{s.runs.length + 1} {T('corridas', 'runs')}</span>}
                       <button onClick={() => setOpen({ ...open, [s.id]: !expanded })} className="flex items-center gap-1 text-ink-3 hover:text-ink" aria-expanded={expanded}>
                         {expanded ? tr('Menos info', 'Less info') : tr('Ver más info', 'More info')} <ChevronDown size={12} className={`transition ${expanded ? 'rotate-180' : ''}`} />

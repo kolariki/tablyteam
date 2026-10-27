@@ -173,6 +173,12 @@ export const api = {
   saveGithubToken: (token: string | null, clear = false) =>
     j<{ set: boolean; last4: string | null }>(authed('/api/settings/github', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, clear }) })),
   cloud: (sessionId: string, id: string) => j<CloudInfo>(authed(`/api/sessions/${sessionId}/builds/${id}/cloud`)),
+  levels: (sessionId: string, id: string) => j<LevelsPayload>(authed(`/api/sessions/${sessionId}/builds/${id}/levels`)),
+  marketList: (sessionId: string, id: string, body: { pitch: string; price_usd: number | null; title?: string }) =>
+    j<{ ok: boolean; listing: MarketListing }>(authed(`/api/sessions/${sessionId}/builds/${id}/market`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })),
+  marketWithdraw: (sessionId: string, id: string) => j<{ ok: boolean }>(authed(`/api/sessions/${sessionId}/builds/${id}/market`, { method: 'DELETE' })),
+  market: () => j<{ listings: MarketListing[]; levels: LevelDef[] }>(authed('/api/market')),
+  marketTransfer: (listingId: string, email: string) => j<{ ok: boolean; to: { name: string; email: string } }>(post(`/api/market/${listingId}/transfer`, { email })),
   cloudPublish: (sessionId: string, id: string) => j(post(`/api/sessions/${sessionId}/builds/${id}/cloud/publish`, {})),
   cloudUnpublish: (sessionId: string, id: string) => j<{ ok: boolean; app: CloudApp | null }>(authed(`/api/sessions/${sessionId}/builds/${id}/cloud/publish`, { method: 'DELETE' })),
   cloudDb: (sessionId: string, id: string, provider: 'neon' | 'supabase') => j<{ ok: boolean; provider: string; host: string; vars: string[] }>(post(`/api/sessions/${sessionId}/builds/${id}/cloud/db`, { provider })),
@@ -258,6 +264,45 @@ export interface CloudStatus {
   missing: Record<'cloudflare' | 'fly' | 'neon' | 'supabase', string | null>
   public_url: string
 }
+/** Growth levels: the strict ladder (1 En línea → 4 Monetizado) and how far the project is from the next step. */
+export interface LevelCheck { id: string; who: 'team' | 'user' | 'world'; label: string; label_en: string; ok: boolean; evidence: string | null }
+export interface LevelDef { n: number; id: string; label: string; label_en: string; goal: string; goal_en: string; unlocks: string; unlocks_en: string }
+export interface LevelRow extends LevelDef { checks: LevelCheck[]; done: number; total: number; pct: number; complete: boolean }
+export interface LevelsInfo {
+  level: number
+  max: number
+  label: string | null
+  label_en: string | null
+  next: number | null
+  next_label: string | null
+  next_label_en: string | null
+  pct: number
+  pending: LevelCheck[]
+  levels: LevelRow[]
+  market_ready: boolean
+  visits: number
+}
+export interface AnalyticsStats { site: string | null; pageviews: number; events: number; errors: number; days: { day: string; n: number }[]; pages: { path: string; n: number }[]; top_events: { name: string; n: number }[]; last_errors: { name: string; ts: number }[] }
+export interface MarketListing {
+  id: string
+  slug: string | null
+  title: string
+  pitch: string | null
+  price_usd: number | null
+  level: number
+  status: string
+  created: number
+  updated: number
+  visits?: number
+  visits_7d?: number
+  owner?: string | null
+  owner_email?: string | null
+  url?: string | null
+  mine?: boolean
+  session_id?: string | null
+  build_id?: string | null
+}
+export interface LevelsPayload { levels: LevelsInfo; analytics: AnalyticsStats; app: CloudApp | null; listing: MarketListing | null; snippet: string }
 export interface CloudDb { provider: string; ok: boolean; vars: string[]; host: string | null; ts: number }
 export interface CloudApp {
   build_id: string
@@ -504,6 +549,9 @@ export interface BuildSummary {
   version?: number
   readiness?: number | null
   pending_council?: string | null
+  level?: number | null
+  level_pct?: number | null
+  level_next?: number | null
 }
 
 export interface ProviderSetting {

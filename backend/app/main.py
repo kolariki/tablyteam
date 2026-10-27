@@ -50,6 +50,7 @@ from . import providers as provmod
 from . import runner as runmod
 from . import skills as skillmod
 from . import cloud as cloudmod
+from . import levels as levelsmod
 from . import gitserver
 from . import agent_sessions
 from . import skills_catalog as catalog
@@ -1921,6 +1922,116 @@ async def _startup():
 
 
 # ================================================================================================ Tably Cloud · git propio, publicar, base de datos, migrar
+
+
+# ------------------------------------------------------------------------------------------------ growth levels · analytics · marketplace
+
+@app.get("/a.js")
+def analytics_snippet():
+    """Tably Analytics: the script a built app loads (`<script defer src=".../a.js" data-site="<slug>">`). No cookies, no personal data."""
+    return Response(levelsmod.SNIPPET_JS, media_type="application/javascript", headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.post("/api/a/{site}")
+async def analytics_hit(site: str, request: Request):
+    """Beacon from a published app (text/plain so there is no preflight). Unauthenticated by design; one row per hit."""
+    if not re.fullmatch(r"[a-z0-9-]{1,80}", site):
+        return Response(status_code=204)
+    try:
+        body = json.loads((await request.body()).decode("utf-8", "replace") or "{}")
+    except Exception:  # noqa: BLE001
+        return Response(status_code=204)
+    if isinstance(body, dict):
+        levelsmod.record_hit(site, body, request.headers.get("user-agent"))
+    return Response(status_code=204)
+
+
+def _levels_payload(user: User, b) -> dict:
+    app_ = cloudmod.get_app(user.id, b.id)
+    ev = b.levels_eval()
+    listing = levelsmod.listing_for(user.id, b.id)
+    if listing and listing.get("level") != ev.get("level"):
+        levelsmod.refresh_level(user.id, b.id, ev.get("level", 0))
+        listing["level"] = ev.get("level", 0)
+    return {"levels": ev, "analytics": levelsmod.stats((app_ or {}).get("slug")), "app": cloudmod.public(app_), "listing": listing, "snippet": f'<script defer src="{cloudmod.public_url()}/a.js" data-site="{(app_ or {}).get("slug") or "<slug>"}"></script>'}
+
+
+@app.get("/api/sessions/{session_id}/builds/{build_id}/levels")
+def build_levels(session_id: str, build_id: str, user: User = CurrentUser):
+    """The project's growth level, the next level's checks with evidence, its analytics and its marketplace listing."""
+    return _levels_payload(user, _build_any(user, session_id, build_id))
+
+
+@app.put("/api/sessions/{session_id}/builds/{build_id}/market")
+def market_list(session_id: str, build_id: str, body: dict, user: User = CurrentUser):
+    """List the project on the marketplace (level 1 or more). Pitch and price are the owner's words."""
+    b = _build_any(user, session_id, build_id)
+    ev = b.levels_eval()
+    if ev.get("level", 0) < 1:
+        raise HTTPException(400, "Para publicar en el marketplace el proyecto tiene que estar en el nivel 1 (construido, aprobado y en línea).")
+    app_ = cloudmod.get_app(user.id, b.id)
+    price = body.get("price_usd")
+    try:
+        price = float(price) if price not in (None, "") else None
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Precio inválido")
+    row = levelsmod.upsert_listing(user.id, session_id, b.id, (app_ or {}).get("slug"), str(body.get("title") or b.title), str(body.get("pitch") or ""), price, ev["level"])
+    return {"ok": True, "listing": row}
+
+
+@app.delete("/api/sessions/{session_id}/builds/{build_id}/market")
+def market_withdraw(session_id: str, build_id: str, user: User = CurrentUser):
+    _build_any(user, session_id, build_id)
+    levelsmod.withdraw_listing(user.id, build_id)
+    return {"ok": True}
+
+
+@app.get("/api/market")
+def market(user: User = CurrentUser):
+    """Every project for sale: level, public URL, real visits, pitch and price. Buyers contact the owner; the owner transfers."""
+    out = []
+    for r in levelsmod.list_market():
+        app_ = cloudmod.get_app(r["user_id"], r["build_id"])
+        with auth._db() as c:
+            o = c.execute("SELECT name, email FROM users WHERE id = ?", (r["user_id"],)).fetchone()
+        item = levelsmod.public_listing(r, (o["name"] if o else None))
+        item["url"] = (app_ or {}).get("url") if (app_ or {}).get("status") == "live" else None
+        item["mine"] = r["user_id"] == user.id
+        item["owner_email"] = o["email"] if o and r["user_id"] != user.id else None
+        item["session_id"] = r["session_id"] if r["user_id"] == user.id else None
+        item["build_id"] = r["build_id"] if r["user_id"] == user.id else None
+        out.append(item)
+    return {"listings": out, "levels": levelsmod.LEVELS}
+
+
+@app.post("/api/market/{listing_id}/transfer")
+def market_transfer(listing_id: str, body: dict, user: User = CurrentUser):
+    """Ownership transfer to another Tably account (by email): the project, its versions, its workdir and its public app move; the URL stays."""
+    with auth._db() as c:
+        r = c.execute("SELECT * FROM market_listings WHERE id = ?", (listing_id,)).fetchone()
+    if not r or r["user_id"] != user.id:
+        raise HTTPException(404, "Publicación no encontrada")
+    if r["status"] != "active":
+        raise HTTPException(409, "Esta publicación ya no está activa")
+    target = levelsmod.user_by_email(str(body.get("email") or ""))
+    if not target:
+        raise HTTPException(404, "No hay una cuenta de Tably con ese email: la otra persona tiene que crearla primero.")
+    if target["id"] == user.id:
+        raise HTTPException(400, "Ya es tuyo")
+    listing = dict(r)
+    b = BUILDS.get(listing["build_id"])
+    if b and b.user.id == user.id and b.status in ("running", "reviewing"):
+        raise HTTPException(409, "Esperá a que el constructor termine antes de transferir")
+    BUILDS.pop(listing["build_id"], None)
+    from .orchestrator import SESSIONS
+
+    for sid in list(SESSIONS):
+        if sid == listing["session_id"] or (getattr(SESSIONS[sid], "config", None) and (SESSIONS[sid].config.review_of or {}).get("build_id") == listing["build_id"]):
+            SESSIONS.pop(sid, None)
+    from .local_engine import BUILD_ROOT
+
+    res = levelsmod.transfer(listing, target["id"], BUILD_ROOT)
+    return {**res, "to": {"name": target["name"], "email": target["email"]}}
 
 
 @app.get("/api/cloud/status")

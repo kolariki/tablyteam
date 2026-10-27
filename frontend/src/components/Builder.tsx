@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, CheckCircle2, FlaskConical, Gauge, Home, ListChecks, Search, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2, CloudUpload, Clock3 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, Trophy, FlaskConical, Gauge, Home, ListChecks, Search, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2, CloudUpload, Clock3 } from 'lucide-react'
 import { marked } from 'marked'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { reconnectBuild, useBuild, type Activity, type ChatItem, type Todo } from '../buildStore'
@@ -13,6 +13,7 @@ import ProviderLogo from './ProviderLogo'
 import { LiveReview, ReviewLauncher, ReviewRoundCard } from './ReviewPanel'
 import ServicesDeploy from './ServicesDeploy'
 import CloudPanel from './CloudPanel'
+import LevelsPanel, { LevelBadge } from './LevelsPanel'
 import { fmtDur } from '../lib/duration'
 import AppRunner from './AppRunner'
 import RunModal from './RunModal'
@@ -38,6 +39,7 @@ const PANES: { id: BuildState['pane']; icon: typeof FileCode2; es: string; en: s
   { id: 'app', icon: MonitorPlay, es: 'App real', en: 'Real app', off: (b) => Object.keys(b.files).length === 0 },
   { id: 'versions', icon: GitBranch, es: 'Versiones', en: 'Versions', off: (b) => b.versions.length === 0 },
   { id: 'cloud', icon: CloudUpload, es: 'Publicar', en: 'Publish', off: () => false },
+  { id: 'levels', icon: Trophy, es: 'Niveles', en: 'Levels', off: () => false },
   { id: 'deploy', icon: KeyRound, es: 'Servicios y deploy', en: 'Services & deploy', off: () => false },
   { id: 'report', icon: FileText, es: 'Informe', en: 'Report', off: (b) => !b.auditReport },
 ]
@@ -252,6 +254,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
             <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${b.status === 'completed' ? 'border-ok/30 bg-ok/10 text-ok' : 'border-line bg-surface-2 text-ink-3'}`}>{b.status === 'completed' ? (b.reviews.length ? T('CAMBIOS LISTOS · pendiente de consejo', 'CHANGES READY · pending council') : <><span className="h-2 w-2 rounded-full bg-ok shadow-[0_0_0_3px_rgba(23,137,106,.18)]" /> {T('LISTO', 'DONE')}</>) : b.status.toUpperCase()}</span>
           )}
           {b.versions.length > 0 && <ReadinessBadge versions={b.versions} />}
+          {b.levels && <button onClick={() => useBuild.getState().set({ pane: 'levels', paneOpen: true })} className="transition hover:brightness-95" title={T('Niveles de crecimiento', 'Growth levels')}><LevelBadge level={b.levels.level} pct={b.levels.pct} next={b.levels.next} /></button>}
           {b.reviews.length > 0 && !reviewing && <span className="hidden text-[11px] text-ink-3 2xl:inline">{b.reviews.length} {b.reviews.length === 1 ? T('ronda', 'round') : T('rondas', 'rounds')} {T('de revisión', 'of review')}</span>}
           {stageCount > 0 && <span className="hidden text-[11px] text-ink-3 2xl:inline">{stageCount} {stageCount === 1 ? T('etapa', 'stage') : T('etapas', 'stages')}</span>}
           {/* what it really costs: an engine build runs on the user's subscription, so only the per-use fees count there */}
@@ -529,6 +532,8 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
                   <span className="ml-auto text-[11px] opacity-70">{running ? T('solo lectura mientras el constructor escribe', 'read-only while the builder writes') : T('editá y guardá con ⌘S: el constructor sigue desde tu versión', 'edit and save with ⌘S: the builder continues from your version')}</span>
                 ) : b.pane === 'cloud' ? (
                   <span className="ml-auto text-[11px] text-ink-3">{T('hosting, base de datos, git y migración', 'hosting, database, git and migration')}</span>
+                ) : b.pane === 'levels' ? (
+                  <span className="ml-auto text-[11px] text-ink-3">{T('qué nivel tiene el proyecto, qué falta para el siguiente, analytics y marketplace', 'the project level, what the next one needs, analytics and marketplace')}</span>
                 ) : b.pane === 'deploy' ? (
                   <span className="ml-auto text-[11px] text-ink-3">{T('keys, variables y hosting', 'keys, variables and hosting')}</span>
                 ) : b.pane === 'app' ? (
@@ -560,6 +565,8 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
                 <AppRunner />
               ) : b.pane === 'cloud' ? (
                 <CloudPanel />
+              ) : b.pane === 'levels' ? (
+                <LevelsPanel />
               ) : b.pane === 'deploy' ? (
                 <ServicesDeploy onOpenSettings={() => { useArena.getState().set({ view: 'settings' }) }} />
               ) : b.pane === 'report' && b.auditReport ? (

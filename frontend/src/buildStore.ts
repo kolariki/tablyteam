@@ -1,4 +1,4 @@
-import type { CloudApp } from './lib/api'
+import type { CloudApp, LevelsInfo } from './lib/api'
 import { create } from 'zustand'
 
 export interface BuildFile {
@@ -125,7 +125,8 @@ interface BuildState {
   reviewMode: 'review' | 'audit'
   mode: 'build' | 'audit'
   auditReport: string | null
-  pane: 'code' | 'preview' | 'report' | 'deploy' | 'app' | 'versions' | 'design' | 'cloud'
+  pane: 'code' | 'preview' | 'report' | 'deploy' | 'app' | 'versions' | 'design' | 'cloud' | 'levels'
+  levels: LevelsInfo | null  // growth level of the project (ladder, next step's checks, %), from the snapshot and the levels endpoint
   fdePrefill: string | null  // open "Pedir un developer" with this text once the builder is shown
   paneOpen: boolean  // right drawer (code/preview/…) closed by default: the agent's work is the show
   deploying: boolean
@@ -199,6 +200,7 @@ const empty = {
   versions: [] as BuildVersion[],
   appRun: { status: 'idle', service: null as string | null, url: null as string | null, port: null as number | null, error: null as string | null, logs: [] as string[] },
   deploys: [] as { target: string; ok: boolean | null; url: string | null; error: string | null; ts: number }[],
+  levels: null as LevelsInfo | null,
   reviewMode: 'review' as const,
   mode: 'build' as const,
   auditReport: null,
@@ -263,7 +265,7 @@ export const useBuild = create<BuildState>((set, get) => ({
           ...(b.live ? { liveTurn: b.live.turn, livePhase: b.live.phase, liveRaw: b.live.raw, liveFile: liveFileFrom(b.live.raw) } : {}),
           team: b.team ?? s.team, reviews: b.reviews ?? s.reviews, reviewPlan: b.review_plan ?? null,
           liveReviews: b.live_reviews ?? {}, reviewRound: b.status === 'reviewing' ? (b.reviews?.length ?? 0) + 1 : null,
-          mode: b.mode ?? 'build', auditReport: b.audit_report ?? null, pane: b.audit_report && !s.auditReport ? 'report' : s.pane, deploys: b.deploys ?? s.deploys,
+          mode: b.mode ?? 'build', auditReport: b.audit_report ?? null, pane: b.audit_report && !s.auditReport ? 'report' : s.pane, deploys: b.deploys ?? s.deploys, levels: b.levels ?? s.levels,
         })
         break
       }

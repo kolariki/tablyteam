@@ -48,6 +48,7 @@ from .providers import PROVIDERS, CallResult, Cred, MockContext, stream
 from .local_engine import ENGINES, is_engine, run_engine, snapshot_dir, sync_files, workdir, USER_ENV, user_claude_env
 from .roles import role_of
 from . import research as rsch
+from . import levels as levelsmod
 
 log = logging.getLogger("arena.builder")
 
@@ -354,7 +355,32 @@ class Build:
             "team": [{k: a.get(k) for k in ("id", "name", "role", "provider", "model", "color", "skills")} | {"role_label": role_of(a.get("role"))["label"]} for a in self.team],
             "review_plan": self.review_plan, "reviews": self.reviews,
             "live_reviews": {k: "".join(v) for k, v in self.live_reviews.items()},
+            "levels": self.levels_eval(),
         }
+
+    # ------------------------------------------------------------- growth levels
+    def cloud_app(self) -> dict | None:
+        from . import cloud as cloudmod
+
+        try:
+            return cloudmod.get_app(self.user.id, self.id)
+        except Exception:  # noqa: BLE001
+            return None
+
+    def levels_eval(self) -> dict:
+        """The project's growth level (1 En línea → 4 Monetizado), the checks of the next level and the % towards it."""
+        try:
+            return levelsmod.evaluate(self, self.cloud_app())
+        except Exception as e:  # noqa: BLE001
+            log.warning("levels: %s", e)
+            return {"level": 0, "max": levelsmod.MAX_LEVEL, "next": 1, "pct": 0, "pending": [], "levels": [], "market_ready": False, "visits": 0}
+
+    def levels_block(self) -> str:
+        """The ladder and the pending checks of the level being climbed, for the builder and the council prompts."""
+        from . import cloud as cloudmod
+
+        app_ = self.cloud_app()
+        return levelsmod.team_block(self.levels_eval(), (app_ or {}).get("slug"), cloudmod.public_url())
 
     def snapshot_event(self) -> dict:
         return {"type": "build.snapshot", "seq": -1, "ts": time.time(), "build": self.snapshot()}
@@ -539,7 +565,7 @@ class Build:
             await self._run_engine(resume_with)
             return
         system = BUILDER_SYSTEM.format(language="español", quality_bar=quality_bar([a.get("role") for a in self.team] or None), design_rule=BUILDER_DESIGN_RULE + frontend_design_guide(5000) if self.design_html else "")
-        first = f"BRIEF.md:\n\n{self.brief}{research_context(self.research_md, bool(self.req.deep_analysis))}{design_context_for_builder(self.files)}{platform_note(self.req.platform)}\n\n---\nEmpezá por la Etapa 1 del plan. Entregá los archivos completos."
+        first = f"BRIEF.md:\n\n{self.brief}{research_context(self.research_md, bool(self.req.deep_analysis))}{design_context_for_builder(self.files)}{platform_note(self.req.platform)}{self.levels_block()}\n\n---\nEmpezá por la Etapa 1 del plan. Entregá los archivos completos."
         pending_user = resume_with or first
         if resume_with:
             self.preview_html = None  # changes invalidate the prototype; it is regenerated after the next <done>
@@ -706,7 +732,8 @@ class Build:
                       + (BUILDER_DESIGN_RULE if (self.workdir / "design" / "mockup.html").exists() else "")
                       + platform_note(self.req.platform)
                       + (self._build_ref_prompt() if (self.workdir / RESEARCH_PATH).exists() else "")
-                      + (REA_PROMPT if self.req.deep_analysis else ""))
+                      + (REA_PROMPT if self.req.deep_analysis else "")
+                      + self.levels_block())
         elif resume_with == CONTINUE:
             prompt = ("La construcción se interrumpió. Revisá el estado actual de este directorio frente a BRIEF.md, completá lo que falte del plan "
                       f"(y los archivos incompletos), regenerá `{PREVIEW_PATH}` si cambió algo visible, y resumí qué hiciste y cómo correrlo.")
@@ -1268,14 +1295,18 @@ class Build:
                       "de cambios que el constructor va a aplicar sobre este mismo código.")
         if prio:
             prior += f"\n\nPRIORIDADES DEL USUARIO PARA ESTA RONDA (tratarlas primero):\n{prio}"
+        lv = self.levels_eval()
+        level_items = [{"id": f"N{i + 1}", "text": c["label"], "who": c["who"]} for i, c in enumerate(lv.get("pending") or [])]
+        if not design_focus:
+            prior += self.levels_block()
         ref_names = ", ".join(r.replace("https://", "").replace("http://", "").strip("/") for r in self.req.references[:3]) if self.req.references else ""
         cfg = SessionConfig(
             topic=(f"Auditoría · ronda {rnd}: ¿qué hay que cambiar en {self.title} antes de salir a producción?" if audit else f"Revisión de diseño · ronda {rnd}: ¿las pantallas de {self.title} están al nivel de {ref_names or 'los referentes'}?" if design_focus else f"Revisión pre-producción · ronda {rnd}: ¿{self.title} está listo para salir?"),
             title=(f"Auditoría · {self.title} · ronda {rnd}" if audit else f"Consejo · {self.title} · ronda {rnd}") + (" · diseño" if design_focus else ""),
-            mode="review", agents=[{k: v for k, v in a.items() if k in ("id", "role", "name", "provider", "model", "persona", "wanted_provider", "skills")} for a in agents],
+            mode="review", agents=[{k: v for k, v in a.items() if k in ("id", "role", "name", "provider", "model", "persona", "wanted_provider", "skills") and v is not None} for a in agents],
             max_turns=min(60, max(4, 2 * len(agents))), min_turns=min(len(agents), 4), final_vote=False, closing_round=True, pace_ms=500, max_tokens=1600,
             auto_skills=True,  # the council picks catalog skills the review needs (per role, on top of the user's)
-            judge=agents[0]["id"], context=digest + prior, review_of={"build_id": self.id, "session_id": self.req.session_id, "title": self.title, "round": rnd, "version": len(self.versions), "prior_requests": prior_requests, "priorities": prio, "focus": focus},
+            judge=agents[0]["id"], context=digest + prior, review_of={"build_id": self.id, "session_id": self.req.session_id, "title": self.title, "round": rnd, "version": len(self.versions), "prior_requests": prior_requests, "priorities": prio, "focus": focus, "level": {"current": lv.get("level", 0), "next": lv.get("next"), "label": lv.get("next_label"), "pct": lv.get("pct"), "items": level_items if not design_focus else []}},
         )
         s = start_session(cfg, self.user, self.creds_all)
         self.council_sessions.append(s.id)
@@ -1309,6 +1340,7 @@ class Build:
         text = "CAMBIOS PEDIDOS POR EL CONSEJO DE REVISIÓN (ronda {r}):\n".format(r=len(self.council_sessions)) + "\n".join(
             f"- [{c.get('severity', 'mejora')}]{(' [' + c['role'] + ']') if c.get('role') else ''} {c['text']}" for c in changes if c.get("text"))
         text += "\n\nAplicá TODOS los cambios con archivos completos (respetando el estilo y la estructura existentes), primero los bloqueantes, actualizá README/NOTES si corresponde y, al terminar, emití <done>."
+        text += self.levels_block()
         if self.req.references and self.research_md:
             text += f"\n\nREFERENTES del usuario: {', '.join(self.req.references[:8])} (notas en {RESEARCH_PATH}). Los cambios de UI y flujo tienen que dejar el producto al nivel de esos referentes." + self._ref_note()
         self.status = "running"
@@ -1601,7 +1633,7 @@ def list_builds(user: User, session_id: str) -> list[dict]:
     for p in sorted(user_dir(user.id).glob(f"{session_id}.build.*.json"), reverse=True):
         try:
             d = json.loads(p.read_text())
-            out.append({k: d[k] for k in ("id", "provider", "model", "status", "turns", "cost_usd")} | {"fees_usd": d.get("fees_usd", 0), "build_seconds": d.get("build_seconds", 0), "files": len(d.get("files", {})), "engine_session": d.get("engine_session"), "workdir": d.get("workdir"), "stages": len(d.get("stages", [])), "version": len(d.get("versions", [])), "readiness": (d.get("versions") or [{}])[-1].get("readiness"), "pending_council": _pending_from_saved(d)})
+            out.append({k: d[k] for k in ("id", "provider", "model", "status", "turns", "cost_usd")} | {"fees_usd": d.get("fees_usd", 0), "build_seconds": d.get("build_seconds", 0), "level": (d.get("levels") or {}).get("level"), "level_pct": (d.get("levels") or {}).get("pct"), "level_next": (d.get("levels") or {}).get("next"), "files": len(d.get("files", {})), "engine_session": d.get("engine_session"), "workdir": d.get("workdir"), "stages": len(d.get("stages", [])), "version": len(d.get("versions", [])), "readiness": (d.get("versions") or [{}])[-1].get("readiness"), "pending_council": _pending_from_saved(d)})
         except Exception:
             continue
     return out

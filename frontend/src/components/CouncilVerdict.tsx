@@ -127,6 +127,19 @@ export default function CouncilVerdict() {
                 <>
                   {council.headline && <div className="serif text-[26px] leading-tight">{council.headline}</div>}
                   {council.why && <p className="mt-3 text-[14.5px] leading-relaxed text-ink">{council.why}</p>}
+                  {(council.level?.status?.length ?? 0) > 0 && (
+                    <div className="mt-4 rounded-xl border border-line bg-surface-2/60 px-4 py-3">
+                      <div className={`${label} text-ink-2`}>{T('Requisitos del nivel', 'Level requirements')} {council.level!.next} · {council.level!.label}</div>
+                      <ul className="mt-1.5 space-y-1">
+                        {council.level!.status.map((p) => (
+                          <li key={p.id} className="flex items-start gap-2 text-[13px]">
+                            {p.status === 'done' ? <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-ok" /> : <XCircle size={14} className={`${p.status === 'partial' ? 'text-gold' : 'text-danger'} mt-0.5 shrink-0`} />}
+                            <span><span className={p.status === 'done' ? 'text-ink-3 line-through' : 'text-ink'}>{p.text}</span>{p.note && <span className="ml-1.5 text-[11px] text-ink-3">· {p.note}</span>}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   {(council.priorities?.length ?? 0) > 0 && (
                     <div className="mt-4 rounded-xl border border-accent/30 bg-accent-soft/40 px-4 py-3">
                       <div className={`${label} text-accent`}>{T('Lo que vos pediste', 'What you asked for')}</div>

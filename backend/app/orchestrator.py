@@ -97,9 +97,12 @@ está listo para producción o no. Mantené la atribución del rol que lo pidió
 <changes>un ítem por línea, formato exacto `- [bloqueante|mejora] [ROL] qué cambiar y dónde`; primero los bloqueantes. Vacío si approve.</changes>
 <resolved>SOLO si hubo ítems pedidos en la ronda anterior: uno por línea, formato exacto `- [ID] done|partial|pending — evidencia en una frase`</resolved>
 <priorities>SOLO si el usuario dio prioridades: una línea por prioridad, formato exacto `- [P1] cumplida|parcial|pendiente — qué se hizo o qué falta`</priorities>
-IMPORTANTE: las prioridades del usuario que no estén cumplidas DEBEN aparecer también en <changes> como [bloqueante] [Usuario]. Nunca devuelvas <changes> vacío si algún rol pidió cambios."""
+<level>SOLO si hay REQUISITOS DEL NIVEL: una línea por requisito, formato exacto `- [N1] cumplido|parcial|pendiente — evidencia concreta (archivo, pantalla)`</level>
+IMPORTANTE: las prioridades del usuario que no estén cumplidas DEBEN aparecer también en <changes> como [bloqueante] [Usuario]. Los requisitos del nivel marcados [team] que no estén
+cumplidos DEBEN aparecer en <changes> como [bloqueante] [Nivel N]: el equipo sigue los niveles a rajatabla y no se aprueba un producto que no cumple el nivel que está escalando.
+Nunca devuelvas <changes> vacío si algún rol pidió cambios."""
 
-TAGS = ("thinking", "reflexion", "message", "stance", "confidence", "next", "reason", "vote", "headline", "why", "key_moment", "others", "verdict", "changes", "resolved", "priorities")
+TAGS = ("thinking", "reflexion", "message", "stance", "confidence", "next", "reason", "vote", "headline", "why", "key_moment", "others", "verdict", "changes", "resolved", "priorities", "level")
 
 
 def parse_tags(text: str) -> dict[str, str]:
@@ -296,6 +299,11 @@ class Session:
                          "No pidas ni menciones tests, CI, deploy, legales, rendimiento ni deuda técnica: están fuera de alcance en esta ronda.\n")
         if prio:
             role_txt += (f"PRIORIDADES DEL USUARIO PARA ESTA RONDA (tratalas PRIMERO, con detalle; recién después lo que vos consideres):\n{prio[:2000]}\n")
+        lvl = (self.config.review_of or {}).get("level") if review else None
+        if lvl and lvl.get("items"):
+            role_txt += (f"NIVELES DE CRECIMIENTO: el proyecto está en el nivel {lvl.get('current', 0)} y esta ronda trabaja para el nivel {lvl.get('next')} · {lvl.get('label')} ({lvl.get('pct', 0)}% cumplido). "
+                         "Los requisitos pendientes del nivel están en el contexto (PENDIENTE PARA SUBIR DE NIVEL): verificá cada uno de tu área en el proyecto entregado y, si no está cumplido, "
+                         "pedilo como [bloqueante] con archivo y pantalla. No se aprueba el producto sin cumplir el nivel; nada de otros niveles entra como bloqueante.\n")
         ids = ", ".join(a.id for a in others)
         protocol = (
             VOTE_PROTOCOL.format(ids=ids)
@@ -550,9 +558,12 @@ class Session:
                 system = self._system(agent).split("Respondé SIEMPRE con este formato")[0] + CLOSING_PROTOCOL.format(mandate=role["mandate"])
                 user = self._user(agent, None, None, vote=True) + f"\n\nRONDA DE CIERRE — entregá tus decisiones finales como {role['label']}."
             script = None
-            if self.config.mode == "review":  # mock/demo agents: a plausible verdict so the council has something to consolidate
-                script = (f"<reflexion>Revisé mi área.</reflexion><message>CAMBIOS\n- [bloqueante] Falta validación de entrada en el endpoint principal (revisar {role['label']}).\n"
-                          f"- [mejora] Documentar en README cómo correr los tests.</message><stance>propose</stance><confidence>78</confidence>")
+            if self.config.mode == "review":  # mock/demo agents: a plausible verdict so the council has something to consolidate; from round 2 on they approve (the demo can climb the levels)
+                if int((self.config.review_of or {}).get("round") or 1) >= 2:
+                    script = f"<reflexion>Los cambios de la ronda anterior están aplicados.</reflexion><message>APRUEBO\n</message><stance>agree</stance><confidence>86</confidence>"
+                else:
+                    script = (f"<reflexion>Revisé mi área.</reflexion><message>CAMBIOS\n- [bloqueante] Falta validación de entrada en el endpoint principal (revisar {role['label']}).\n"
+                              f"- [mejora] Documentar en README cómo correr los tests.</message><stance>propose</stance><confidence>78</confidence>")
             try:
                 text, native_reasoning, result = await self._call(agent, system, user, turn=turn, vote=False, mock_script=script, max_tokens=max(self.config.max_tokens * 3, 2500))  # closing decisions are long and structured: never cut them at the debate's per-turn budget
                 text, result = await self._finish_if_cut(agent, system, user, text, result, turn=turn)
@@ -678,9 +689,13 @@ class Session:
         prios = split_priorities((cfg.review_of or {}).get("priorities"))
         prio_txt = ("\n\nPRIORIDADES DEL USUARIO (decidí para cada una cumplida/parcial/pendiente; las no cumplidas van a <changes> como [bloqueante] [Usuario]):\n"
                     + "\n".join(f"- [P{i + 1}] {t}" for i, t in enumerate(prios))) if prios else ""
+        lvl = (cfg.review_of or {}).get("level") or {}
+        lv_items = [i for i in (lvl.get("items") or []) if isinstance(i, dict) and i.get("text")]
+        level_txt = (f"\n\nREQUISITOS DEL NIVEL {lvl.get('next')} · {lvl.get('label')} (decidí para cada uno cumplido/parcial/pendiente según el proyecto y los veredictos; los [team] no cumplidos van a <changes> como [bloqueante] [Nivel {lvl.get('next')}]):\n"
+                     + "\n".join(f"- [{i['id']}] [{i.get('who', 'team')}] {i['text']}" for i in lv_items)) if lv_items else ""
         focus_txt = ("\n\nENFOQUE DE LA RONDA: DISEÑO. Los <changes> son únicamente de UI/UX (layout, componentes, paleta, tipografía, estados, interacciones, responsive, pulido) con pantalla y archivo. "
                      "Descartá cualquier pedido de tests, CI, deploy, legales, rendimiento o deuda técnica aunque algún rol lo haya mencionado.") if (cfg.review_of or {}).get("focus") == "design" else ""
-        user = f"PROYECTO: {(cfg.review_of or {}).get('title') or cfg.topic}\n\nDEBATE DEL CONSEJO:\n{transcript}\n\nVEREDICTOS FINALES POR ROL:\n{verdicts}{prior_txt}{prio_txt}{focus_txt}"
+        user = f"PROYECTO: {(cfg.review_of or {}).get('title') or cfg.topic}\n\nDEBATE DEL CONSEJO:\n{transcript}\n\nVEREDICTOS FINALES POR ROL:\n{verdicts}{prior_txt}{prio_txt}{level_txt}{focus_txt}"
         system = COUNCIL_SYSTEM.format(model=judge.model, language=cfg.language)
         self.emit("judge.started", judge_id=judge.id, model=judge.model, provider=judge.provider)
         try:
@@ -713,11 +728,17 @@ class Session:
         for ps in prio_status:
             if ps["status"] != "done" and not any("(prioridad del usuario)" in c["text"] and ps["text"][:40].lower() in c["text"].lower() for c in changes):
                 changes.append({"severity": "bloqueante", "role": "Usuario", "text": f"(prioridad del usuario) {ps['text']}" + (f" — {ps['note']}" if ps.get("note") else "")})
+        # the growth level: every pending team requirement the council did not see fulfilled is a blocking change (the ladder is strict)
+        level_status = parse_resolved(p.get("level", "").replace("cumplido", "done").replace("cumplida", "done").replace("parcial", "partial").replace("pendiente", "pending"), lv_items) if lv_items else []
+        who = {i["id"]: i.get("who", "team") for i in lv_items}
+        for ls in level_status:
+            if ls["status"] != "done" and who.get(ls["id"]) == "team" and not any(f"(nivel {lvl.get('next')})" in c["text"].lower() and ls["text"][:40].lower() in c["text"].lower() for c in changes):
+                changes.append({"severity": "bloqueante", "role": f"Nivel {lvl.get('next')}", "text": f"(nivel {lvl.get('next')}) {ls['text']}" + (f" — {ls['note']}" if ls.get("note") else "")})
         approved = ("approve" in (p.get("verdict") or "").lower()) if p.get("verdict") else not any(c["severity"] == "bloqueante" for c in changes)
         if changes and any(c["severity"] == "bloqueante" for c in changes):
             approved = False  # a blocking item (incl. an unmet user priority) can never ship as "approved"
         resolved = parse_resolved(p.get("resolved", ""), prior) if prior else []
-        self.verdict = {"winner": None, "tally": {}, "council": {"approved": approved, "headline": p.get("headline", ""), "why": p.get("why", ""), "changes": changes, "resolved": resolved, "priorities": prio_status, "judge_id": judge.id, "model": judge.model}}
+        self.verdict = {"winner": None, "tally": {}, "council": {"approved": approved, "headline": p.get("headline", ""), "why": p.get("why", ""), "changes": changes, "resolved": resolved, "priorities": prio_status, "level": {**lvl, "status": level_status} if lv_items else None, "judge_id": judge.id, "model": judge.model}}
         self.emit("council.verdict", **self.verdict["council"], review_of=cfg.review_of)
         # score the version the council just looked at (readiness %, resolved items) on the build itself
         try:
@@ -737,6 +758,9 @@ class Session:
         pr = split_priorities((self.config.review_of or {}).get("priorities"))
         if pr:
             res_tag += "\n<priorities>\n" + "\n".join(f"- [P{i + 1}] {'cumplida' if i % 2 else 'pendiente'} — simulado" for i in range(len(pr))) + "\n</priorities>"
+        lv_items = ((self.config.review_of or {}).get("level") or {}).get("items") or []
+        if lv_items:
+            res_tag += "\n<level>\n" + "\n".join(f"- [{i['id']}] cumplido — simulado" for i in lv_items) + "\n</level>"
         if not items:
             return "<verdict>approve</verdict><headline>Listo para producción</headline><why>Nadie pidió cambios.</why><changes></changes>" + res_tag
         lines = "\n".join(f"- [{c['severity']}] [{c['role'] or 'Equipo'}] {c['text']}" for c in items[:8])

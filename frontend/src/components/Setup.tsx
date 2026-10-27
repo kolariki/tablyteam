@@ -1,7 +1,7 @@
 import { useArena } from '../store'
 import { useBuild, type Activity } from '../buildStore'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeftRight, Bookmark, Check, Eye, FolderOpen, Gavel, Globe, Loader2, LogOut, MonitorSmartphone, Play, Plus, Puzzle, Settings2, Smartphone, Trash2, Users, X, Zap } from 'lucide-react'
+import { ArrowLeftRight, Bookmark, Check, Eye, FolderOpen, Gavel, Globe, Loader2, LogOut, MonitorSmartphone, Play, Plus, Puzzle, Settings2, Smartphone, Store, Trash2, Users, X, Zap } from 'lucide-react'
 import { toast, useConfirm, usePrompt } from './Toast'
 import SkillPicker from './SkillPicker'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
@@ -507,8 +507,6 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
         <ArenaIntro
           team={introTeam(cfg.agents.map((a) => ({ ...a, roleLabel: roles.roles.find((r) => r.id === a.role)?.label })), (p) => providers.find((x) => x.id === p)?.label.split(' · ')[0] ?? p)}
           onDone={async () => {
-            // hackathon edition: the stage is the show; nothing starts, back to the setup
-            if (HACKATHON_MODE) { setLaunching(false); return }
             // the stage fades out → start the debate; if it cannot start (missing topic, API error…) come back to the setup
             setStarting(true)
             try {
@@ -542,6 +540,9 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
             <LangSwitch />
             <button onClick={onAudit} title={T('Subí un proyecto existente y el equipo lo revisa desde cada rol', 'Upload an existing project and the team reviews it from every role')} className="flex h-10 items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-md transition hover:brightness-110 hover:shadow-lg">
               <Gavel size={16} /> {T('Auditar un proyecto', 'Audit a project')}
+            </button>
+            <button onClick={() => useArena.getState().set({ view: 'market' })} title={T('Apps construidas con Tably en venta, con su nivel y sus visitas reales', 'Apps built with Tably for sale, with their level and real visits')} className="flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent">
+              <Store size={16} /> Marketplace
             </button>
             <button onClick={() => useArena.getState().set({ view: 'agents' })} title={T('Tus proyectos y conversaciones de Muse Code, tal como están en esta máquina', 'Your Muse Code projects and conversations, as they are on this machine')} className="flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white ring-1 ring-black/10"><ProviderLogo provider="meta" size={15} /></span> {T('Mis sesiones', 'My sessions')}
@@ -893,7 +894,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                 </button>
                 )}
                 {lane === 'team' && (
-                <button onClick={() => (HACKATHON_MODE ? setLaunching(true) : research(false))} disabled={busy || launching || directBusy || cfg.agents.length < 2} style={{ background }} className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-black/10 text-ink px-6 py-3.5 font-bold text-lg shadow-sm hover:scale-[1.02] transition disabled:opacity-50" title={order.join(' · ')}>
+                <button onClick={() => research(false)} disabled={busy || launching || directBusy || cfg.agents.length < 2} style={{ background }} className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-black/10 text-ink px-6 py-3.5 font-bold text-lg shadow-sm hover:scale-[1.02] transition disabled:opacity-50" title={order.join(' · ')}>
                   {/* launch: the play icon slides out to the right, then the logos follow one by one (each one shows up big on stage as it leaves) */}
                   <span className="flex items-center -space-x-1">
                     {order.map((p, i) => (

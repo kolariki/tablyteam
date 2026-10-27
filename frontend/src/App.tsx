@@ -20,6 +20,7 @@ import Verdict from './components/Verdict'
 import VideoExport, { type VideoOptions } from './components/VideoExport'
 import RunModal from './components/RunModal'
 import AgentSessions from './components/AgentSessions'
+import Marketplace from './components/Marketplace'
 import ResearchOverlay from './components/ResearchOverlay'
 import { api, auth, connect, connectBuild, replay } from './lib/api'
 import { tr, useT } from './lib/i18n'
@@ -259,7 +260,7 @@ function AppInner() {
     useBuild.getState().reset({
       id, sessionId, provider: d.provider, model: d.model, title: d.title, engineSession: d.engine_session ?? null, workdir: d.workdir ?? null, versions: d.versions ?? [], pendingCouncil: d.pending_council ?? null, status: d.status === 'running' || d.status === 'reviewing' ? 'connecting' : d.status, files, chat: d.chat, stages: d.stages, cost: d.cost_usd, buildSeconds: (d as { build_seconds?: number }).build_seconds ?? 0, tokens: d.tokens, done: d.done,
       selected: Object.keys(files)[0] ?? null, team: d.team ?? [], reviews: d.reviews ?? [], reviewPlan: d.review_plan ?? null, mode: d.mode ?? 'build', auditReport: d.audit_report ?? null,
-      previewHtml: d.file_contents?.['preview/index.html'] ?? null, designHtml: d.file_contents?.['design/mockup.html'] ?? d.design_html ?? null, pane: d.audit_report ? 'report' : 'code',
+      previewHtml: d.file_contents?.['preview/index.html'] ?? null, designHtml: d.file_contents?.['design/mockup.html'] ?? d.design_html ?? null, pane: d.audit_report ? 'report' : 'code', levels: d.levels ?? null,
     })
     if (show) st.set({ showBriefExport: false, view: 'builder' })
     buildWs.current?.()
@@ -512,6 +513,7 @@ function AppInner() {
   if (view === 'audit') return <>{banner}{demoLayer}<AuditSetup onBack={() => useArena.getState().set({ view: 'setup' })} onStart={startAudit} /></>
   if (view === 'settings') return <>{banner}{demoLayer}<Settings onBack={() => useArena.getState().set({ view: 'setup' })} /></>
   if (view === 'agents') return <>{banner}{demoLayer}<AgentSessions onBack={() => useArena.getState().set({ view: 'setup' })} /></>
+  if (view === 'market') return <>{banner}{demoLayer}<Marketplace onBack={() => useArena.getState().set({ view: 'setup' })} /></>
   if (view === 'setup') return <>{banner}{demoLayer}<Setup key={user.id} user={user} onLogout={logout} onSettings={() => useArena.getState().set({ view: 'settings' })} onAudit={() => useArena.getState().set({ view: 'audit' })} onStart={start} onDirect={direct} onReplay={startReplay} onOpen={(id, mode) => (mode === 'run' ? runApp(id) : openSaved(id, mode !== 'arena', mode === 'builder')).catch((e) => toast.error(tr('No se pudo abrir', 'Could not open'), (e as Error).message))} />{runOverlayLayer}</>
 
   const exporter = (

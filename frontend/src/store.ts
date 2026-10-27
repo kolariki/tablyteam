@@ -39,6 +39,7 @@ export interface CouncilVerdictData {
   why: string
   changes: { severity: 'bloqueante' | 'mejora'; role: string; text: string }[]
   priorities?: { id: string; text: string; status: string; note: string }[]
+  level?: { current: number; next: number | null; label: string | null; pct: number; status: { id: string; text: string; status: string; note: string }[] } | null
   judge_id: string
   model: string
 }
@@ -53,7 +54,7 @@ export interface Explanation {
 }
 
 interface ArenaState {
-  view: 'setup' | 'arena' | 'settings' | 'builder' | 'audit' | 'agents'
+  view: 'setup' | 'arena' | 'settings' | 'builder' | 'audit' | 'agents' | 'market'
   sessionId: string | null
   source: 'live' | 'replay'
   status: Status
@@ -228,7 +229,7 @@ export const useArena = create<ArenaState>((set, get) => ({
         set({ explanation: d as Explanation })
         break
       case 'council.verdict':
-        set({ council: { approved: !!d.approved, headline: d.headline ?? '', why: d.why ?? '', changes: d.changes ?? [], priorities: d.priorities ?? [], judge_id: d.judge_id, model: d.model }, verdict: { winner: null, tally: {} }, showVerdict: true, live: null })
+        set({ council: { approved: !!d.approved, headline: d.headline ?? '', why: d.why ?? '', changes: d.changes ?? [], priorities: d.priorities ?? [], level: d.level ?? null, judge_id: d.judge_id, model: d.model }, verdict: { winner: null, tally: {} }, showVerdict: true, live: null })
         break
       case 'session.completed':
         set({ status: (d.status as Status) ?? 'completed', stats: d.stats, endedAt: ev.ts, live: null })
