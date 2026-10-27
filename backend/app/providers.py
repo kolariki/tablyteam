@@ -54,9 +54,9 @@ class ProviderSpec:
 PROVIDERS: dict[str, ProviderSpec] = {
     p.id: p
     for p in [
+        ProviderSpec("meta", "Meta · Muse", "#0082FB", "META_API_KEY", "https://api.meta.ai/v1", "muse-spark-1.3"),
         ProviderSpec("anthropic", "Anthropic · Claude", "#C0603F", "ANTHROPIC_API_KEY", None, "claude-sonnet-5-5", "anthropic"),
         ProviderSpec("openai", "OpenAI · GPT", "#17896A", "OPENAI_API_KEY", None, "gpt-5-mini"),
-        ProviderSpec("meta", "Meta · Muse", "#0082FB", "META_API_KEY", "https://api.meta.ai/v1", "muse-spark-1.3"),
         ProviderSpec("deepseek", "DeepSeek", "#3D5CC4", "DEEPSEEK_API_KEY", "https://api.deepseek.com", "deepseek-chat"),
         ProviderSpec("gemini", "Google · Gemini", "#9A57B8", "GEMINI_API_KEY", "https://generativelanguage.googleapis.com/v1beta/openai/", "gemini-3.8-flash"),
         ProviderSpec("xai", "xAI · Grok", "#4B5157", "XAI_API_KEY", "https://api.x.ai/v1", "grok-4"),

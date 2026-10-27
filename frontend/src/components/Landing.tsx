@@ -16,7 +16,7 @@ import { brandTheme } from '../lib/brand'
  * so the animation is deterministic and loops cleanly.
  */
 /* ------------------------------------------------------------------ demo data: a weather app, from the idea to the built product */
-const PROVIDERS_ALL: [string, string][] = [['anthropic', 'Anthropic · Claude'], ['openai', 'OpenAI · GPT'], ['meta', 'Meta · Muse'], ['deepseek', 'DeepSeek'], ['gemini', 'Google · Gemini'], ['xai', 'xAI · Grok'], ['groq', 'Groq · Llama'], ['kimi', 'Moonshot · Kimi'], ['mistral', 'Mistral'], ['openrouter', 'OpenRouter · 300+ modelos'], ['ollama', 'Ollama · modelos locales']]
+const PROVIDERS_ALL: [string, string][] = [['meta', 'Meta · Muse'], ['anthropic', 'Anthropic · Claude'], ['openai', 'OpenAI · GPT'], ['deepseek', 'DeepSeek'], ['gemini', 'Google · Gemini'], ['xai', 'xAI · Grok'], ['groq', 'Groq · Llama'], ['kimi', 'Moonshot · Kimi'], ['mistral', 'Mistral'], ['openrouter', 'OpenRouter · 300+ modelos'], ['ollama', 'Ollama · modelos locales']]
 const IDEA = 'Una app del clima para Argentina que me diga si llevo paraguas, con alertas oficiales y pronóstico por horas.'
 const IDEA_EN = 'A weather app for Argentina that tells me whether to take an umbrella, with official alerts and an hourly forecast.'
 const QUESTIONS: [string, string][] = [
@@ -32,12 +32,12 @@ const BRIEF_LINES: [string, string][] = [
 ]
 type Member = { id: string; name: string; name_en: string; role: string; role_en: string; provider: string; model: string; color: string; persona: string; persona_en: string; skills: string[] }
 const TEAM: Member[] = [
-  { id: 'ceo', name: 'CEO', name_en: 'CEO', role: 'Dirección', role_en: 'Leadership', provider: 'anthropic', model: 'claude-opus-5-5', color: '#C0603F', persona: 'visionario pero concreto', persona_en: 'visionary but concrete' , skills: ['pitch', 'alcance MVP'] },
-  { id: 'cto', name: 'CTO', name_en: 'CTO', role: 'Dirección', role_en: 'Leadership', provider: 'openai', model: 'gpt-5.6', color: '#17896A', persona: 'escéptico del hype', persona_en: 'hype sceptic' , skills: ['stack review', 'costos'] },
-  { id: 'eng', name: 'Head of Eng', name_en: 'Head of Eng', role: 'Ingeniería', role_en: 'Engineering', provider: 'gemini', model: 'gemini-3.8-pro', color: '#3D5CC4', persona: 'veinte años de cicatrices', persona_en: 'twenty years of scars' , skills: ['arquitectura', 'CI/CD'] },
-  { id: 'product', name: 'Product', name_en: 'Product', role: 'Producto', role_en: 'Product', provider: 'deepseek', model: 'deepseek-v4', color: '#AD7D1A', persona: 'historias claras, prioriza', persona_en: 'clear stories, prioritises' , skills: ['user stories', 'priorización'] },
-  { id: 'design', name: 'Diseño', name_en: 'Design', role: 'Diseño', role_en: 'Design', provider: 'anthropic', model: 'claude-opus-5-5', color: '#9A57B8', persona: 'flujos simples, pantallas precisas', persona_en: 'simple flows, precise screens' , skills: ['frontend-design', 'UX audit'] },
-  { id: 'qa', name: 'QA', name_en: 'QA', role: 'Calidad', role_en: 'Quality', provider: 'openai', model: 'gpt-5.6', color: '#6E8226', persona: 'busca cómo se rompe todo', persona_en: 'finds how everything breaks' , skills: ['test plan', 'e2e'] },
+  { id: 'ceo', name: 'CEO', name_en: 'CEO', role: 'Dirección', role_en: 'Leadership', provider: 'meta', model: 'muse-wonder-1.0', color: '#C0603F', persona: 'visionario pero concreto', persona_en: 'visionary but concrete' , skills: ['pitch', 'alcance MVP'] },
+  { id: 'cto', name: 'CTO', name_en: 'CTO', role: 'Dirección', role_en: 'Leadership', provider: 'meta', model: 'muse-spark-1.3', color: '#17896A', persona: 'escéptico del hype', persona_en: 'hype sceptic' , skills: ['stack review', 'costos'] },
+  { id: 'eng', name: 'Head of Eng', name_en: 'Head of Eng', role: 'Ingeniería', role_en: 'Engineering', provider: 'meta', model: 'muse-wonder-1.0', color: '#3D5CC4', persona: 'veinte años de cicatrices', persona_en: 'twenty years of scars' , skills: ['arquitectura', 'CI/CD'] },
+  { id: 'product', name: 'Product', name_en: 'Product', role: 'Producto', role_en: 'Product', provider: 'meta', model: 'muse-spark-1.3', color: '#AD7D1A', persona: 'historias claras, prioriza', persona_en: 'clear stories, prioritises' , skills: ['user stories', 'priorización'] },
+  { id: 'design', name: 'Diseño', name_en: 'Design', role: 'Diseño', role_en: 'Design', provider: 'meta', model: 'muse-spark-1.3', color: '#9A57B8', persona: 'flujos simples, pantallas precisas', persona_en: 'simple flows, precise screens' , skills: ['frontend-design', 'UX audit'] },
+  { id: 'qa', name: 'QA', name_en: 'QA', role: 'Calidad', role_en: 'Quality', provider: 'meta', model: 'muse-spark-1.3', color: '#6E8226', persona: 'busca cómo se rompe todo', persona_en: 'finds how everything breaks' , skills: ['test plan', 'e2e'] },
 ]
 const ARENA = TEAM.slice(0, 4)
 const MEMBER = Object.fromEntries(TEAM.map((m) => [m.id, m])) as Record<string, Member>
@@ -49,10 +49,10 @@ const TURNS = [
   { from: 'product', to: 'ceo', text: 'Ciudad, hoy por horas, 7 días y alertas. Radar y widgets, etapa 2.', text_en: 'City, hourly today, 7 days and alerts. Radar and widgets, phase 2.', stance: '⚔️ discrepa', stance_en: '⚔️ disagrees', reason: 'que confirme el nombre', reason_en: 'let him confirm the name' },
 ]
 const BUILD_STEPS: { key: string; label: string; label_en: string; detail: string; detail_en: string }[] = [
-  { key: 'research', label: 'Benchmark de referentes', label_en: 'Reference benchmark', detail: '3 apps visitadas · capturas · qué emular y qué evitar', detail_en: '3 apps visited · screenshots · what to emulate and avoid' },
+  { key: 'research', label: 'Benchmark de referentes', label_en: 'Reference benchmark', detail: '3 apps visitadas · capturas segmentadas con SAM 3.1 · qué emular', detail_en: '3 apps visited · screenshots segmented with SAM 3.1 · what to emulate' },
   { key: 'deep', label: 'Ingeniería inversa (REA)', label_en: 'Reverse engineering (REA)', detail: 'bundles, rutas y API de los referentes', detail_en: 'the references’ bundles, routes and API' },
-  { key: 'design', label: 'Diseño UX/UI', label_en: 'UX/UI design', detail: 'sistema · 3 pantallas · mockup aprobado por vos', detail_en: 'system · 3 screens · mockup approved by you' },
-  { key: 'build', label: 'Construcción · Claude Code', label_en: 'Build · Claude Code', detail: 'app/page.tsx · lib/weather.ts · Umbrella.tsx…', detail_en: 'app/page.tsx · lib/weather.ts · Umbrella.tsx…' },
+  { key: 'design', label: 'Diseño UX/UI', label_en: 'UX/UI design', detail: 'sistema · 3 pantallas · mockup con Muse Image, aprobado por vos', detail_en: 'system · 3 screens · Muse Image mockup, approved by you' },
+  { key: 'build', label: 'Construcción · Muse Code', label_en: 'Build · Muse Code', detail: 'app/page.tsx · lib/weather.ts · Umbrella.tsx…', detail_en: 'app/page.tsx · lib/weather.ts · Umbrella.tsx…' },
   { key: 'polish', label: 'Pulido visual', label_en: 'Visual polish', detail: 'la UI iguala el mockup', detail_en: 'the UI matches the mockup' },
   { key: 'review', label: 'Revisión del consejo', label_en: 'Council review', detail: 'v1 · 100 % listo para producción', detail_en: 'v1 · 100 % production-ready' },
 ]
@@ -119,6 +119,7 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
       <header className="sticky top-0 z-20 flex items-center gap-3 px-6 h-14 border-b border-line bg-paper/80 backdrop-blur">
         <img data-brand-icon src="/icon.svg" alt="" aria-hidden className="h-7 w-7 rounded-lg shadow-sm" draggable={false} />
         <span className="serif text-lg"><span data-brand-text>Tably</span> <em data-brand-text className="text-accent">Team</em></span>
+        <MuseBadge className="ml-1 hidden sm:inline-flex" />
         <div className="ml-auto flex items-center gap-2">
           <LangSwitch className="mr-1" />
           <a href={`${prefix}/blog`} className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-2 hover:text-ink sm:inline">{T('Blog', 'Blog')}</a>
@@ -139,12 +140,12 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
           <span data-fuse-spark className="absolute left-0 top-0 h-3.5 w-3.5 rounded-full bg-accent opacity-0" style={{ boxShadow: '0 0 20px 8px rgba(47,107,93,.65)' }} />
         </div>
         <div>
-          <div data-hero-kicker className="text-xs uppercase tracking-[0.5em] text-accent">{T('tu equipo que diseña y construye', 'your team that designs and builds')}</div>
+          <div data-hero-kicker className="text-xs uppercase tracking-[0.5em] text-accent">{T('tu equipo que diseña y construye · powered by Muse', 'your team that designs and builds · powered by Muse')}</div>
           <h1 key={lang} data-hero-title className="mt-3 text-6xl md:text-7xl leading-[0.95] tracking-tight opacity-0">
             {T('Escribí tu idea.', 'Write your idea.')} <em data-hero-word className="text-accent">Tably</em> {T('la construye.', 'builds it.')}
           </h1>
           <p data-hero-copy className="mt-5 text-lg text-ink-2 leading-relaxed max-w-lg">
-            {T('Describís la app que querés y elegís qué IA ocupa cada rol: CEO, CTO, ingeniería, producto, diseño y QA. El equipo debate tu idea, estudia apps de referencia, diseña las pantallas, escribe el código y lo revisa antes de entregarte un producto listo para correr. Vos aprobás cada paso.', 'Describe the app you want and choose which AI takes each role: CEO, CTO, engineering, product, design and QA. The team debates your idea, studies reference apps, designs the screens, writes the code and reviews it before handing you a product ready to run. You approve every step.')}
+            {T('Describís la app que querés y Muse, el modelo de Meta, ocupa cada rol: CEO, CTO, ingeniería, producto, diseño y QA. El equipo debate tu idea, estudia apps de referencia, diseña las pantallas, escribe el código con Muse Code y lo revisa antes de entregarte un producto listo para correr. Vos aprobás cada paso.', 'Describe the app you want and Muse, Meta\'s model, takes every role: CEO, CTO, engineering, product, design and QA. The team debates your idea, studies reference apps, designs the screens, writes the code with Muse Code and reviews it before handing you a product ready to run. You approve every step.')}
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <button data-hero-cta onClick={onSignup} className="flex items-center gap-2 rounded-2xl bg-accent text-white px-6 py-3.5 font-semibold text-lg hover:brightness-110 transition">
@@ -165,9 +166,9 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
       {/* features */}
       <section className="max-w-[1400px] mx-auto px-6 pb-20 grid md:grid-cols-3 gap-5">
         {[
-          { title: T('Un equipo completo', 'A full team'), text: T('CEO, CTO, Head of Engineering, Product, Diseño y QA, cada uno con una IA distinta, con su rol, su prompt y sus skills. Debaten tu idea, se contradicen, votan y cierran decisiones con un responsable por cada paso.', 'CEO, CTO, Head of Engineering, Product, Design and QA, each on a different AI, with their role, prompt and skills. They debate your idea, push back on each other, vote and close decisions with an owner for every step.') },
-          { title: T('Diseñan y construyen', 'They design and build'), text: T('El equipo estudia apps de referencia, el diseñador entrega sistema, pantallas y mockup, y recién cuando lo aprobás el constructor escribe el código con Claude Code o Codex, al nivel de un producto profesional.', 'The team studies reference apps, the designer delivers system, screens and mockup, and only once you approve it does the builder write the code with Claude Code or Codex, at the level of a professional product.') },
-          { title: T('Vos decidís, ellos iteran', 'You decide, they iterate'), text: T('Pedís cambios en el diseño o en el código, el consejo revisa cada versión antes de producción y vuelve a debatir si hace falta. Todo con costo, tokens y confianza por agente, y tus API keys cifradas y solo tuyas.', 'You ask for changes in the design or the code, the council reviews every version before production and debates again if needed. All with cost, tokens and confidence per agent, and your API keys encrypted and yours alone.') },
+          { title: T('Un equipo completo, con Muse', 'A full team, on Muse'), text: T('CEO, CTO, Head of Engineering, Product, Diseño y QA, cada uno con Muse Spark o Muse Wonder, su rol, su prompt y sus skills. Debaten tu idea, se contradicen, votan y cierran decisiones con un responsable por cada paso.', 'CEO, CTO, Head of Engineering, Product, Design and QA, each on Muse Spark or Muse Wonder, with their role, prompt and skills. They debate your idea, disagree, vote and close decisions with an owner for every step.') },
+          { title: T('Diseñan y construyen', 'They design and build'), text: T('El equipo estudia apps de referencia (SAM 3.1 segmenta cada pantalla en componentes), el diseñador entrega sistema, pantallas y un mockup hecho con Muse Image, y recién cuando lo aprobás Muse Code escribe el código, al nivel de un producto profesional.', 'The team studies reference apps (SAM 3.1 segments every screen into components), the designer delivers system, screens and a Muse Image mockup, and only once you approve does Muse Code write the code, at the level of a professional product.') },
+          { title: T('Vos decidís, ellos iteran', 'You decide, they iterate'), text: T('Pedís cambios en el diseño o en el código, el consejo revisa cada versión antes de producción y vuelve a debatir si hace falta. Publicás con un clic y el equipo te lleva nivel por nivel: analítica, buscadores, cobros, y la app lista para venderse.', 'Ask for changes in the design or the code, the council reviews every version before production and debates again if needed. Publish in one click and the team takes you level by level: analytics, search engines, payments, and an app ready to sell.') },
         ].map((f) => (
           <div key={f.title} data-scroll-reveal className="panel rounded-2xl p-6">
             <h3 className="text-2xl">{f.title}</h3>
@@ -181,6 +182,16 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
       </div>
       <MadeWith />
     </div>
+  )
+}
+
+/** The "powered by Muse" seal: Meta's model behind every role. */
+export function MuseBadge({ className = '' }: { className?: string }) {
+  return (
+    <span className={`items-center gap-1.5 rounded-full border border-[#BBD5FA] bg-[#EEF5FF] py-1 pl-1.5 pr-2.5 text-[11px] font-semibold text-[#0B2E66] ${className}`}>
+      <img src="/logos/meta.png" alt="" aria-hidden className="h-4 w-4" draggable={false} />
+      powered by <span className="font-bold">Muse</span>
+    </span>
   )
 }
 

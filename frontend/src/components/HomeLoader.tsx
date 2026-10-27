@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { useT } from '../lib/i18n'
 import ProviderLogo from './ProviderLogo'
 
-const RING = ['anthropic', 'openai', 'meta', 'deepseek', 'gemini', 'xai', 'groq', 'kimi', 'mistral', 'openrouter', 'ollama']
+const RING = ['meta', 'anthropic', 'openai', 'deepseek', 'gemini', 'xai', 'groq', 'kimi', 'mistral', 'openrouter', 'ollama']
 
 /** The Tably mark with the companies orbiting around it: the loader of the home and of any panel that is working. */
 export function Orbit({ size = 92, logo = 80 }: { size?: number; logo?: number }) {

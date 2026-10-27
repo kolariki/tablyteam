@@ -23,13 +23,13 @@ from .providers import PROVIDERS
 def _brand(provider: str | None) -> tuple[str, str]:
     """(logo path, brand color) for the AI an article is about."""
     spec = PROVIDERS.get(provider or "")
-    ext = "svg" if provider in ("meta", "github", "cloudflare") else "png"
+    ext = "svg" if provider in ("github", "cloudflare") else "png"
     return (f"/logos/{provider}.{ext}", spec.color if spec else "#2F6B5D") if provider else ("", "#2F6B5D")
 
 CONTENT_DIR = Path(env("ARENA_CONTENT_DIR", str(Path(__file__).resolve().parents[1] / "content")))
 SITE_URL = (env("ARENA_PUBLIC_URL", "https://tablyteam.com") or "https://tablyteam.com").rstrip("/")
 SITE_NAME = "Tably Team"
-SITE_TAGLINE = "Tu equipo de IA que diseña y construye apps"
+SITE_TAGLINE = "Tu equipo de IA que diseña y construye apps, powered by Muse"
 SITE_DESCRIPTION = ("Tably Team arma un equipo de inteligencias artificiales (CEO, CTO, ingeniería, producto, diseño y QA) que debate tu idea, "
                     "estudia apps de referencia, diseña las pantallas, escribe el código y lo revisa antes de entregarte una app lista para correr.")
 
@@ -318,7 +318,7 @@ UI = {
            "min": "min read", "by": "by the team at", "updated": "updated", "all_sections": "← All sections", "topic": "Topic", "in_article": "In this article",
            "share": "Share", "more": "Keep reading", "cta_title": "Try Tably Team with your idea", "cta_text": "Describe what you want to build and watch the team debate it, design it and build it.",
            "cta_btn": "Create a free account", "product": "Product", "resources": "Resources", "legal": "AI provider trademarks belong to their owners.",
-           "footer_text": "An AI team with roles that debates your idea, designs it, builds it and reviews it. You approve every step.", "tagline": "Your AI team that designs and builds apps",
+           "footer_text": "An AI team with roles that debates your idea, designs it, builds it and reviews it. You approve every step.", "tagline": "Your AI team that designs and builds apps, powered by Muse",
            "blog_title": "Blog: guides on AI for building apps", "blog_desc": "In-depth guides on Claude, GPT, Gemini, DeepSeek, Grok, Llama, Kimi, Mistral and more: what each one is good for, how to pick one per role and how Tably Team builds apps with them.",
            "blog_h1": "Guides to building apps with an AI team", "blog_lede": "What each AI does well, how to pick one for each role, what building an app costs and how Tably Team works inside. Written by the team that builds it.",
            "faq_title": "Frequently asked questions", "faq_desc": "Straight answers about Tably Team: what it is, what it costs, which AI fits each role, how the app gets published, where your code lives and how your API keys are protected.",

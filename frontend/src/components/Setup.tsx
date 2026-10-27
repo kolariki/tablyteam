@@ -10,6 +10,7 @@ import { fmtUsd } from '../lib/parse'
 import Dashboard from './Dashboard'
 import HomeLoader from './HomeLoader'
 import LaneCards from './LaneCards'
+import { MuseBadge } from './Landing'
 import { readCache, writeCache } from '../lib/cache'
 import ModelSelect, { invalidateModels } from './ModelSelect'
 import ArenaIntro, { ICON_STEP, PLAY_OUT, iconExitAt, introTeam } from './ArenaIntro'
@@ -412,6 +413,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
           <span className="flex items-center gap-2.5">
             <img src="/icon.svg" alt="" aria-hidden className="h-9 w-9 rounded-xl shadow-sm" draggable={false} />
             <span className="serif text-xl">Tably <em className="text-accent">Team</em></span>
+            <MuseBadge className="ml-2 hidden md:inline-flex" />
           </span>
           <div className="ml-auto flex items-center gap-2">
             <LangSwitch />

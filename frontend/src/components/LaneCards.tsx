@@ -25,10 +25,10 @@ const TIMING: Record<Lane, { at: Record<string, number>; loop: number }> = {
 }
 
 const TEAM = [
-  { name: 'CEO', role: 'ceo', provider: 'anthropic' },
-  { name: 'CTO', role: 'cto', provider: 'openai' },
-  { name: 'Diseño', role: 'product-designer', provider: 'gemini' },
-  { name: 'QA', role: 'qa', provider: 'anthropic' },
+  { name: 'CEO', role: 'ceo', provider: 'meta' },
+  { name: 'CTO', role: 'cto', provider: 'meta' },
+  { name: 'Diseño', role: 'product-designer', provider: 'meta' },
+  { name: 'QA', role: 'qa', provider: 'meta' },
 ]
 
 type R = { x: number; y: number; w: number; h: number }

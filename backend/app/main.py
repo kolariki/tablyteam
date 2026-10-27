@@ -853,7 +853,7 @@ async def create_direct_build(body: dict, user: User = CurrentUser):
     eff = keystore.creds(user.id)
     bp, bm = (provider, model) if (not is_engine(provider) and eff.get(provider) and eff[provider].source != "none") else (None, None)
     if not bp:
-        for pid in ("anthropic", "meta", "openai", "gemini", "deepseek", "xai", "groq", "mistral", "openrouter", "kimi", "ollama"):
+        for pid in ("meta", "anthropic", "openai", "gemini", "deepseek", "xai", "groq", "mistral", "openrouter", "kimi", "ollama"):
             c = eff.get(pid)
             if c and c.source != "none":
                 bp, bm = pid, c.model or PROVIDERS[pid].default_model

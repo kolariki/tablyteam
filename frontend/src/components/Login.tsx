@@ -5,6 +5,7 @@ import { api, auth, type User } from '../lib/api'
 import TeamBackdrop from './TeamBackdrop'
 import { useT } from '../lib/i18n'
 import LangSwitch from './LangSwitch'
+import { MuseBadge } from './Landing'
 import LogoMarquee from './LogoMarquee'
 import { MadeWith } from './Landing'
 import ProviderRow from './ProviderRow'
@@ -118,8 +119,9 @@ export default function Login({ onAuthed, onBack, initialMode = 'login' }: { onA
           <h1 className="mt-2 text-6xl md:text-7xl tracking-tight">
             Tably <em className="text-accent">Team</em>
           </h1>
+          <MuseBadge className="mt-3 inline-flex" />
           <p className="mt-4 text-ink-2 text-lg leading-relaxed max-w-md">
-            {T('Escribí tu idea, elegí qué IA ocupa cada rol y el equipo la debate, la diseña, la construye y la revisa. Vos aprobás cada paso.', 'Write your idea, choose which AI takes each role, and the team debates it, designs it, builds it and reviews it. You approve every step.')}
+            {T('Escribí tu idea y Muse, el modelo de Meta, ocupa cada rol: el equipo la debate, la diseña, la construye y la revisa. Vos aprobás cada paso.', 'Write your idea and Muse, Meta\'s model, takes every role: the team debates it, designs it, builds it and reviews it. You approve every step.')}
           </p>
           {/* every company the app can seat at the table: hover lifts, click opens a note */}
           <ProviderRow className="mt-6" />
