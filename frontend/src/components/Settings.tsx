@@ -63,7 +63,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
                   ))}
                 </span>
               ) : <span className="ml-1.5 h-2 w-2 rounded-full bg-ok" />}
-              {ready} {T('de', 'of')} {items.length} {T('proveedores listos', 'providers ready')}
+              {MUSE_ONLY ? (items.find((p) => p.id === 'meta')?.configured ? T('Muse conectado', 'Muse connected') : T('Muse sin conectar', 'Muse not connected')) : <>{ready} {T('de', 'of')} {items.length} {T('proveedores listos', 'providers ready')}</>}
             </span>
           }
         />
