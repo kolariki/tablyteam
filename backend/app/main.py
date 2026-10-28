@@ -295,6 +295,7 @@ class IntakeRun(BaseModel):
     provider: str = "mock"
     model: str = "mock-1"
     extra: str = ""  # "add this too" after a prompt was generated
+    language: str = ""  # "es" | "en" (the UI language): the analysis, the questions and the prompt come out in it
 
 
 class IntakeAnswers(BaseModel):
@@ -401,6 +402,7 @@ class RolePromptsBody(BaseModel):
     agents: list[dict]  # [{id, name, role, label, mandate, persona}]
     provider: str = "mock"
     model: str = "mock-1"
+    language: str = ""  # "es" | "en"
 
 
 @app.post("/api/intake/{intake_id}/role-prompts")
@@ -413,7 +415,7 @@ async def intake_role_prompts(intake_id: str, body: RolePromptsBody, user: User 
     if PROVIDERS[body.provider].kind != "mock" and body.provider not in eff:
         raise HTTPException(400, f"{PROVIDERS[body.provider].label}: sin API key")
     try:
-        prompts = await it.role_prompts(body.agents[:8], body.provider, body.model, eff.get(body.provider))
+        prompts = await it.role_prompts(body.agents[:8], body.provider, body.model, eff.get(body.provider), language=body.language or None)
     except (ValueError, json.JSONDecodeError) as e:
         raise HTTPException(400, str(e))
     return {"prompts": prompts, "cost_usd": round(it.cost_usd, 4)}
@@ -430,7 +432,7 @@ async def intake_run(intake_id: str, body: IntakeRun, user: User = CurrentUser):
     if PROVIDERS[body.provider].kind != "mock" and body.provider not in eff:
         raise HTTPException(400, f"{PROVIDERS[body.provider].label}: sin API key")
     try:
-        it.start(body.text, body.provider, body.model, eff.get(body.provider), extra=body.extra)
+        it.start(body.text, body.provider, body.model, eff.get(body.provider), extra=body.extra, language=body.language or None)
     except ValueError as e:
         raise HTTPException(409, str(e))
     return it.snapshot()
@@ -891,7 +893,7 @@ async def create_direct_build(body: dict, user: User = CurrentUser):
         if not cred or cred.source == "none":
             raise HTTPException(400, f"Falta la API key de {provider}")
     req = BuildRequest(session_id=sid, provider=provider, model=model or (cred.model or ""), target=target, review_rounds=0, council=True, design=bool(body.get("design", True)),
-                       design_review=False, research=bool(refs), references=refs, deep_analysis=bool(body.get("deep_analysis")), platform=config["platform"])
+                       design_review=False, research=bool(refs), references=refs, deep_analysis=bool(body.get("deep_analysis")), platform=config["platform"], language=config.get("language") or "español rioplatense")
     b = start_build(user, req, cred, brief, title, agents, eff)
     b.chat.insert(0, {"role": "system", "text": "Vía rápida: brief escrito desde tu pedido (sin consejo) y construcción directa.", "ts": _t.time()})
     return {"session_id": sid, "id": b.id, "brief_by": f"{bp} · {bm}"}
@@ -976,6 +978,7 @@ async def create_build(req: BuildRequest, user: User = CurrentUser):
     title = data["config"].get("title") or data["config"]["topic"][:60]
     if req.platform == "web":  # the request rarely says it: the session config decides (web / mobile / both)
         req.platform = data["config"].get("platform") or "web"
+    req.language = data["config"].get("language") or req.language
     b = start_build(user, req, cred, brief, title, data["config"].get("agents", []), keystore.creds(user.id))
     return {"id": b.id}
 
@@ -1028,6 +1031,7 @@ async def create_audit(
     provider: str = Form("mock"),
     model: str = Form("mock-1"),
     auto_skills: str = Form("false"),
+    language: str = Form("español"),
     user: User = CurrentUser,
 ):
     """Upload a project (.zip) and have the team audit it. Creates a lightweight session + an audit build."""
@@ -1086,14 +1090,14 @@ async def create_audit(
     # a session record so the audit lives next to normal sessions (history, builds folder, exports)
     sid = _t.strftime("%Y%m%d-%H%M%S-") + __import__("uuid").uuid4().hex[:6]
     config = {"topic": f"Auditoría de «{title}»: {description.strip()[:500]}", "title": f"Auditoría · {title}", "mode": "audit", "agents": agents,
-              "max_turns": 0, "min_turns": 0, "language": "español", "final_vote": False, "closing_round": False, "max_tokens": 0, "pace_ms": 0}
+              "max_turns": 0, "min_turns": 0, "language": language or "español", "final_vote": False, "closing_round": False, "max_tokens": 0, "pace_ms": 0}
     (user_dir(user.id) / f"{sid}.json").write_text(json.dumps({"id": sid, "owner": user.id, "status": "audit", "config": config, "events": [
         {"type": "session.started", "seq": 0, "ts": _t.time(), "session_id": sid, "config": config, "providers": {}, "langfuse_url": None},
         {"type": "session.completed", "seq": 1, "ts": _t.time(), "status": "audit", "stats": {"agents": {}, "turns": 0, "total_cost_usd": 0, "total_tokens": 0, "disagreement_rate": 0, "verdict": None}},
     ]}, ensure_ascii=False))
     tree = "\n".join(f"- {p} ({c.count(chr(10)) + 1} líneas)" for p, c in sorted(files.items()))
     brief = f"# Auditoría de {title}\n\n{description.strip() or '(sin descripción)'}\n\n## Árbol del proyecto ({len(files)} archivos)\n{tree}\n"
-    b = Build(user, BuildRequest(session_id=sid, provider=provider, model=model), cred, brief, title, agents, keystore.creds(user.id))
+    b = Build(user, BuildRequest(session_id=sid, provider=provider, model=model, language=language or "español"), cred, brief, title, agents, keystore.creds(user.id))
     b.context = description.strip()
     b.files = files
     if b.workdir:  # local engine: materialise the project on disk so the CLI can read it

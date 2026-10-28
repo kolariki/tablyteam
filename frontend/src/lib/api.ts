@@ -1,3 +1,4 @@
+import { getLang } from './i18n'
 import type { AgentConfig, ArenaEvent, Preset, Provider, Role, SessionConfig, SessionSummary } from '../types'
 
 const TOKEN_KEY = 'arena.token'
@@ -647,8 +648,8 @@ export const intake = {
   pick: (id: string, kind: 'folder' | 'files') => j<IntakeState & { added: number; cancelled: boolean; errors?: string[] }>(post(`/api/intake/${id}/pick`, { kind })),
   addPath: (id: string, path: string) => j<IntakeState & { added: number }>(post(`/api/intake/${id}/path`, { path })),
   remove: (id: string, attId: string) => j<IntakeState>(authed(`/api/intake/${id}/files/${attId}`, { method: 'DELETE' })),
-  run: (id: string, text: string, provider: string, model: string, extra = '') => j<IntakeState>(post(`/api/intake/${id}/run`, { text, provider, model, extra })),
-  rolePrompts: (id: string, agents: { id: string; name: string; role?: string | null; label?: string; mandate?: string; persona?: string }[], provider: string, model: string) => j<{ prompts: Record<string, string>; cost_usd: number }>(post(`/api/intake/${id}/role-prompts`, { agents, provider, model })),
+  run: (id: string, text: string, provider: string, model: string, extra = '') => j<IntakeState>(post(`/api/intake/${id}/run`, { text, provider, model, extra, language: getLang() })),
+  rolePrompts: (id: string, agents: { id: string; name: string; role?: string | null; label?: string; mandate?: string; persona?: string }[], provider: string, model: string) => j<{ prompts: Record<string, string>; cost_usd: number }>(post(`/api/intake/${id}/role-prompts`, { agents, provider, model, language: getLang() })),
   answer: (id: string, answers: Record<string, string>) => j<IntakeState>(post(`/api/intake/${id}/answer`, { answers })),
   cancel: (id: string) => j<IntakeState>(authed(`/api/intake/${id}/cancel`, { method: 'POST' })),
   connect: (id: string, onEvent: (e: Record<string, any>) => void, onClose: () => void): (() => void) => {

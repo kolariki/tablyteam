@@ -140,6 +140,7 @@ export default function AuditSetup({ onBack, onStart }: Props) {
     fd.append('provider', provider)
     fd.append('model', model)
     fd.append('auto_skills', String(autoSkills))
+    fd.append('language', lang === 'en' ? 'English' : 'español rioplatense')
     try {
       await onStart(fd)
     } catch (e) {

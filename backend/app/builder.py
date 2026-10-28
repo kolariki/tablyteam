@@ -117,6 +117,7 @@ class BuildRequest(BaseModel):
     references: list[str] = []  # reference apps / URLs the team studies first
     deep_analysis: bool = False  # level 2 (paid per use): REA reverse-engineering tools for the builder engine on those targets
     platform: str = "web"  # web | mobile | both (from the session config): decides the default stack and how the app runs
+    language: str = "español rioplatense"  # the session language: <say>/<stage>/<done>, the design copy and the audit report come out in it
 
 
 RESEARCH_PATH = "research/REFERENCES.md"
@@ -349,7 +350,7 @@ class Build:
             "activity": self.activity[-60:], "todos": self.todos,
             "app_run": self.app_run.state() if self.app_run else None,
             "design_review": self.status == "design_review", "design_rounds": self.design_rounds,
-            "research": self.research_refs, "references": self.req.references, "deep_analysis": self.req.deep_analysis, "platform": self.req.platform, "fees": self.fees, "fees_usd": round(sum(float(f.get("usd") or 0) for f in self.fees), 2), "fees_due_usd": round(sum(float(f.get("usd") or 0) for f in self.fees if not f.get("paid")), 2),
+            "research": self.research_refs, "references": self.req.references, "deep_analysis": self.req.deep_analysis, "platform": self.req.platform, "language": self.req.language, "fees": self.fees, "fees_usd": round(sum(float(f.get("usd") or 0) for f in self.fees), 2), "fees_due_usd": round(sum(float(f.get("usd") or 0) for f in self.fees if not f.get("paid")), 2),
             "council_sessions": self.council_sessions, "council": self.req.council,
             "versions": self.versions, "version": len(self.versions), "pending_council": self.pending_council(),
             "mode": self.mode, "audit_report": self.audit_report, "deploys": self.deploys,
@@ -453,7 +454,7 @@ class Build:
             f"### {r['name']} · {r['role_label']} (puntaje {r.get('score', '—')})\nFORTALEZAS:\n{r.get('strengths', '')}\nHALLAZGOS:\n{r['findings']}\nPROPUESTAS:\n{r['requests']}" for r in rnd["results"]
         )
         user = f"PROYECTO: {self.title}\nCONTEXTO DEL USUARIO: {self.context or '—'}\nARCHIVOS: {len(self.files)}\n\nEVALUACIONES DEL EQUIPO:\n{evals}"
-        system = AUDIT_REPORT_SYSTEM.format(language="español")
+        system = AUDIT_REPORT_SYSTEM.format(language=self.req.language)
         self.turns += 1
         self.emit("turn.started", turn=self.turns, phase="report")
         buf: list[str] = []
@@ -565,7 +566,7 @@ class Build:
         if self.engine:
             await self._run_engine(resume_with)
             return
-        system = BUILDER_SYSTEM.format(language="español", quality_bar=quality_bar([a.get("role") for a in self.team] or None), design_rule=BUILDER_DESIGN_RULE + frontend_design_guide(5000) if self.design_html else "")
+        system = BUILDER_SYSTEM.format(language=self.req.language, quality_bar=quality_bar([a.get("role") for a in self.team] or None), design_rule=BUILDER_DESIGN_RULE + frontend_design_guide(5000) if self.design_html else "")
         kit = await self._seed_uikit() if resume_with is None else self._uikit_reminder()
         first = f"BRIEF.md:\n\n{self.brief}{research_context(self.research_md, bool(self.req.deep_analysis))}{design_context_for_builder(self.files)}{platform_note(self.req.platform)}{kit}{self.levels_block()}\n\n---\nEmpezá por la Etapa 1 del plan. Entregá los archivos completos."
         pending_user = resume_with or first
@@ -1103,7 +1104,7 @@ class Build:
             await self._engine_design()
             return
         designer = next((a for a in self.team if a.get("role") == "product-designer"), None)
-        system = design_system_prompt("español", self.req.platform) + ("\n\n" + skillmod.prompt_block(self.user.id, designer.get("skills")) if designer and designer.get("skills") else "")
+        system = design_system_prompt(self.req.language, self.req.platform) + ("\n\n" + skillmod.prompt_block(self.user.id, designer.get("skills")) if designer and designer.get("skills") else "")
         user_msg = DESIGN_USER.format(brief=self.brief[:30000]) + design_platform_note(self.req.platform) + research_context(self.research_md, bool(self.req.deep_analysis)) + (self._ref_note() if self.research_md else "")
         if feedback:
             prev = self.files.get("design/DESIGN.md", "")[:12000]
@@ -1622,6 +1623,7 @@ def rehydrate(user: User, session_id: str, build_id: str, cred: Cred, team: list
     b.req.council = bool(d.get("council", True))
     b.req.references = [r for r in (d.get("references") or []) if isinstance(r, str)]
     b.req.deep_analysis = bool(d.get("deep_analysis", False))
+    b.req.language = d.get("language") or b.req.language
     b.stages = d.get("stages", [])
     b.chat = d.get("chat", [])
     b.events = d.get("events", [])

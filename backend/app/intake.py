@@ -84,18 +84,43 @@ El Markdown del prompt tiene estas secciones, en este orden, concretas y sin rel
 ## Criterios de aceptación  (lista numerada)
 ## Decisiones ya tomadas por el usuario  (respuestas a las preguntas)
 ## Instrucción para el equipo  (qué tiene que quedar resuelto al final del debate)
-Idioma: el del usuario (español rioplatense si escribe en español). No inventes datos del negocio: si falta, decilo como supuesto explícito."""
+{language_rule} No inventes datos del negocio: si falta, decilo como supuesto explícito."""
+
+LANGUAGE_RULES = {
+    "es": "Idioma: español rioplatense (títulos de sección como están arriba), aunque el usuario escriba en otro idioma.",
+    "en": "LANGUAGE: ENGLISH. Everything you write — the questions, understanding, scope and the whole Markdown prompt — must be in English, even if the user wrote in Spanish. Use these exact English section titles instead of the Spanish ones above: # <product name>, ## Goal, ## Who it is for, ## Context and attached material, ## MVP scope, ## Out of scope, ## Functional requirements, ## Data and integrations, ## Technical and product constraints, ## Acceptance criteria, ## Decisions already made by the user, ## Instructions for the team.",
+}
+
+
+def lang_code(language: str | None) -> str:
+    """'English' / 'en' / 'inglés' → en; anything else → es."""
+    l = (language or "").strip().lower()
+    return "en" if l.startswith(("en", "ingl")) else "es"
+
+
+STEPS = {
+    "reading": ("Leyendo el material adjunto", "Reading the attached material"),
+    "studying": ("Estudiando lo que necesitás y el alcance", "Studying what you need and the scope"),
+    "integrating": ("Integrando tus respuestas", "Working your answers in"),
+    "questions": ("Tengo algunas preguntas antes de escribir el prompt", "I have a few questions before writing the prompt"),
+    "done": ("Prompt listo", "Prompt ready"),
+    "failed": ("Falló el análisis", "The analysis failed"),
+}
 
 
 ROLE_PROMPTS_SYSTEM = """Sos un prompt engineer senior. Te dan el brief de un producto y el equipo de roles que lo va a debatir y construir.
 Para CADA rol escribí su prompt de personalidad A MEDIDA DE ESTE PROYECTO: 3 a 6 frases en segunda persona ("Sos…"), concretas, que digan
 qué tiene que priorizar en este producto, qué riesgos vigilar, qué decisiones le tocan y en qué debe ser exigente con los demás. Nada genérico:
 citá partes del brief (datos, integraciones, usuarios, restricciones). Respetá el rol (el CTO no decide copy, el diseñador no decide stack).
-Respondé SOLO un JSON: {"<agent_id>": "<prompt>", …} con todos los ids que te pasaron. Idioma: el del brief."""
+Respondé SOLO un JSON: {"<agent_id>": "<prompt>", …} con todos los ids que te pasaron. {language_rule}"""
+
+ROLE_LANGUAGE_RULES = {"es": "Idioma de los prompts: español rioplatense.", "en": "LANGUAGE: ENGLISH. Write every prompt in English (start with \"You are…\"), even if the brief or the current prompts are in Spanish."}
 
 
-def _mock_role_prompts(agents: list[dict], brief: str) -> dict:
+def _mock_role_prompts(agents: list[dict], brief: str, lang: str = "es") -> dict:
     head = brief.strip().splitlines()[0].lstrip("# ").strip()[:60] if brief.strip() else "el producto"
+    if lang == "en":
+        return {a["id"]: f"You are the {a.get('label') or a.get('name')} of «{head}». Prioritise {a.get('mandate') or 'what is yours'} and hold the rest of the team to it." for a in agents}
     return {a["id"]: f"Sos {a.get('label') or a.get('name')} de «{head}». Priorizá {a.get('mandate') or 'lo que te toca'} y sé exigente con el resto del equipo en eso." for a in agents}
 
 
@@ -131,6 +156,7 @@ class Intake:
         self.rounds = 0
         self.previous_md = ""  # prompt being revised (when the user asks to add something)
         self.extra = ""
+        self.language = "es"  # es | en: the UI language when the analysis started; everything generated follows it
         self._subs: set[asyncio.Queue] = set()
         self._answered = asyncio.Event()
         self._task: asyncio.Task | None = None
@@ -258,13 +284,14 @@ class Intake:
         return "\n".join(parts)[: DIGEST_BUDGET + 8000]
 
     # ------------------------------------------------------------------ run
-    def start(self, text: str, provider: str, model: str, cred: Cred | None, extra: str = "") -> None:
+    def start(self, text: str, provider: str, model: str, cred: Cred | None, extra: str = "", language: str | None = None) -> None:
         """`extra`: something the user wants added/changed after a prompt was generated → the analyst rewrites it."""
         if self.status in ("running", "waiting"):
             raise ValueError("Ya está analizando")
         if provider not in PROVIDERS:
             raise ValueError("Proveedor desconocido")
         self.text, self.provider, self.model = text.strip(), provider, model
+        self.language = lang_code(language) if language else self.language
         self.previous_md = self.prompt_md if extra.strip() else ""
         self.extra = extra.strip()
         self.status, self.error, self.prompt_md = "running", None, ""
@@ -307,25 +334,26 @@ class Intake:
             else:
                 script = json.dumps(data, ensure_ascii=False)
             mock = MockContext("Analista", [("user", "Usuario")], self.text, script=script)
-        async for kind, delta in stream(self.provider, self.model, ANALYST_SYSTEM, user_msg, temperature=0.2, max_tokens=8000, result=result, mock=mock, cred=cred, history=self.history):
+        async for kind, delta in stream(self.provider, self.model, ANALYST_SYSTEM.replace("{language_rule}", LANGUAGE_RULES[self.language]), user_msg, temperature=0.2, max_tokens=8000, result=result, mock=mock, cred=cred, history=self.history):
             chunks.append(delta)
             self.emit("delta", kind=kind, delta=delta)
         self.cost_usd += cost_usd(self.model, result.input_tokens, result.output_tokens, result.cached_input_tokens, result.cache_write_tokens)
         self.history += [{"role": "user", "content": user_msg}, {"role": "assistant", "content": "".join(chunks)}]
         return "".join(chunks)
 
-    async def role_prompts(self, agents: list[dict], provider: str, model: str, cred: Cred | None) -> dict[str, str]:
+    async def role_prompts(self, agents: list[dict], provider: str, model: str, cred: Cred | None, language: str | None = None) -> dict[str, str]:
         """One call: the brief (or the user's text) + the team → a tailored personality prompt per agent id."""
         brief = self.prompt_md or self.text
         if not brief.strip():
             raise ValueError("Primero escribí o generá el prompt del proyecto")
+        lang = lang_code(language) if language else self.language
         if PROVIDERS[provider].kind == "mock":
-            return _mock_role_prompts(agents, brief)
+            return _mock_role_prompts(agents, brief, lang)
         team = "\n".join(f"- id: {a['id']} · {a.get('label') or a.get('name')} ({a.get('name')}) · debe resolver: {a.get('mandate') or '—'} · prompt actual: {str(a.get('persona') or '')[:300]}" for a in agents)
         user = f"BRIEF DEL PRODUCTO:\n{brief[:20000]}\n\nEQUIPO:\n{team}\n\nRespondé solo el JSON."
         result = CallResult()
         chunks: list[str] = []
-        async for _kind, delta in stream(provider, model, ROLE_PROMPTS_SYSTEM, user, temperature=0.3, max_tokens=4000, result=result, cred=cred):
+        async for _kind, delta in stream(provider, model, ROLE_PROMPTS_SYSTEM.replace("{language_rule}", ROLE_LANGUAGE_RULES[lang]), user, temperature=0.3, max_tokens=4000, result=result, cred=cred):
             chunks.append(delta)
         self.cost_usd += cost_usd(model, result.input_tokens, result.output_tokens, result.cached_input_tokens, result.cache_write_tokens)
         raw = "".join(chunks)
@@ -334,6 +362,9 @@ class Intake:
             raise ValueError("El modelo no devolvió los prompts en el formato esperado")
         data = json.loads(m.group(0))
         return {a["id"]: str(data[a["id"]]).strip() for a in agents if isinstance(data.get(a["id"]), str) and data[a["id"]].strip()}
+
+    def _step(self, key: str) -> str:
+        return STEPS[key][1 if self.language == "en" else 0]
 
     @staticmethod
     def _parse(raw: str) -> dict:
@@ -360,7 +391,7 @@ class Intake:
 
     async def _run(self, cred: Cred | None) -> None:
         try:
-            self._set("running", "Leyendo el material adjunto")
+            self._set("running", self._step("reading"))
             for a in self.attachments:
                 self.emit("reading", name=a.name, kind=a.kind, chars=a.chars, size=a.size)
                 await asyncio.sleep(0.03)
@@ -377,7 +408,7 @@ class Intake:
             msg = first
             bad = 0  # format retries (separate from question rounds)
             while True:
-                self._set("running", "Estudiando lo que necesitás y el alcance" if self.rounds == 0 else "Integrando tus respuestas")
+                self._set("running", self._step("studying") if self.rounds == 0 else self._step("integrating"))
                 raw = await self._ask_model(msg, cred)
                 try:
                     data = self._parse(raw)
@@ -395,7 +426,7 @@ class Intake:
                                                options=[str(o) for o in (q.get("options") or [])][:4]) for i, q in enumerate(data["questions"][:5]) if q.get("question")]
                     self.rounds += 1
                     self._answered.clear()
-                    self._set("waiting", "Tengo algunas preguntas antes de escribir el prompt")
+                    self._set("waiting", self._step("questions"))
                     self.emit("questions", understanding=self.understanding, scope=str(data.get("scope", "")), questions=[q.__dict__ for q in self.questions], round=self.rounds)
                     await self._answered.wait()
                     answered = "\n".join(f"- {q.question}\n  Respuesta: {q.answer or '(decidilo vos con el criterio más razonable)'}" for q in self.questions)
@@ -406,7 +437,7 @@ class Intake:
                 if not prompt:
                     raise ValueError("El modelo no escribió el prompt")
                 self.prompt_md = prompt
-                self._set("done", "Prompt listo")
+                self._set("done", self._step("done"))
                 # the material goes with the prompt: the council sees it as shared context
                 self.emit("done", prompt=prompt, understanding=self.understanding, cost_usd=round(self.cost_usd, 4), context=self.digest() if self.attachments else None)
                 return
@@ -415,7 +446,7 @@ class Intake:
         except Exception as e:  # noqa: BLE001
             self.error = str(e)[:600]
             self.status = "error"
-            self.step = "Falló el análisis"
+            self.step = self._step("failed")
             self.emit("error", error=self.error)
             self.emit("status", status="error", step=self.step)
 
