@@ -98,7 +98,8 @@ construiste al lado de design/mockup.html y design/DESIGN.md y corregí, archivo
 3. Layout: márgenes y espaciado en la escala 4/8; contenedor con ancho máximo centrado; alineación consistente; en móvil (360px) nada
    desborda ni se encima; la navegación y el CTA principal se ven sin scroll.
 4. Componentes: botones con estados hover/focus/disabled, inputs con label y foco visible, tarjetas con jerarquía (no todo con el mismo
-   borde y la misma sombra), listas y tablas con ritmo vertical; iconos de UNA librería y un solo grosor.
+   borde y la misma sombra), listas y tablas con ritmo vertical; iconos de UNA librería y un solo grosor. Si el proyecto trae UIKIT.md,
+   todo control es el componente de src/components/ui (shadcn) correspondiente: reemplazá los caseros.
 5. Estados: vacío con explicación y acción, cargando con skeleton, error con reintento, todos diseñados (no texto suelto en rojo).
 6. Primer impacto: la primera pantalla tiene un elemento memorable (dato protagonista, hero, visual del dominio) y el resto queda sobrio.
    Nada de decoración gratuita, gradientes de relleno ni plantilla genérica.
@@ -107,9 +108,11 @@ Hacé los cambios ahora mismo en el código (no me describas lo que harías). Al
 pendiente, y dejá la checklist de DESIGN.md marcada en NOTES.md."""
 
 
-def design_system_prompt(language: str = "español") -> str:
+def design_system_prompt(language: str = "español", platform: str = "web") -> str:
+    from . import uikit
+
     e = EXPERTISE["product-designer"]
-    return DESIGN_SYSTEM.format(craft=e["craft"], standards=e["standards"], language=language) + frontend_design_guide()
+    return DESIGN_SYSTEM.format(craft=e["craft"], standards=e["standards"], language=language) + uikit.designer_block(platform) + frontend_design_guide()
 
 
 def design_context_for_builder(files: dict[str, str]) -> str:

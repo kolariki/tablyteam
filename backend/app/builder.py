@@ -48,6 +48,7 @@ from .providers import PROVIDERS, CallResult, Cred, MockContext, stream
 from .local_engine import ENGINES, is_engine, run_engine, snapshot_dir, sync_files, workdir, USER_ENV, user_claude_env
 from .roles import role_of
 from . import research as rsch
+from . import uikit
 from . import levels as levelsmod
 
 log = logging.getLogger("arena.builder")
@@ -184,7 +185,7 @@ Tu responsabilidad en el equipo: {mandate}.
 {craft}
 
 REVISIÓN PRE-PRODUCCIÓN (ronda {round}). El constructor entregó el proyecto. Si existe design/ (DESIGN.md, tokens.css, mockup.html), la interfaz
-se juzga contra ESE diseño: toda desviación de tokens, layout, estados o copy es un hallazgo. Revisalo DESDE TU ÁREA como lo haría un
+se juzga contra ESE diseño: toda desviación de tokens, layout, estados o copy es un hallazgo.{uikit_note} Revisalo DESDE TU ÁREA como lo haría un
 profesional serio antes de aprobar una salida a producción: ¿cumple el brief? ¿está completo? ¿se rompe? ¿qué falta?
 Leé el código real que te paso; no supongas. Sé exigente pero justo: aprobá si tu área está cubierta, pedí cambios si no.
 {prior}
@@ -565,7 +566,8 @@ class Build:
             await self._run_engine(resume_with)
             return
         system = BUILDER_SYSTEM.format(language="español", quality_bar=quality_bar([a.get("role") for a in self.team] or None), design_rule=BUILDER_DESIGN_RULE + frontend_design_guide(5000) if self.design_html else "")
-        first = f"BRIEF.md:\n\n{self.brief}{research_context(self.research_md, bool(self.req.deep_analysis))}{design_context_for_builder(self.files)}{platform_note(self.req.platform)}{self.levels_block()}\n\n---\nEmpezá por la Etapa 1 del plan. Entregá los archivos completos."
+        kit = await self._seed_uikit() if resume_with is None else self._uikit_reminder()
+        first = f"BRIEF.md:\n\n{self.brief}{research_context(self.research_md, bool(self.req.deep_analysis))}{design_context_for_builder(self.files)}{platform_note(self.req.platform)}{kit}{self.levels_block()}\n\n---\nEmpezá por la Etapa 1 del plan. Entregá los archivos completos."
         pending_user = resume_with or first
         if resume_with:
             self.preview_html = None  # changes invalidate the prototype; it is regenerated after the next <done>
@@ -578,7 +580,7 @@ class Build:
             else:
                 # the files the request names come with their current content, so the model edits instead of guessing
                 named = self._files_named_in(resume_with)
-                pending_user = f"(Estado actual del proyecto: {len(self.files)} archivos ya escritos:\n{files})\n\n{self._contents_block(named)}Pedido del usuario: {resume_with}\nAplicá los cambios entregando los archivos completos (los que modificás, enteros; los nuevos, enteros). Si necesitás ver otro archivo antes de tocarlo, pedilo con <read path=\"…\"/>."
+                pending_user = f"(Estado actual del proyecto: {len(self.files)} archivos ya escritos:\n{files}){kit}\n\n{self._contents_block(named)}Pedido del usuario: {resume_with}\nAplicá los cambios entregando los archivos completos (los que modificás, enteros; los nuevos, enteros). Si necesitás ver otro archivo antes de tocarlo, pedilo con <read path=\"…\"/>."
         idle = 0
         try:
             with obs.session_trace(self.req.session_id, self.user.email, f"build · {self.title}"[:200], ["tablyteam", "build", self.req.provider], {"model": self.req.model}, {"session": self.req.session_id}):
@@ -701,6 +703,31 @@ class Build:
         self.history += [{"role": "user", "content": u[:8000]}, {"role": "assistant", "content": a[:6000]}]
 
     # ------------------------------------------------------------- local engines (Claude Code / Codex)
+    async def _seed_uikit(self) -> str:
+        """Web builds start from Tably's UI kit (shadcn/ui + Tailwind + the design tokens) copied into the tree before the first turn."""
+        if not uikit.enabled(self.req.platform) or any(p.startswith(uikit.UI_DIR + "/") or p == uikit.GUIDE_PATH for p in self.files):
+            return self._uikit_reminder()
+        try:
+            files, info = await asyncio.to_thread(uikit.scaffold, self.files.get("design/tokens.css", ""), None, title=self.title)
+        except Exception as e:  # pragma: no cover - the kit is a boost, never a reason to fail a build
+            log.warning("uikit scaffold failed: %s", e)
+            return ""
+        for rel, content in files.items():
+            self._write(rel, content)
+            if self.workdir:
+                dest = self.workdir / rel
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_text(content)
+        self.chat.append({"role": "system", "text": f"Kit de UI sembrado: {len(info['components'])} componentes de shadcn/ui en {uikit.UI_DIR}/, Tailwind v4 y los tokens del diseño ({uikit.GUIDE_PATH}).", "ts": time.time()})
+        self._save()
+        return uikit.builder_block(info)
+
+    def _uikit_reminder(self) -> str:
+        if uikit.GUIDE_PATH not in self.files:
+            return ""
+        return (f"\n\nRecordá el kit de UI del proyecto ({uikit.GUIDE_PATH}): la interfaz se compone con los componentes de {uikit.UI_DIR}/ y las clases de tokens "
+                "(bg-background, text-muted-foreground, bg-primary…); nada de controles caseros ni hex sueltos.")
+
     def _sync_from_disk(self) -> list[str]:
         assert self.workdir
         changed = sync_files(self.workdir, self.files)
@@ -731,6 +758,7 @@ class Build:
                       f"ESTÁNDAR DE CALIDAD (el equipo que diseñó el producto lo va a revisar con esta vara; construí para aprobarla a la primera):\n{bar}"
                       + (BUILDER_DESIGN_RULE if (self.workdir / "design" / "mockup.html").exists() else "")
                       + platform_note(self.req.platform)
+                      + await self._seed_uikit()
                       + (self._build_ref_prompt() if (self.workdir / RESEARCH_PATH).exists() else "")
                       + (REA_PROMPT if self.req.deep_analysis else "")
                       + self.levels_block())
@@ -854,7 +882,7 @@ class Build:
             system = AUDIT_SYSTEM.format(name=agent["name"], role_label=role["label"], persona=agent.get("persona") or "profesional exigente", mandate=role["mandate"], context=self.context or "sin descripción", prior=prior, craft=expertise_block(agent["role"], mode="audit") + "\n" + skillmod.prompt_block(self.user.id, agent.get("skills")))
             prompt = f"Auditá el proyecto de este directorio (leé los archivos que necesites) como {role['label']}. Respondé SOLO con las etiquetas indicadas."
         else:
-            system = REVIEW_SYSTEM.format(name=agent["name"], role_label=role["label"], persona=agent.get("persona") or "profesional exigente", mandate=role["mandate"], round=rnd, prior=prior, craft=expertise_block(agent["role"], mode="review") + "\n" + skillmod.prompt_block(self.user.id, agent.get("skills")))
+            system = REVIEW_SYSTEM.format(name=agent["name"], role_label=role["label"], persona=agent.get("persona") or "profesional exigente", mandate=role["mandate"], round=rnd, prior=prior, craft=expertise_block(agent["role"], mode="review") + "\n" + skillmod.prompt_block(self.user.id, agent.get("skills")), uikit_note=uikit.reviewer_note() if uikit.GUIDE_PATH in self.files else "")
             prompt = f"Revisá el proyecto de este directorio (leé BRIEF.md y los archivos que necesites) como {role['label']}. Respondé SOLO con las etiquetas indicadas."
         buf = self.live_reviews[agent["id"]]
 
@@ -1075,7 +1103,7 @@ class Build:
             await self._engine_design()
             return
         designer = next((a for a in self.team if a.get("role") == "product-designer"), None)
-        system = design_system_prompt("español") + ("\n\n" + skillmod.prompt_block(self.user.id, designer.get("skills")) if designer and designer.get("skills") else "")
+        system = design_system_prompt("español", self.req.platform) + ("\n\n" + skillmod.prompt_block(self.user.id, designer.get("skills")) if designer and designer.get("skills") else "")
         user_msg = DESIGN_USER.format(brief=self.brief[:30000]) + design_platform_note(self.req.platform) + research_context(self.research_md, bool(self.req.deep_analysis)) + (self._ref_note() if self.research_md else "")
         if feedback:
             prev = self.files.get("design/DESIGN.md", "")[:12000]
@@ -1115,7 +1143,7 @@ class Build:
         try:
             designer = next((a for a in self.team if a.get("role") == "product-designer"), None)
             fb = getattr(self, "_design_feedback_now", None)
-            dprompt = ENGINE_DESIGN_PROMPT + frontend_design_guide() + design_platform_note(self.req.platform) + (self._design_ref_prompt() if self.research_md else "") + (REA_PROMPT if self.req.deep_analysis else "") + (f"\n\nYA EXISTE design/ y el usuario lo revisó. Pide ESTOS CAMBIOS (prioridad absoluta): {fb}\nRediseñá los tres archivos aplicándolos y mejorando el resto." if fb else "") + ("\n\n" + skillmod.prompt_block(self.user.id, designer.get("skills")) if designer and designer.get("skills") else "")
+            dprompt = ENGINE_DESIGN_PROMPT + uikit.designer_block(self.req.platform) + frontend_design_guide() + design_platform_note(self.req.platform) + (self._design_ref_prompt() if self.research_md else "") + (REA_PROMPT if self.req.deep_analysis else "") + (f"\n\nYA EXISTE design/ y el usuario lo revisó. Pide ESTOS CAMBIOS (prioridad absoluta): {fb}\nRediseñá los tres archivos aplicándolos y mejorando el resto." if fb else "") + ("\n\n" + skillmod.prompt_block(self.user.id, designer.get("skills")) if designer and designer.get("skills") else "")
             res = await run_engine(self.engine, dprompt, self.workdir, resume_session=self.engine_session, model=self._engine_model(), mcp=self._engine_mcp(), on_event=on_event)
             if res.get("session_id"):
                 self.engine_session = res["session_id"]
@@ -1358,8 +1386,10 @@ class Build:
     def _project_digest(self) -> str:
         """Tree + file contents for reviewers, within a char budget (key files first)."""
         prio = ["design/DESIGN.md", "design/tokens.css", "README.md", "NOTES.md", ".env.example", "package.json", "pyproject.toml", "requirements.txt"]
-        keyed = sorted(self.files, key=lambda p: (0 if p in prio else 1 if re.search(r"(schema|migration|prisma|\.sql$)", p) else 2 if p == PREVIEW_PATH else 1, p))
-        tree = "\n".join(f"- {p} ({c.count(chr(10)) + 1} líneas)" for p, c in self.files.items())
+        # the seeded kit (shadcn components, Tailwind glue) is vendor code: listed in the tree, never dumped
+        vendored = {p for p in self.files if p.startswith(uikit.UI_DIR + "/") or p in (uikit.UTILS_PATH, uikit.INDEX_CSS, "components.json")}
+        keyed = sorted((p for p in self.files if p not in vendored), key=lambda p: (0 if p in prio else 1 if re.search(r"(schema|migration|prisma|\.sql$)", p) else 2 if p == PREVIEW_PATH else 1, p))
+        tree = "\n".join(f"- {p} ({c.count(chr(10)) + 1} líneas)" + (" [kit de UI sembrado por Tably]" if p in vendored else "") for p, c in self.files.items())
         out = [f"ÁRBOL ({len(self.files)} archivos):\n{tree}\n"]
         used = len(out[0])
         for p in keyed:
@@ -1391,7 +1421,7 @@ class Build:
                 system = AUDIT_SYSTEM.format(name=agent["name"], role_label=role["label"], persona=agent.get("persona") or "profesional exigente", mandate=role["mandate"], context=self.context or "sin descripción", prior=prior, craft=expertise_block(agent["role"], mode="audit") + "\n" + skillmod.prompt_block(self.user.id, agent.get("skills")))
                 user = f"PROYECTO: {self.title}\n\n{digest}\n\nAuditá como {role['label']}."
             else:
-                system = REVIEW_SYSTEM.format(name=agent["name"], role_label=role["label"], persona=agent.get("persona") or "profesional exigente", mandate=role["mandate"], round=rnd, prior=prior, craft=expertise_block(agent["role"], mode="review") + "\n" + skillmod.prompt_block(self.user.id, agent.get("skills")))
+                system = REVIEW_SYSTEM.format(name=agent["name"], role_label=role["label"], persona=agent.get("persona") or "profesional exigente", mandate=role["mandate"], round=rnd, prior=prior, craft=expertise_block(agent["role"], mode="review") + "\n" + skillmod.prompt_block(self.user.id, agent.get("skills")), uikit_note=uikit.reviewer_note() if uikit.GUIDE_PATH in self.files else "")
                 user = f"BRIEF (resumen):\n{self.brief[:12000]}\n\nPROYECTO ENTREGADO:\n{digest}\n\nRevisá como {role['label']}."
             provider = agent["provider"] if self.creds_all.get(agent["provider"]) and self.creds_all[agent["provider"]].source != "none" else self.req.provider
             model = agent["model"] if provider == agent["provider"] else self.req.model

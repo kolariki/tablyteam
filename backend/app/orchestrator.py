@@ -30,6 +30,7 @@ from collections import Counter, defaultdict
 from typing import Any
 
 from . import observability as obs
+from . import uikit
 from .tasks import spawn
 from .auth import User, user_dir
 from .pricing import cost_usd
@@ -290,6 +291,8 @@ class Session:
         craft = expertise_block(agent.role, mode="review" if review else "debate")
         if craft:
             role_txt += craft + "\n"
+        if not review:
+            role_txt += uikit.team_block(agent.role, getattr(self.config, "platform", "web"))
         sk = skillmod.prompt_block(self.owner.id, agent.skills)
         if sk:
             role_txt += sk

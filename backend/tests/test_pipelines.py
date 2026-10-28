@@ -150,3 +150,40 @@ def test_versions_diffs_and_readiness():
         BUILDS.pop(b.id, None)
 
     asyncio.run(go())
+
+
+def test_uikit_scaffold_offline_and_with_fake_registry():
+    from app import uikit
+
+    files, info = uikit.scaffold(":root { --color-bg: #fff; --primary: #123456; }", ["button"], fetcher=lambda url: None)
+    assert info["components"] == [] and uikit.GUIDE_PATH in files and "npx shadcn@latest add" in files[uikit.GUIDE_PATH]
+    assert "--background: var(--color-bg" in files[uikit.TOKENS_PATH] and "--primary:" not in files[uikit.TOKENS_PATH].split("sembrado por Tably")[1]
+
+    def fake(url):
+        name = url.rsplit("/", 1)[1][:-5]
+        if name == "card":
+            return {"name": "card", "dependencies": ["cn"], "registryDependencies": ["button"], "files": [{"path": f"registry/x/ui/card.tsx", "type": "registry:ui", "content": 'import { cn } from "cn"\nfunction Card() {}\nexport { Card }\n'}]}
+        if name == "button":
+            return {"name": "button", "dependencies": ["cn", "radix-ui"], "files": [{"path": "registry/x/ui/button.tsx", "type": "registry:ui", "content": 'import { Slot } from "radix-ui"\nimport { cn } from "@/registry/x/lib/utils"\nexport { Button, buttonVariants }\n'}]}
+        return None
+
+    files, info = uikit.scaffold("", ["card"], fetcher=fake)
+    assert info["components"] == ["button", "card"] and info["exports"]["button"] == ["Button", "buttonVariants"]
+    assert 'from "@/lib/utils"' in files[f"{uikit.UI_DIR}/card.tsx"] and 'from "@/lib/utils"' in files[f"{uikit.UI_DIR}/button.tsx"]
+    assert "radix-ui" in info["deps"] and "cn" not in info["deps"]
+    block = uikit.builder_block(info)
+    assert "button, card" in block and '"radix-ui"' in block
+    assert uikit.team_block("cto", "web") and not uikit.team_block("cto", "mobile") and "shadcn" in uikit.designer_block("web")
+
+
+def test_build_seeds_uikit_only_for_web(tmp_path, monkeypatch):
+    from app import uikit
+
+    monkeypatch.setattr(uikit, "CACHE_DIR", tmp_path / "cache")
+    b = Build(USER, BuildRequest(session_id="s-kit", provider="mock", model="mock-1", design=False, platform="web"), MOCK, "# brief", "Demo")
+    asyncio.run(b.pipeline())
+    assert uikit.GUIDE_PATH in b.files and uikit.INDEX_CSS in b.files and "vite.config.ts" in b.files
+    assert any(c.get("role") == "system" and "Kit de UI" in c.get("text", "") for c in b.chat)
+    m = Build(USER, BuildRequest(session_id="s-mob", provider="mock", model="mock-1", design=False, platform="mobile"), MOCK, "# brief", "Demo")
+    asyncio.run(m.pipeline())
+    assert uikit.GUIDE_PATH not in m.files
