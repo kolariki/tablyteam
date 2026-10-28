@@ -224,8 +224,12 @@ export default function CouncilVerdict() {
                 <button onClick={openBuild} className={`${primary} w-full justify-center`}><Hammer size={16} /> {T('Volver al constructor', 'Back to the builder')}</button>
               )}
               {chosen.length > 0 && (
-                <div className="flex h-11 w-full min-w-0 items-center gap-2 rounded-full border border-line bg-surface pl-2 pr-2 text-[12px] text-ink-2 shadow-sm" title={T('Quién aplica los cambios: un agente local con tu suscripción o un modelo por API', 'Who applies the changes: a local agent on your subscription or an API model')}>
+                <div className="flex h-11 w-full min-w-0 items-center gap-2 rounded-full border border-line bg-surface px-2 text-[12px] text-ink-2 shadow-sm transition hover:border-accent" title={T('Quién aplica los cambios: un agente local con tu suscripción o un modelo por API', 'Who applies the changes: a local agent on your subscription or an API model')}>
+                  {/* the visible face of the picker, centred: logo + name + caret; the native select sits invisible on top */}
+                  <label className="relative flex h-full min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5">
                   <ProviderLogo provider={engines.find((e) => e.id === bProvider)?.logo ?? bProvider} size={16} />
+                  <span className="truncate text-[12.5px] font-medium text-ink">{(engines.find((e) => e.id === bProvider)?.label ?? providers.find((p) => p.id === bProvider)?.label ?? T('Elegí constructor', 'Pick a builder')).split(' · ')[0]}</span>
+                  <ChevronDown size={14} className="shrink-0 text-ink-3" />
                   <select
                     value={bProvider}
                     onChange={(e) => {
@@ -234,7 +238,8 @@ export default function CouncilVerdict() {
                       setBProvider(id)
                       setBModel(eng ? 'default' : providers.find((p) => p.id === id)?.default_model ?? '')
                     }}
-                    className="h-8 min-w-0 max-w-[45%] shrink appearance-none truncate rounded-full bg-transparent pr-1 text-[12.5px] text-ink outline-none"
+                    className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
+                    aria-label={T('Constructor', 'Builder')}
                   >
                     {engines.length > 0 && (
                       <optgroup label={T('Con tu suscripción', 'On your subscription')}>
@@ -245,6 +250,7 @@ export default function CouncilVerdict() {
                       {providers.map((p) => <option key={p.id} value={p.id}>{p.label.split(' · ')[0]}</option>)}
                     </optgroup>
                   </select>
+                  </label>
                   {!isEngineSel && bProvider && <span className="min-w-0 flex-1"><ModelSelect provider={bProvider} value={bModel} onChange={setBModel} /></span>}
                 </div>
               )}
