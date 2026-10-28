@@ -9,7 +9,7 @@ export const HACKATHON_MODE = true
 export const MUSE_ONLY = true
 
 /** The providers a picker may show. */
-export const visibleProviders = <T extends { id: string }>(ps: T[]): T[] => (MUSE_ONLY ? ps.filter((p) => p.id === 'meta' || p.id === 'mock') : ps)
+export const visibleProviders = <T extends { id: string; source?: string }>(ps: T[]): T[] => (MUSE_ONLY ? ps.filter((p) => p.id === 'meta' || p.id === 'mock' || (p.id === 'baseten' && p.source === 'trial')) : ps)
 /** The desktop coding agents a picker may show: Muse Code and the user's own Claude Code stay available as builders even in Muse-only mode. */
 export const visibleEngines = <T extends { id: string }>(es: T[]): T[] => (MUSE_ONLY ? es.filter((e) => e.id === 'muse-code' || e.id === 'claude-code') : es)
 

@@ -13,6 +13,7 @@ from cryptography.fernet import Fernet, InvalidToken
 
 from .auth import _db
 from .config import DATA_DIR, env
+from . import trial
 from .providers import PROVIDERS, Cred, server_cred
 
 SHARE_SERVER_KEYS = (env("ARENA_SHARE_SERVER_KEYS", "false") or "false").lower() == "true"
@@ -76,6 +77,8 @@ def creds(user_id: str) -> dict[str, Cred]:
                 key = None
         if not key and SHARE_SERVER_KEYS and server.api_key:
             key, source = server.api_key, "server"
+        if not key and pid == trial.PROVIDER and server.api_key and trial.left(user_id) > 0:
+            key, source = server.api_key, "trial"
         if spec.kind == "mock":
             key, source = "mock", "server"
         if pid == "ollama" and (row.get("base_url") or server.api_key):

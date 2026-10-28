@@ -45,8 +45,10 @@ export function museLabel(model: string | undefined | null): string {
 }
 
 /** The same team on Muse, but through the simulated provider when the Meta key is not loaded yet (the card still shows Muse and its model). */
-export function museTeamFor(agents: AgentConfig[], metaConfigured: boolean): AgentConfig[] {
-  return agents.map((a) => (metaConfigured ? { ...a, provider: 'meta', wanted_provider: undefined, model: museReco(a).model, color: null } : { ...a, provider: 'mock', wanted_provider: 'meta', model: 'mock-1' }))
+export function museTeamFor(agents: AgentConfig[], metaConfigured: boolean, trialModel?: string): AgentConfig[] {
+  // without the Meta key a seat runs on the free Baseten trial (an open model) when there is one, else simulated
+  const standIn = trialModel ? { provider: 'baseten', model: trialModel } : { provider: 'mock', model: 'mock-1' }
+  return agents.map((a) => (metaConfigured ? { ...a, provider: 'meta', wanted_provider: undefined, model: museReco(a).model, color: null } : { ...a, ...standIn, wanted_provider: 'meta' }))
 }
 
 /** The same team, every seat on Muse with the recommended model for its role. */

@@ -481,6 +481,7 @@ class Session:
             self.status = "error"
             self.emit("session.completed", status="error", error=str(e), stats=self._stats())
         finally:
+            self._charge_trial()
             await asyncio.to_thread(obs.flush)  # flush is blocking; keep the event loop free
             self._save()
             for q in list(self.subscribers):
@@ -831,6 +832,15 @@ class Session:
             "disagreement_rate": round(disagreements / n, 3),
             "verdict": self.verdict or None,
         }
+
+    def _charge_trial(self) -> None:
+        """What the seats on the free Baseten trial spent goes against the trial budget."""
+        trial_ids = {a.id for a in self.config.agents if (c := self.creds.get(a.provider)) and c.source == "trial"}
+        if trial_ids:
+            from . import trial
+
+            cost = sum(v["cost_usd"] for k, v in self._stats()["agents"].items() if k in trial_ids)
+            trial.spend(self.owner.id, cost_usd=cost)
 
     def _score(self, stats: dict) -> None:
         obs.score(self.trace_id, "disagreement_rate", stats["disagreement_rate"], comment="share of turns with stance=disagree")

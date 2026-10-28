@@ -35,7 +35,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
-from . import auth, keystore
+from . import auth, keystore, trial
 from . import observability as obs
 from .tasks import spawn
 from . import research
@@ -175,13 +175,22 @@ def auth_config():
     return {"allow_signup": auth.ALLOW_SIGNUP}
 
 
+async def _trial_model(cred: Cred) -> str:
+    return trial.pick_model(await available_models(trial.PROVIDER, cred)) or cred.model or PROVIDERS[trial.PROVIDER].default_model
+
+
 @app.get("/api/providers")
-def providers(user: User = CurrentUser):
+async def providers(user: User = CurrentUser):
     eff = keystore.creds(user.id)
-    return [
+    out = [
         {"id": p.id, "label": p.label, "color": p.color, "configured": eff[p.id].source != "none", "default_model": eff[p.id].model, "source": eff[p.id].source}
         for p in PROVIDERS.values()
     ]
+    for p in out:
+        if p["id"] == trial.PROVIDER and p["source"] == "trial":
+            p["default_model"] = await _trial_model(eff[trial.PROVIDER])
+            p["trial_left"] = trial.left(user.id)
+    return out
 
 
 @app.get("/api/providers/{provider_id}/models")
@@ -248,6 +257,9 @@ def roles():
 async def presets(fallback: bool = True, user: User = CurrentUser):
     """Built-in experiments + the user's saved ones (each with its animated scene)."""
     eff = keystore.creds(user.id)
+    # seats without a key run on the Baseten trial when there is one, else on the simulator
+    stand_in = trial.PROVIDER if eff[trial.PROVIDER].source == "trial" else "mock"
+    stand_in_model = await _trial_model(eff[stand_in]) if stand_in == trial.PROVIDER else eff["mock"].model
     out = []
     for preset in copy.deepcopy(PRESETS) + list_presets(user.id):
         for a in preset["agents"]:
@@ -256,7 +268,8 @@ async def presets(fallback: bool = True, user: User = CurrentUser):
                 pid = a["provider"] = "mock"
             if fallback and eff[pid].source == "none":
                 a["wanted_provider"] = pid
-                pid = a["provider"] = "mock"
+                pid = a["provider"] = stand_in
+                a["model"] = stand_in_model
             a.setdefault("model", eff[pid].model)
         preset.setdefault("scene_url", f"/scenes/{preset['id']}.svg")
         if preset.get("custom"):
@@ -545,6 +558,8 @@ async def create_session(config: SessionConfig, user: User = CurrentUser):
         if not spec:
             raise HTTPException(400, f"unknown provider {a.provider}")
         if eff[a.provider].source == "none":
+            if a.provider == trial.PROVIDER and trial.enabled():
+                raise HTTPException(400, "Se terminaron tus rondas de prueba gratis. Cargá tu API key en Configuración para seguir.")
             raise HTTPException(400, f"{spec.label}: falta la API key. Cargala en Configuración.")
     # preflight: every model must exist for this account, otherwise the agent would fail on every turn
     problems = []
@@ -557,6 +572,8 @@ async def create_session(config: SessionConfig, user: User = CurrentUser):
     if problems:
         raise HTTPException(400, " · ".join(problems))
     _check_capacity(user.id)
+    if any(eff[a.provider].source == "trial" for a in config.agents):
+        trial.spend(user.id, rounds=1)  # creds() already refused the trial when no round is left
     s = start_session(config, user, eff, auto_pick=False)
     return {"id": s.id}
 
@@ -859,7 +876,7 @@ async def create_direct_build(body: dict, user: User = CurrentUser):
     eff = keystore.creds(user.id)
     bp, bm = (provider, model) if (not is_engine(provider) and eff.get(provider) and eff[provider].source != "none") else (None, None)
     if not bp:
-        for pid in ("meta", "anthropic", "openai", "gemini", "deepseek", "xai", "groq", "mistral", "openrouter", "kimi", "ollama"):
+        for pid in ("meta", "anthropic", "openai", "gemini", "deepseek", "xai", "groq", "mistral", "openrouter", "kimi", "ollama", "baseten"):
             c = eff.get(pid)
             if c and c.source != "none":
                 bp, bm = pid, c.model or PROVIDERS[pid].default_model

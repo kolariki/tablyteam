@@ -7,6 +7,8 @@ export interface Provider {
   color: string
   configured: boolean
   default_model: string
+  source?: string  // user | server | trial | none
+  trial_left?: number  // free Baseten rounds left (source "trial")
 }
 
 export interface AgentConfig {

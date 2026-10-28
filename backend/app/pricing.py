@@ -49,6 +49,13 @@ PRICES: dict[str, tuple[float, float]] = {
     "kimi-k2.6": (0.95, 4.0),
     "kimi-k2.5": (0.60, 3.0),
     "kimi": (0.95, 4.0),
+    # Baseten Model APIs (baseten.co/pricing, Oct 2026; matched without the org prefix)
+    "glm-5.3-flash": (0.15, 0.50),
+    "glm-5.3-fast": (2.10, 6.60),
+    "glm-5": (1.40, 4.40),
+    "deepseek-v4.1-flash": (0.30, 1.20),
+    "deepseek-v4-flash": (0.13, 0.26),
+    "gpt-oss-120b": (0.10, 0.50),
     # Groq / open models
     "llama": (0.59, 0.79),
     "mock": (0.0, 0.0),

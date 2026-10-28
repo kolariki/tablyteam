@@ -98,6 +98,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   }, [chooser])
   const lang = useLang()
   const [providers, setProviders] = useState<Provider[]>(() => visibleProviders(readCache<Provider[]>('providers') ?? []))
+  const trialProvider = providers.find((x) => x.id === 'baseten' && x.source === 'trial')
   const apiProviders = providers.filter((p) => p.id !== 'mock' || !providers.some((x) => x.configured && x.id !== 'mock'))
   const isApiBuilder = !!builder.provider && !engines.some((e) => e.id === builder.provider)
   const [roles, setRoles] = useState<{ groups: string[]; groups_en?: string[]; roles: Role[] }>({ groups: [], roles: [] })
@@ -151,9 +152,9 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
     const title = pick(p, 'title')
     const topic = pick(p, 'topic')
     const language = defaultLanguage()
-    const base = p.agents.map((a, i) => ({ ...a, name: pick(a, 'name') || a.name, persona: pick(a, 'persona') || a.persona, color: a.provider === 'mock' ? BRAND_COLOR[a.wanted_provider ?? ''] ?? PALETTE[i % PALETTE.length] : null }))
+    const base = p.agents.map((a, i) => ({ ...a, name: pick(a, 'name') || a.name, persona: pick(a, 'persona') || a.persona, color: a.provider === 'mock' || a.provider === 'baseten' ? BRAND_COLOR[a.wanted_provider ?? ''] ?? PALETTE[i % PALETTE.length] : null }))
     // Muse first: every seat of the preset lands on the Muse model recommended for its role (simulated until the Meta key is loaded)
-    const agents = MUSE_FIRST ? museTeamFor(base, !!providers.find((x) => x.id === 'meta')?.configured) : base
+    const agents = MUSE_FIRST ? museTeamFor(base, !!providers.find((x) => x.id === 'meta')?.configured, trialProvider?.default_model) : base
     baseline.current = { preset: p, title, topic, language, agents: Object.fromEntries(agents.map((a) => [a.id, { name: a.name, persona: a.persona }])) }
     setIdea(topic)
     setPromptMd(null)
@@ -161,9 +162,16 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
     setPresetRefs(p.references ?? [])
   }
   // Muse first: as soon as the Meta key is connected, the seats that were waiting for it (simulated) move to Muse with their recommended model
+  // the free trial showed up after the team was laid out: the simulated seats move to it
+  useEffect(() => {
+    if (!MUSE_FIRST || !trialProvider || providers.find((x) => x.id === 'meta')?.configured) return
+    setCfg((c) => (c.agents.some((a) => a.provider === 'mock' && a.wanted_provider === 'meta') ? { ...c, agents: c.agents.map((a) => (a.provider === 'mock' && a.wanted_provider === 'meta' ? { ...a, provider: 'baseten', model: trialProvider.default_model } : a)) } : c))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [providers])
   useEffect(() => {
     if (!MUSE_FIRST || !providers.find((x) => x.id === 'meta')?.configured) return
-    setCfg((c) => (c.agents.some((a) => a.provider === 'mock' && a.wanted_provider === 'meta') ? { ...c, agents: c.agents.map((a) => (a.provider === 'mock' && a.wanted_provider === 'meta' ? { ...a, provider: 'meta', wanted_provider: undefined, model: museReco(a).model, color: null } : a)) } : c))
+    const waiting = (a: AgentConfig) => (a.provider === 'mock' || a.provider === 'baseten') && a.wanted_provider === 'meta'
+    setCfg((c) => (c.agents.some(waiting) ? { ...c, agents: c.agents.map((a) => (waiting(a) ? { ...a, provider: 'meta', wanted_provider: undefined, model: museReco(a).model, color: null } : a)) } : c))
   }, [providers])
   useEffect(() => {
     // language switched: swap every default that is still untouched to the other language
@@ -416,7 +424,8 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
           <PersonaField value={a.persona} onChange={(v) => updateAgent(i, { persona: v })} placeholder={T('personalidad (opcional, se suma al rol)', 'personality (optional, adds to the role)')} roleLabel={a.name} />
         </div>
         <div className="mt-1.5"><SkillPicker value={a.skills ?? []} onChange={(ids) => updateAgent(i, { skills: ids })} /></div>
-        {a.wanted_provider && <div className="mt-1 text-[11px] text-gold">{T('Simulado: falta la key de', 'Simulated: missing the key for')} {a.wanted_provider}. <button className="underline hover:text-accent" onClick={onSettings}>{T('Cargala en Configuración', 'Add it in Settings')}</button>{T(' para usar el modelo real.', ' to use the real model.')}</div>}
+        {a.wanted_provider && a.provider === 'baseten' && <div className="mt-1 text-[11px] text-gold">{T('Prueba gratis: corre en', 'Free trial: runs on')} {a.model} {T('(modelo abierto vía Baseten)', '(open model via Baseten)')}{trialProvider?.trial_left != null ? T(`, te quedan ${trialProvider.trial_left} rondas`, `, ${trialProvider.trial_left} rounds left`) : ''}. <button className="underline hover:text-accent" onClick={onSettings}>{T('Cargá la key de', 'Add the key for')} {a.wanted_provider}</button>{T(' para usar el modelo real.', ' to use the real model.')}</div>}
+        {a.wanted_provider && a.provider !== 'baseten' && <div className="mt-1 text-[11px] text-gold">{T('Simulado: falta la key de', 'Simulated: missing the key for')} {a.wanted_provider}. <button className="underline hover:text-accent" onClick={onSettings}>{T('Cargala en Configuración', 'Add it in Settings')}</button>{T(' para usar el modelo real.', ' to use the real model.')}</div>}
         </div>
       </div>
     )
