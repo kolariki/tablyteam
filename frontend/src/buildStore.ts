@@ -1,4 +1,6 @@
 import type { CloudApp, LevelsInfo } from './lib/api'
+export interface Usage { input: number; output: number; cache_read: number; cache_write: number; unsplit?: number; total: number; engine: number; api: number; measured: boolean }
+import { srv } from './lib/serverText'
 import { create } from 'zustand'
 
 export interface BuildFile {
@@ -151,6 +153,9 @@ interface BuildState {
   liveFile: { path: string; content: string } | null
   selected: string | null
   cost: number
+  usage: Usage | null  // measured tokens of the whole build (API calls + the CLI agent's own logs)
+  engineCost: number  // what the CLI agent reports (Claude Code: its API-equivalent price)
+  turns: number
   fees: number  // per-use charges (deep analysis…) that are billed on top of the tokens
   feesDue: number  // of those, what is still unpaid (Stripe)
   tokens: number
@@ -216,6 +221,9 @@ const empty = {
   liveFile: null,
   selected: null,
   cost: 0,
+  usage: null,
+  engineCost: 0,
+  turns: 0,
   fees: 0,
   feesDue: 0,
   tokens: 0,
@@ -261,7 +269,7 @@ export const useBuild = create<BuildState>((set, get) => ({
           activity: b.activity ?? s.activity, todos: b.todos ?? s.todos, versions: b.versions ?? s.versions, pendingCouncil: b.pending_council ?? null, designRounds: b.design_rounds ?? s.designRounds, designHtml: b.design_html ?? s.designHtml,
           appRun: b.app_run ? { status: b.app_run.status, service: b.app_run.service, label: b.app_run.label, url: b.app_run.url, embedUrl: b.app_run.embed_url ?? null, port: b.app_run.port, error: b.app_run.error, logs: b.app_run.logs ?? [] } : s.appRun,
           status: b.status === 'running' ? 'running' : b.status, files: { ...s.files, ...b.files }, chat: b.chat, stages: b.stages,
-          councilSessionsKnown: (b.council_sessions ?? []).length, cost: b.cost_usd, buildSeconds: (b as { build_seconds?: number }).build_seconds ?? s.buildSeconds, fees: (b as { fees_usd?: number }).fees_usd ?? 0, feesDue: (b as { fees_due_usd?: number }).fees_due_usd ?? 0, tokens: b.tokens, done: b.done, selected: s.selected ?? Object.keys(b.files)[0] ?? null,
+          councilSessionsKnown: (b.council_sessions ?? []).length, cost: b.cost_usd, buildSeconds: (b as { build_seconds?: number }).build_seconds ?? s.buildSeconds, fees: (b as { fees_usd?: number }).fees_usd ?? 0, usage: (b as { usage?: Usage }).usage ?? s.usage, engineCost: (b as { engine_cost_usd?: number }).engine_cost_usd ?? s.engineCost, turns: (b as { turns?: number }).turns ?? s.turns, feesDue: (b as { fees_due_usd?: number }).fees_due_usd ?? 0, tokens: b.tokens, done: b.done, selected: s.selected ?? Object.keys(b.files)[0] ?? null,
           ...(b.live ? { liveTurn: b.live.turn, livePhase: b.live.phase, liveRaw: b.live.raw, liveFile: liveFileFrom(b.live.raw) } : {}),
           team: b.team ?? s.team, reviews: b.reviews ?? s.reviews, reviewPlan: b.review_plan ?? null,
           liveReviews: b.live_reviews ?? {}, reviewRound: b.status === 'reviewing' ? (b.reviews?.length ?? 0) + 1 : null,
@@ -273,7 +281,7 @@ export const useBuild = create<BuildState>((set, get) => ({
         set({ liveTurn: ev.turn, turnStartedAt: Date.now(), livePhase: ev.phase ?? 'build', liveRaw: '', liveFile: null, activity: [], thinking: '', status: 'running', pane: ev.phase === 'preview' ? s.pane : 'code' })
         break
       case 'build.activity':
-        set({ activity: [...s.activity.slice(-79), { kind: ev.kind, label: ev.label, path: ev.path ?? '', ts: ev.ts }], thinking: ev.kind === 'think' ? s.thinking : '' })
+        set({ activity: [...s.activity.slice(-79), { kind: ev.kind, label: srv(ev.label), path: ev.path ?? '', ts: ev.ts }], thinking: ev.kind === 'think' ? s.thinking : '' })
         break
       case 'build.thinking':
         set({ thinking: ev.text ?? '' })

@@ -117,6 +117,7 @@ class BuildRequest(BaseModel):
     references: list[str] = []  # reference apps / URLs the team studies first
     deep_analysis: bool = False  # level 2 (paid per use): REA reverse-engineering tools for the builder engine on those targets
     platform: str = "web"  # web | mobile | both (from the session config): decides the default stack and how the app runs
+    references_auto: bool = False  # the references are the preset's (not the user's): used silently, never named in the chat
     language: str = "español rioplatense"  # the session language: <say>/<stage>/<done>, the design copy and the audit report come out in it
 
 
@@ -169,9 +170,113 @@ CLONE_NOTE = (f"\n\nMODO CLON (ingeniería inversa activada por el usuario): el 
               "Lo ÚNICO que cambia: el nombre, el logo y los textos literales (reescribilos con el mismo sentido y largo). No copies imágenes, íconos de marca, assets ni código del sitio: todo se implementa propio. "
               "Criterio de terminado: abierto al lado del referente, se ve y se siente igual.")
 
+PREVIEW_RULE = (f"\n\nREGLA DEL PROTOTIPO: `{PREVIEW_PATH}` es la vista previa que el usuario abre en Tably sin correr nada, dentro de un iframe aislado. "
+                "Tiene que funcionar SOLO, sin backend ni servidor: datos de ejemplo dentro del propio prototipo, sin llamadas a la API real, sin login, "
+                "sin depender de localStorage para arrancar. Nunca lo conviertas en cliente de la API de la app: la app real (apps/, src/…) es la que se conecta "
+                "al backend; el prototipo la refleja con datos de ejemplo. Si cambian las pantallas, actualizalo con los mismos datos de ejemplo.")
+
+
 FIDELITY_NOTE = (f"\n\nFIDELIDAD AL REFERENTE: en {RESEARCH_PATH} está el «Plano visual objetivo» y en research/shots/ las capturas reales (abrí las imágenes y miralas). "
                  "Reproducí la estructura visual lo más fielmente posible: distribución y proporciones de las regiones, componentes y su estilo, paleta (hex), tipografía equivalente, "
                  "espaciado, interacciones y comportamiento móvil. Con elementos propios: nunca assets, logos, marcas, textos ni código de terceros.")
+
+
+# ------------------------------------------------------------------ self-contained HTML for the panes
+_LINK_RX = re.compile(r"<link\b[^>]*>", re.I)
+_SCRIPT_RX = re.compile(r"<script\b([^>]*)\bsrc=[\"']([^\"']+)[\"']([^>]*)>\s*</script>", re.I)
+# a sandboxed srcdoc iframe (no same-origin) throws on localStorage: an in-memory stand-in keeps prototypes that use it alive
+_STORAGE_SHIM = ("<script>(function(){try{window.localStorage.getItem('x')}catch(e){var m={};var s={getItem:function(k){return Object.prototype.hasOwnProperty.call(m,k)?m[k]:null},"
+                 "setItem:function(k,v){m[k]=String(v)},removeItem:function(k){delete m[k]},clear:function(){m={}},key:function(i){return Object.keys(m)[i]||null},"
+                 "get length(){return Object.keys(m).length}};try{Object.defineProperty(window,'localStorage',{value:s});Object.defineProperty(window,'sessionStorage',{value:s})}catch(_){}}})()</script>")
+
+
+def _local_ref(ref: str, base_dir: str, files: dict[str, str]) -> str | None:
+    """Content of a project file an HTML page references by a relative path (None for URLs, data: and missing files)."""
+    import posixpath
+
+    ref = ref.strip()
+    if not ref or re.match(r"^(?:[a-z][a-z0-9+.-]*:|//)", ref, re.I):
+        return None
+    ref = ref.split("#")[0].split("?")[0]
+    path = ref.lstrip("/") if ref.startswith("/") else posixpath.normpath(posixpath.join(base_dir, ref))
+    return files.get(path)
+
+
+def html_refs(html: str, base_dir: str) -> set[str]:
+    """Project paths a page pulls in (stylesheets and scripts), to know when a change to them should refresh the pane."""
+    import posixpath
+
+    out: set[str] = set()
+    for tag in _LINK_RX.findall(html or ""):
+        h = re.search(r"\bhref=[\"']([^\"']+)", tag, re.I)
+        if h and "stylesheet" in tag.lower() and not re.match(r"^(?:[a-z][a-z0-9+.-]*:|//)", h.group(1), re.I):
+            r = h.group(1).split("#")[0].split("?")[0]
+            out.add(r.lstrip("/") if r.startswith("/") else posixpath.normpath(posixpath.join(base_dir, r)))
+    for m in _SCRIPT_RX.finditer(html or ""):
+        r = m.group(2)
+        if not re.match(r"^(?:[a-z][a-z0-9+.-]*:|//)", r, re.I):
+            r = r.split("#")[0].split("?")[0]
+            out.add(r.lstrip("/") if r.startswith("/") else posixpath.normpath(posixpath.join(base_dir, r)))
+    return out
+
+
+def inline_html(html: str, path: str, files: dict[str, str]) -> str:
+    """The pane shows the page as srcdoc, where relative links go nowhere: the project's own stylesheets and scripts are
+    inlined (a deferred script moves to the end of <body>, where it would have run), plus the storage shim."""
+    if not html:
+        return html
+    base_dir = path.rsplit("/", 1)[0] if "/" in path else ""
+    tail: list[str] = []
+
+    def link(m: re.Match) -> str:
+        tag = m.group(0)
+        if "stylesheet" not in tag.lower():
+            return tag
+        h = re.search(r"\bhref=[\"']([^\"']+)", tag, re.I)
+        css = _local_ref(h.group(1), base_dir, files) if h else None
+        return f"<style>\n{css}\n</style>" if css is not None else tag
+
+    def script(m: re.Match) -> str:
+        attrs = (m.group(1) + " " + m.group(3)).strip()
+        js = _local_ref(m.group(2), base_dir, files)
+        if js is None:
+            return m.group(0)
+        js = js.replace("</script", "<\\/script")
+        module = re.search(r"type=[\"']?module", attrs, re.I)
+        tag = f"<script{' type=\"module\"' if module else ''}>\n{js}\n</script>"
+        if re.search(r"\b(defer|async)\b", attrs, re.I) and not module:
+            tail.append(tag)
+            return ""
+        return tag
+
+    out = _LINK_RX.sub(link, html)
+    out = _SCRIPT_RX.sub(script, out)
+    if tail:
+        i = out.lower().rfind("</body>")
+        out = (out[:i] + "\n".join(tail) + out[i:]) if i >= 0 else out + "\n".join(tail)
+    i = out.lower().find("<head>")
+    return (out[: i + 6] + _STORAGE_SHIM + out[i + 6:]) if i >= 0 else _STORAGE_SHIM + out
+
+
+def saved_usage(d: dict) -> dict:
+    """Build.usage() for a build saved on disk (the same sources: API counters + Claude Code's session logs)."""
+    from .local_engine import claude_usage
+
+    api = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0, "unsplit": 0}
+    if d.get("api_usage"):
+        api.update(d["api_usage"])
+    else:
+        api["unsplit"] = int(d.get("tokens") or 0)
+    u = dict(api)
+    wd = d.get("workdir")
+    eng = claude_usage(Path(wd)) if d.get("provider") == "claude-code" and wd and Path(wd).exists() else None
+    if eng:
+        for k in eng:
+            u[k] += eng[k]
+    elif d.get("engine_tokens"):
+        u["input"] += int(d["engine_tokens"])
+    return u | {"total": sum(u.values()), "engine": sum(eng.values()) if eng else int(d.get("engine_tokens") or 0),
+                "api": sum(api.values()), "measured": bool(eng) or d.get("provider") != "claude-code"}
 
 
 def research_context(md: str, clone: bool = False) -> str:
@@ -273,6 +378,9 @@ class Build:
         self.turns = 0
         self.done_text = ""
         self.preview_html: str | None = None
+        self.engine_cost = 0.0  # what the CLI agent itself reports (Claude Code: total_cost_usd, its API-equivalent price)
+        self.engine_tokens = 0  # tokens the CLI agents report (Codex / Muse); Claude Code is read from its own logs
+        self.api_usage = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0, "unsplit": 0}  # API calls (design, review, API builders)
         self.live: dict | None = None  # {turn, phase, raw} while a model turn is streaming
         self.team = [a for a in (team or []) if role_of(a.get("role"))]  # reviewers = session agents with a role
         self.creds_all = creds or {}
@@ -343,14 +451,14 @@ class Build:
         return {
             "id": self.id, "session_id": self.req.session_id, "provider": self.req.provider, "model": self.req.model, "title": self.title,
             "status": self.status, "files": {p: {"size": len(c), "lines": c.count("\n") + 1} for p, c in self.files.items()},
-            "stages": self.stages, "chat": self.chat, "cost_usd": round(self.cost, 5), "tokens": self.tokens, "turns": self.turns, "done": self.done_text, "build_seconds": round(getattr(self, "build_seconds", 0.0)),
+            "stages": self.stages, "chat": self.chat, "cost_usd": round(self.cost, 5), "tokens": self.tokens, "usage": self.usage(), "engine_cost_usd": round(self.engine_cost, 5), "turns": self.turns, "done": self.done_text, "build_seconds": round(getattr(self, "build_seconds", 0.0)),
             "preview": self.preview_html is not None, "design": self.design_html is not None, "design_html": self.design_html,
             "live": {"turn": self.live["turn"], "phase": self.live["phase"], "raw": "".join(self.live["buf"])} if self.live else None,
             "engine": self.engine, "workdir": str(self.workdir) if self.workdir else None, "engine_session": self.engine_session,
             "activity": self.activity[-60:], "todos": self.todos,
             "app_run": self.app_run.state() if self.app_run else None,
             "design_review": self.status == "design_review", "design_rounds": self.design_rounds,
-            "research": self.research_refs, "references": self.req.references, "deep_analysis": self.req.deep_analysis, "platform": self.req.platform, "language": self.req.language, "fees": self.fees, "fees_usd": round(sum(float(f.get("usd") or 0) for f in self.fees), 2), "fees_due_usd": round(sum(float(f.get("usd") or 0) for f in self.fees if not f.get("paid")), 2),
+            "research": self.research_refs, "references": self.req.references, "deep_analysis": self.req.deep_analysis, "platform": self.req.platform, "language": self.req.language, "references_auto": self.req.references_auto, "fees": self.fees, "fees_usd": round(sum(float(f.get("usd") or 0) for f in self.fees), 2), "fees_due_usd": round(sum(float(f.get("usd") or 0) for f in self.fees if not f.get("paid")), 2),
             "council_sessions": self.council_sessions, "council": self.req.council,
             "versions": self.versions, "version": len(self.versions), "pending_council": self.pending_council(),
             "mode": self.mode, "audit_report": self.audit_report, "deploys": self.deploys,
@@ -440,10 +548,11 @@ class Build:
         self._pending_requests = [{"severity": "mejora", "role": r.get("role_label", ""), "text": r["text"]} for r in requests if r.get("text")]
         self._pending_trigger, self._pending_from = "audit", None
         text = "MEJORAS APROBADAS POR EL USUARIO tras la auditoría del equipo:\n" + "\n".join(f"- [{r.get('role_label', '')} · {r.get('name', '')}] {r['text']}" for r in requests if r.get("text"))
+        shown = self.tx("Mejoras aprobadas tras la auditoría:", "Improvements approved after the audit:") + "\n" + "\n".join(f"- [{r.get('role_label', '')}] {r['text']}" for r in requests if r.get("text"))
         text += "\n\nAplicá TODAS con archivos completos (respetando el estilo y la estructura existentes), actualizá README/NOTES si corresponde y, al terminar, emití <done>."
         self.status = "running"
         self._stop = asyncio.Event()
-        self.chat.append({"role": "user", "text": text, "ts": time.time()})
+        self.chat.append({"role": "user", "text": shown, "ts": time.time()})  # the chat shows the list; the instructions go to the builder only
         self.task = spawn(self.pipeline(text))
 
     async def _audit_report(self, rnd: dict) -> None:
@@ -464,6 +573,8 @@ class Build:
                 res = await run_engine(self.engine, user + "\n\nEscribí el informe con el formato indicado.", self.workdir, system=system, read_only=True, max_turns=6, on_event=lambda *a, **k: None)
                 text = res.get("text") or ""
                 self.cost += float(res.get("cost") or 0)
+                self.engine_cost += float(res.get("cost") or 0)
+                self.engine_tokens += int(res.get("tokens") or 0)
             else:
                 result = CallResult()
                 mock = MockContext("Chair", [("x", "x")], self.title, script=_mock_audit_report(self.title, rnd))
@@ -476,6 +587,7 @@ class Build:
                 text = "".join(parts)
                 self.cost += cost_usd(self.req.model, result.input_tokens, result.output_tokens)
                 self.tokens += result.input_tokens + result.output_tokens
+                self._add_api_usage(result)
         except Exception as e:
             text = f"# Informe de auditoría · {self.title}\n\n(No se pudo generar la síntesis: {str(e)[:200]}. Abajo están las evaluaciones por rol.)\n\n{evals}"
         self.live = None
@@ -505,7 +617,7 @@ class Build:
                     while self.req.design_review and self.status != "error" and not self._stop.is_set() and self.design_rounds < 6:
                         self.status = "design_review"
                         self._design_ok.clear()
-                        self.chat.append({"role": "system", "text": "El diseño está listo: revisalo en la pestaña Diseño. Aprobalo para construir, o pedí cambios.", "ts": time.time()})
+                        self.chat.append({"role": "system", "text": self.tx("El diseño está listo: revisalo en la pestaña Diseño. Aprobalo para construir, o pedí cambios.", "The design is ready: review it in the Design tab. Approve it to build, or ask for changes."), "ts": time.time()})
                         self.emit("design.review", html=self.files.get(DESIGN_MOCKUP, ""), round=self.design_rounds + 1)
                         self._save()
                         await self._design_ok.wait()
@@ -515,7 +627,7 @@ class Build:
                             break
                         self.design_rounds += 1
                         fb, self.design_feedback = self.design_feedback, None
-                        self.chat.append({"role": "user", "text": f"Cambios al diseño: {fb}", "ts": time.time()})
+                        self.chat.append({"role": "user", "text": self.tx("Cambios al diseño: ", "Design changes: ") + fb, "ts": time.time()})
                         await self.design_phase(feedback=fb)
                         await self._ensure_mockup()
                 if self.status != "error":
@@ -523,7 +635,7 @@ class Build:
                 # a last pass that makes the UI match the design (typography, tokens, states, first impact): the difference
                 # between "works" and "looks like a product"
                 if resume_with is None and self.req.design and self.status == "completed" and self.files and not self._stop.is_set():
-                    self.chat.append({"role": "system", "text": "Pulido visual: el constructor ajusta la UI al diseño antes de entregar.", "ts": time.time()})
+                    self.chat.append({"role": "system", "text": self.tx("Pulido visual: el constructor ajusta la UI al diseño antes de entregar.", "Visual polish: the builder matches the UI to the design before delivering."), "ts": time.time()})
                     await self.run(POLISH_PROMPT)
                 if self.status == "completed" and self.files:
                     self.snapshot_version()
@@ -605,7 +717,7 @@ class Build:
                         # the model hit the output limit: unfinished <file> blocks were dropped; make it redo them in smaller turns
                         open_file = re.findall(r'<file path="([^"\n]+)"\s*>(?![\s\S]*</file>)', text)
                         cut = open_file[-1] if open_file else None
-                        self.chat.append({"role": "system", "text": f"El turno se cortó por el límite de salida{f' en `{cut}`' if cut else ''}. Se le pide reanudar con menos archivos por turno.", "ts": time.time()})
+                        self.chat.append({"role": "system", "text": self.tx(f"El turno se cortó por el límite de salida{f' en `{cut}`' if cut else ''}. Se le pide reanudar con menos archivos por turno.", f"The turn was cut off by the output limit{f' at `{cut}`' if cut else ''}. It is asked to resume with fewer files per turn."), "ts": time.time()})
                         self.emit("notice", text=f"Turno cortado por límite de salida{f' en {cut}' if cut else ''}; se reanuda con menos archivos por turno.")
                         pending_user = (f"Tu turno anterior se cortó por el límite de salida" + (f" mientras escribías `{cut}` (ese archivo NO quedó guardado)" if cut else "") +
                                         ". Seguí desde ahí: entregá como máximo 3 archivos por turno, completos, empezando por el que faltó.")
@@ -624,7 +736,7 @@ class Build:
                         continue
                     if idle >= 3:
                         # three turns without files, stage, done or a read: the model is stuck asking for something the pipeline cannot give
-                        self.chat.append({"role": "system", "text": "El constructor se trabó: tres turnos seguidos sin entregar archivos. Se detiene para no gastar tokens. Podés pedirle lo mismo con más precisión, o pedirle que use <read path=\"…\"/> para leer lo que necesite.", "ts": time.time()})
+                        self.chat.append({"role": "system", "text": self.tx("El constructor se trabó: tres turnos seguidos sin entregar archivos. Se detiene para no gastar tokens. Podés pedirle lo mismo con más precisión, o pedirle que use <read path=\"…\"/> para leer lo que necesite.", "The builder got stuck: three turns in a row without delivering files. It stops so it does not burn tokens. Ask again more precisely, or ask it to use <read path=\"…\"/> to read what it needs."), "ts": time.time()})
                         self.emit("notice", text="Constructor detenido: tres turnos seguidos sin entregar archivos.")
                         self.status = "stopped"
                         break
@@ -667,7 +779,7 @@ class Build:
         if was_engine != self.engine:
             self.engine_session = None  # a different agent: no session to resume
         if not same:
-            self.chat.append({"role": "system", "text": f"Constructor cambiado a {provider} · {model}.", "ts": time.time()})
+            self.chat.append({"role": "system", "text": self.tx("Constructor cambiado a ", "Builder switched to ") + f"{provider} · {model}.", "ts": time.time()})
             self.emit("build.status", status=self.status, build=self.snapshot())
             self._save()
 
@@ -721,7 +833,7 @@ class Build:
                 dest = self.workdir / rel
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_text(content)
-        self.chat.append({"role": "system", "text": f"Kit de UI sembrado: {len(info['components'])} componentes de shadcn/ui en {uikit.UI_DIR}/, Tailwind v4 y los tokens del diseño ({uikit.GUIDE_PATH}).", "ts": time.time()})
+        self.chat.append({"role": "system", "text": self.tx(f"Kit de UI sembrado: {len(info['components'])} componentes de shadcn/ui en {uikit.UI_DIR}/, Tailwind v4 y los tokens del diseño ({uikit.GUIDE_PATH}).", f"UI kit seeded: {len(info['components'])} shadcn/ui components in {uikit.UI_DIR}/, Tailwind v4 and the design tokens ({uikit.GUIDE_PATH})."), "ts": time.time()})
         self._save()
         return uikit.builder_block(info)
 
@@ -731,18 +843,62 @@ class Build:
         return (f"\n\nRecordá el kit de UI del proyecto ({uikit.GUIDE_PATH}): la interfaz se compone con los componentes de {uikit.UI_DIR}/ y las clases de tokens "
                 "(bg-background, text-muted-foreground, bg-primary…); nada de controles caseros ni hex sueltos.")
 
+    @property
+    def en(self) -> bool:
+        from .intake import lang_code
+
+        return lang_code(self.req.language) == "en"
+
+    def tx(self, es: str, en: str) -> str:
+        """User-facing text in the session language (chat notes, headers)."""
+        return en if self.en else es
+
+    def _lang_note(self) -> str:
+        return f"\n\nIDIOMA: tus mensajes, resúmenes, README/NOTES y todo el texto de la interfaz van en {self.req.language}."
+
+    def _add_api_usage(self, result: Any) -> None:
+        cr, cw = int(getattr(result, "cached_input_tokens", 0) or 0), int(getattr(result, "cache_write_tokens", 0) or 0)
+        self.api_usage["input"] += max(0, int(result.input_tokens or 0) - cr - cw)
+        self.api_usage["output"] += int(result.output_tokens or 0)
+        self.api_usage["cache_read"] += cr
+        self.api_usage["cache_write"] += cw
+
+    def usage(self) -> dict:
+        """Measured tokens of the whole build: API calls + the CLI agent (Claude Code from its session logs)."""
+        from .local_engine import claude_usage
+
+        u = dict(self.api_usage)
+        eng = claude_usage(self.workdir) if self.engine == "claude-code" and self.workdir else None
+        if eng:
+            for k in eng:
+                u[k] += eng[k]
+        engine_total = sum(eng.values()) if eng else self.engine_tokens
+        if not eng and self.engine_tokens:
+            u["input"] += self.engine_tokens  # Codex / Muse only report a total
+        api_total = sum(self.api_usage.values())
+        return u | {"total": sum(u.values()), "engine": engine_total, "api": api_total,
+                    "measured": bool(eng) or self.engine != "claude-code"}
+
+    def _publish_pages(self, changed: list[str]) -> None:
+        """Re-emit the prototype / mockup when they or a stylesheet or script they load changed, inlined for the pane."""
+        for path, ev in ((PREVIEW_PATH, "preview.ready"), (DESIGN_MOCKUP, "design.ready")):
+            raw = self.files.get(path)
+            if not raw or not (path in changed or html_refs(raw, path.rsplit("/", 1)[0]) & set(changed)):
+                continue
+            doc = inline_html(raw, path, self.files)
+            if path == PREVIEW_PATH:
+                self.preview_html = doc
+            else:
+                self.design_html = doc
+            self.emit(ev, path=path, html=doc)
+
     def _sync_from_disk(self) -> list[str]:
         assert self.workdir
         changed = sync_files(self.workdir, self.files)
         for rel in changed:
             c = self.files[rel]
             self.emit("file.written", path=rel, size=len(c), lines=c.count("\n") + 1, new=True, turn=self.turns)
-            if rel == PREVIEW_PATH:
-                self.preview_html = c
-                self.emit("preview.ready", path=rel, html=c)
-            if rel == DESIGN_MOCKUP:
-                self.design_html = c
-                self.emit("design.ready", path=rel, html=c)
+        self._publish_pages(changed)
         return changed
 
     async def _run_engine(self, resume_with: str | None) -> None:
@@ -764,16 +920,16 @@ class Build:
                       + await self._seed_uikit()
                       + (self._build_ref_prompt() if (self.workdir / RESEARCH_PATH).exists() else "")
                       + (REA_PROMPT if self.req.deep_analysis else "")
-                      + self.levels_block())
+                      + self.levels_block() + PREVIEW_RULE + self._lang_note())
         elif resume_with == CONTINUE:
             prompt = ("La construcción se interrumpió. Revisá el estado actual de este directorio frente a BRIEF.md, completá lo que falte del plan "
-                      f"(y los archivos incompletos), regenerá `{PREVIEW_PATH}` si cambió algo visible, y resumí qué hiciste y cómo correrlo.")
+                      f"(y los archivos incompletos), regenerá `{PREVIEW_PATH}` si cambió algo visible, y resumí qué hiciste y cómo correrlo." + PREVIEW_RULE + self._lang_note())
         else:
             prompt = (f"Pedido de cambios sobre el proyecto de este directorio (ver BRIEF.md):\n{resume_with}\n\nAplicá TODOS los cambios con archivos completos, "
                       f"actualizá README/NOTES si corresponde, regenerá `{PREVIEW_PATH}` para reflejarlos, y resumí qué cambió y cómo verificarlo."
                       + platform_note(self.req.platform)
                       + (self._build_ref_prompt() if (self.workdir / RESEARCH_PATH).exists() else "")
-                      + (REA_PROMPT if self.req.deep_analysis else ""))
+                      + (REA_PROMPT if self.req.deep_analysis else "") + PREVIEW_RULE + self._lang_note())
         self.turns += 1
         self.emit("turn.started", turn=self.turns, phase="build")
         buf: list[str] = []
@@ -836,7 +992,9 @@ class Build:
                     if res.get("subtype") != "error_max_turns" or self._stop.is_set():
                         break
                     self.cost += float(res.get("cost") or 0)
-                    self._note("El constructor llegó al límite de pasos del turno; sigue desde donde quedó.")
+                    self.engine_cost += float(res.get("cost") or 0)
+                    self.engine_tokens += int(res.get("tokens") or 0)
+                    self._note(self.tx("El constructor llegó al límite de pasos del turno; sigue desde donde quedó.", "The builder hit the turn's step limit; it continues from where it left off."))
                     res = await run_engine(self.engine, "Seguí EXACTAMENTE desde donde quedaste con el pedido anterior: completá lo que falte, dejá todo compilando y con los tests en verde, y resumí qué cambió y cómo verificarlo.",
                                            self.workdir, continue_=True, resume_session=self.engine_session, model=self._engine_model(), mcp=self._engine_mcp(), on_event=on_event)
                     if res.get("session_id"):
@@ -848,6 +1006,8 @@ class Build:
         self.live = None
         changed = self._sync_from_disk()
         self.cost += float(res.get("cost") or 0)
+        self.engine_cost += float(res.get("cost") or 0)
+        self.engine_tokens += int(res.get("tokens") or 0)
         summary = (res.get("text") or "").strip()
         if res.get("is_error"):
             self.status = "error"
@@ -868,10 +1028,12 @@ class Build:
                 try:
                     r2 = await run_engine(self.engine, f"Falta `{PREVIEW_PATH}`: creá ese único archivo HTML autocontenido (CSS/JS inline, sin dependencias, navegable, datos de ejemplo) que muestre el producto terminado tal como lo vería el usuario.", self.workdir, continue_=True, resume_session=self.engine_session, on_event=lambda *a, **k: None)
                     self.cost += float(r2.get("cost") or 0)
+                    self.engine_cost += float(r2.get("cost") or 0)
+                    self.engine_tokens += int(r2.get("tokens") or 0)
                 except Exception as e:
                     log.warning("preview pass failed: %s", e)
                 ch2 = self._sync_from_disk()
-                self.chat.append({"role": "assistant", "turn": self.turns, "say": "Vista previa generada." if self.preview_html else "No se pudo generar la vista previa.", "files": ch2, "stage": None, "done": None, "phase": "preview", "ts": time.time()})
+                self.chat.append({"role": "assistant", "turn": self.turns, "say": self.tx("Vista previa generada.", "Preview generated.") if self.preview_html else self.tx("No se pudo generar la vista previa.", "The preview could not be generated."), "files": ch2, "stage": None, "done": None, "phase": "preview", "ts": time.time()})
                 self.emit("turn.completed", **self.chat[-1])
         elif self.status == "running":
             self.status = "stopped" if self._stop.is_set() else "error"
@@ -900,6 +1062,8 @@ class Build:
             if res.get("is_error"):
                 text = f"<verdict>approve</verdict><findings>[mejora] No pude revisar: {res.get('error')}</findings><requests></requests>"
             self.cost += float(res.get("cost") or 0)
+            self.engine_cost += float(res.get("cost") or 0)
+            self.engine_tokens += int(res.get("tokens") or 0)
         except Exception as e:
             text = f"<verdict>approve</verdict><findings>[mejora] No pude revisar: {str(e)[:200]}</findings><requests></requests>"
         res_ = _parse_review(text, mode) | {"agent_id": agent["id"], "name": agent["name"], "role": agent["role"], "role_label": role["label"], "provider": self.engine, "model": ENGINES[self.engine]["label"]}
@@ -982,6 +1146,7 @@ class Build:
                 break
         self.cost += cost_usd(model, result.input_tokens, result.output_tokens, result.cached_input_tokens, result.cache_write_tokens)
         self.tokens += result.input_tokens + result.output_tokens
+        self._add_api_usage(result)
         return "".join(buf)
 
     def _note(self, text: str) -> None:
@@ -1006,7 +1171,7 @@ class Build:
         self.live = {"turn": self.turns, "phase": "research", "buf": []}
         who = self._vision_model()
         if not who:
-            self._note("Investigación de referentes omitida: hace falta una API key (Anthropic, OpenAI o Gemini) para mirar capturas.")
+            self._note(self.tx("Investigación de referentes omitida: hace falta una API key (Anthropic, OpenAI o Gemini) para mirar capturas.", "Reference research skipped: an API key (Anthropic, OpenAI or Gemini) is needed to look at screenshots."))
             self.live = None
             return
         provider, model, cred = who
@@ -1027,12 +1192,12 @@ class Build:
             # the user's list is respected as is: the team only proposes references when nothing was given, and
             # otherwise just resolves the public URL of apps the user typed by name
             if named_only and refs:
-                self._note("Buscando la URL de: " + ", ".join(named_only))
+                self._note(self.tx("Buscando la URL de: ", "Looking up the URL of: ") + ", ".join(named_only))
                 self._activity("search", "Resolviendo referentes nombrados")
                 ask = f"BRIEF:\n{self.brief[:6000]}\n\nEl usuario nombró estas apps (devolvé solo ellas, con su URL pública): {', '.join(named_only)}\nProponé exactamente {len(named_only)} referentes (JSON)."
                 want = len(named_only)
             else:
-                self._note("El equipo propone apps de referencia para esta categoría…" if not named_only else "El equipo busca las apps que nombraste y completa con referentes de la categoría…")
+                self._note(self.tx("El equipo propone apps de referencia para esta categoría…", "The team proposes reference apps for this category…") if not named_only else self.tx("El equipo busca las apps que nombraste y completa con referentes de la categoría…", "The team looks up the apps you named and adds references from the category…"))
                 self._activity("search", "Buscando referentes")
                 ask = f"BRIEF:\n{self.brief[:6000]}\n\n" + (f"El usuario nombró estas apps (buscá su URL pública e incluilas primero): {', '.join(named_only)}\n" if named_only else "") + f"Proponé {max(3, len(named_only))} referentes (JSON)."
                 want = rsch.MAX_REFERENCES
@@ -1045,10 +1210,11 @@ class Build:
                     seen.add(pr["url"])
                     added += 1
         if not refs:
-            self._note("No se encontraron referentes para investigar; el diseño sigue solo con el brief.")
+            self._note(self.tx("No se encontraron referentes para investigar; el diseño sigue solo con el brief.", "No references found to research; the design continues from the brief alone."))
             self.live = None
             return
-        self._note("Investigación de referentes: " + ", ".join(r["name"] or r["url"] for r in refs) + ". El equipo entra a cada app, saca capturas y anota qué emular y qué evitar.")
+        self._note(self.tx("Analizando modelos de referencia: el equipo saca capturas y anota qué emular y qué evitar.", "Analyzing reference models: the team takes screenshots and notes what to emulate and what to avoid.") if self.req.references_auto else
+                   self.tx("Investigación de referentes: ", "Reference research: ") + ", ".join(r["name"] or r["url"] for r in refs) + self.tx(". El equipo entra a cada app, saca capturas y anota qué emular y qué evitar.", ". The team opens each app, takes screenshots and notes what to emulate and what to avoid."))
         notes: list[str] = []
         for i, ref in enumerate(refs, 1):
             if self._stop.is_set():
@@ -1060,14 +1226,14 @@ class Build:
             self.research_refs.append(entry)
             self.emit("research.reference", **entry)
             if not cap.ok:
-                self._note(f"No se pudo abrir {ref['url']}: {cap.error}")
+                None if self.req.references_auto else self._note(self.tx(f"No se pudo abrir {ref['url']}: {cap.error}", f"Could not open {ref['url']}: {cap.error}"))
                 continue
             self._activity("read", f"Analizando {ref['name'] or cap.title or ref['url']}", ref["url"])
             images = [im for im in (cap.desktop, cap.mobile) if im] if not mock else None
             analysis = await self._ask(rsch.analyze_system(bool(self.req.deep_analysis)), rsch.build_user_prompt_for_analysis(cap, self.brief), provider, model, cred, images=images, max_tokens=4500 if self.req.deep_analysis else 3000,
                                        mock_text=f"## 1. Qué es\n{cap.title or ref['url']} (simulado).\n## 2. Pantallas\nHome con buscador y pronóstico.\n## 3. Patrones\nCards, jerarquía clara.\n## 4. Decisiones\nSin cuentas.\n## 5. Emular / evitar\nEmular: buscador arriba. Evitar: densidad excesiva.")
             notes.append(f"## {ref['name'] or cap.title or ref['url']}\nURL: {ref['url']}\n\n{analysis.strip()}")
-            self._note(f"{ref['name'] or cap.title or ref['url']}: notas tomadas ({len(analysis.split())} palabras).")
+            None if self.req.references_auto else self._note(self.tx(f"{ref['name'] or cap.title or ref['url']}: notas tomadas ({len(analysis.split())} palabras).", f"{ref['name'] or cap.title or ref['url']}: notes taken ({len(analysis.split())} words)."))
         md = ""
         if notes and not self._stop.is_set():
             self._activity("plan", "Armando el brief de referentes", RESEARCH_PATH)
@@ -1096,7 +1262,7 @@ class Build:
         self.design_turns += 1
         self.emit("build.started", build=self.snapshot())
         self.emit("turn.started", turn=self.turns, phase="design")
-        self.chat.append({"role": "system", "text": "Fase de diseño: el Product Designer diseña la interfaz antes de escribir código.", "ts": time.time()})
+        self.chat.append({"role": "system", "text": self.tx("Fase de diseño: el Product Designer diseña la interfaz antes de escribir código.", "Design phase: the Product Designer designs the interface before any code is written."), "ts": time.time()})
         if self.engine and not self._designer():
             await self._engine_design()
             return
@@ -1130,7 +1296,7 @@ class Build:
         for _ in range(tries):
             if DESIGN_MOCKUP in self.files or self._stop.is_set() or self.status == "error":
                 return
-            self.chat.append({"role": "system", "text": "Falta la maqueta (design/mockup.html): el diseñador la entrega ahora.", "ts": time.time()})
+            self.chat.append({"role": "system", "text": self.tx("Falta la maqueta (design/mockup.html): el diseñador la entrega ahora.", "The mockup (design/mockup.html) is missing: the designer delivers it now."), "ts": time.time()})
             ask = (f"Faltó {DESIGN_MOCKUP}. Entregá SOLO ese archivo, completo, con el protocolo <say>…</say><file path=\"{DESIGN_MOCKUP}\">…</file>: un único HTML autocontenido "
                    "(CSS inline en <style>, sin frameworks; Google Fonts por <link> si el diseño define una familia) que copia el :root de tokens.css y muestra las 3-5 pantallas clave "
                    "en alta fidelidad, navegables entre sí con JS mínimo, con datos reales del dominio, un estado vacío y uno de error, responsive. Sé eficiente con el largo: CSS compartido "
@@ -1143,6 +1309,8 @@ class Build:
                 assert self.workdir
                 res = await run_engine(self.engine, ask.split("\n\n=====")[0] + " Escribilo directamente en el archivo; DESIGN.md y tokens.css ya están en design/.", self.workdir, resume_session=self.engine_session, model=self._engine_model())
                 self.cost += float(res.get("cost") or 0)
+                self.engine_cost += float(res.get("cost") or 0)
+                self.engine_tokens += int(res.get("tokens") or 0)
                 self._sync_from_disk()
             else:
                 who = self._designer()
@@ -1157,7 +1325,7 @@ class Build:
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     dest.write_text(self.files[DESIGN_MOCKUP])
             if DESIGN_MOCKUP in self.files:
-                self.design_html = self.files[DESIGN_MOCKUP]
+                self.design_html = inline_html(self.files[DESIGN_MOCKUP], DESIGN_MOCKUP, self.files)
                 self.emit("design.ready", path=DESIGN_MOCKUP, html=self.design_html)
             self._save()
 
@@ -1192,6 +1360,8 @@ class Build:
         self.live = None
         changed = self._sync_from_disk()
         self.cost += float(res.get("cost") or 0)
+        self.engine_cost += float(res.get("cost") or 0)
+        self.engine_tokens += int(res.get("tokens") or 0)
         say = (res.get("text") or "").strip() or f"Diseño entregado: {', '.join(changed) or 'sin archivos'}."
         entry = {"role": "assistant", "turn": self.turns, "say": say, "files": changed, "stage": None, "done": None, "phase": "design", "ts": time.time()}
         self.chat.append(entry)
@@ -1319,10 +1489,10 @@ class Build:
         before = self.status
         try:
             if new_refs:
-                self.chat.append({"role": "system", "text": f"Investigando {len(new_refs)} referente(s) antes del consejo: {', '.join(new_refs)[:300]}", "ts": time.time()})
+                self.chat.append({"role": "system", "text": self.tx(f"Investigando {len(new_refs)} referente(s) antes del consejo: {', '.join(new_refs)[:300]}", f"Researching {len(new_refs)} reference(s) before the council: {', '.join(new_refs)[:300]}"), "ts": time.time()})
                 await self.research_phase(only=new_refs)
         except Exception as e:  # noqa: BLE001
-            self._note(f"La investigación de referentes falló: {str(e)[:200]}")
+            self._note(self.tx("La investigación de referentes falló: ", "The reference research failed: ") + str(e)[:200])
         finally:
             self.status = before if before not in ("running", "reviewing") else "completed"
             self.live = None
@@ -1384,7 +1554,7 @@ class Build:
         )
         s = start_session(cfg, self.user, self.creds_all)
         self.council_sessions.append(s.id)
-        self.chat.append({"role": "system", "text": f"El consejo revisa el proyecto en la arena (ronda {rnd}).", "ts": time.time()})
+        self.chat.append({"role": "system", "text": self.tx(f"El consejo revisa el proyecto en la arena (ronda {rnd}).", f"The council reviews the project in the arena (round {rnd})."), "ts": time.time()})
         self.emit("build.council", session_id=s.id, round=rnd)
         self._save()
         return s.id
@@ -1394,10 +1564,10 @@ class Build:
         USER_ENV.set(user_claude_env(self.user.id))  # the engine runs as this user (their own subscription token on a server)
         before = self.status
         try:
-            self.chat.append({"role": "system", "text": f"Investigando {len(refs)} referente(s) antes de aplicar los cambios: {', '.join(refs)[:300]}", "ts": time.time()})
+            self.chat.append({"role": "system", "text": self.tx(f"Investigando {len(refs)} referente(s) antes de aplicar los cambios: {', '.join(refs)[:300]}", f"Researching {len(refs)} reference(s) before applying the changes: {', '.join(refs)[:300]}"), "ts": time.time()})
             await self.research_phase(only=refs)
         except Exception as e:  # noqa: BLE001
-            self._note(f"La investigación de referentes falló: {str(e)[:200]}")
+            self._note(self.tx("La investigación de referentes falló: ", "The reference research failed: ") + str(e)[:200])
         finally:
             self.status = before if before not in ("running", "reviewing") else "completed"
             self.live = None
@@ -1413,13 +1583,18 @@ class Build:
         self._pending_requests, self._pending_trigger, self._pending_from = list(changes), "council", session_id
         text = "CAMBIOS PEDIDOS POR EL CONSEJO DE REVISIÓN (ronda {r}):\n".format(r=len(self.council_sessions)) + "\n".join(
             f"- [{c.get('severity', 'mejora')}]{(' [' + c['role'] + ']') if c.get('role') else ''} {c['text']}" for c in changes if c.get("text"))
+        sev = {"bloqueante": ("bloqueante", "blocking"), "mejora": ("mejora", "improvement")}
+        shown = self.tx(f"Cambios pedidos por el consejo (ronda {len(self.council_sessions)}):", f"Changes requested by the council (round {len(self.council_sessions)}):") + "\n" + "\n".join(
+            f"- [{self.tx(*sev.get(c.get('severity', 'mejora'), (c.get('severity', ''),) * 2))}]{(' [' + c['role'] + ']') if c.get('role') else ''} {c['text']}" for c in changes if c.get("text"))
         text += "\n\nAplicá TODOS los cambios con archivos completos (respetando el estilo y la estructura existentes), primero los bloqueantes, actualizá README/NOTES si corresponde y, al terminar, emití <done>."
         text += self.levels_block()
         if self.req.references and self.research_md:
-            text += f"\n\nREFERENTES del usuario: {', '.join(self.req.references[:8])} (notas en {RESEARCH_PATH}). Los cambios de UI y flujo tienen que dejar el producto al nivel de esos referentes." + self._ref_note()
+            who = "REFERENTES" if self.req.references_auto else "REFERENTES del usuario"
+            text += f"\n\n{who}: {', '.join(self.req.references[:8])} (notas en {RESEARCH_PATH}). Los cambios de UI y flujo tienen que dejar el producto al nivel de esos referentes." + self._ref_note()
+        text += PREVIEW_RULE
         self.status = "running"
         self._stop = asyncio.Event()
-        self.chat.append({"role": "user", "text": text, "ts": time.time()})
+        self.chat.append({"role": "user", "text": shown, "ts": time.time()})  # the chat shows the list; the instructions go to the builder only
         self.task = spawn(self.pipeline(text))
 
     # ------------------------------------------------------------- pre-production review
@@ -1487,6 +1662,7 @@ class Build:
                     cost = cost_usd(model, result.input_tokens, result.output_tokens)
                     self.cost += cost
                     self.tokens += result.input_tokens + result.output_tokens
+                    self._add_api_usage(result)
                     obs.safe_update(gen, output=text[:8000], usage_details={"input": result.input_tokens, "output": result.output_tokens}, cost_details={"total": cost})
             res = _parse_review(text, mode) | {"agent_id": agent["id"], "name": agent["name"], "role": agent["role"], "role_label": role["label"], "provider": provider, "model": model}
             self.emit("review.result", round=rnd, **res)
@@ -1573,6 +1749,7 @@ class Build:
             cost = cost_usd(model, result.input_tokens, result.output_tokens, result.cached_input_tokens, result.cache_write_tokens)
             self.cost += cost
             self.tokens += result.input_tokens + result.output_tokens
+            self._add_api_usage(result)
             obs.safe_update(gen, output=text[:20000], usage_details={"input": result.input_tokens, "output": result.output_tokens}, cost_details={"total": cost})
         return text
 
@@ -1586,12 +1763,7 @@ class Build:
         is_new = safe not in self.files
         self.files[safe] = content
         self.emit("file.written", path=safe, size=len(content), lines=content.count("\n"), new=is_new, turn=self.turns)
-        if safe == PREVIEW_PATH:  # any (re)write of the prototype publishes it
-            self.preview_html = content
-            self.emit("preview.ready", path=safe, html=content)
-        if safe == DESIGN_MOCKUP:
-            self.design_html = content
-            self.emit("design.ready", path=safe, html=content)
+        self._publish_pages([safe])  # any (re)write of the prototype, the mockup or a file they load publishes them
 
     def _apply(self, text: str, phase: str = "build") -> dict:
         files = []
@@ -1621,7 +1793,7 @@ class Build:
 
     def _save(self) -> None:
         try:
-            self._path().write_text(json.dumps({**self.snapshot(), "context": self.context, "file_contents": self.files, "events": self.events, "history": self.history}, ensure_ascii=False))
+            self._path().write_text(json.dumps({**self.snapshot(), "context": self.context, "file_contents": self.files, "events": self.events, "history": self.history, "engine_tokens": self.engine_tokens, "api_usage": self.api_usage}, ensure_ascii=False))
         except Exception as e:  # pragma: no cover
             log.warning("could not save build: %s", e)
 
@@ -1663,12 +1835,20 @@ def rehydrate(user: User, session_id: str, build_id: str, cred: Cred, team: list
     b.req.references = [r for r in (d.get("references") or []) if isinstance(r, str)]
     b.req.deep_analysis = bool(d.get("deep_analysis", False))
     b.req.language = d.get("language") or b.req.language
+    b.req.references_auto = bool(d.get("references_auto", False))
     b.stages = d.get("stages", [])
     b.chat = d.get("chat", [])
     b.events = d.get("events", [])
     b.cost, b.tokens, b.turns, b.done_text = d.get("cost_usd", 0.0), d.get("tokens", 0), d.get("turns", 0), d.get("done", "")
-    b.preview_html = b.files.get(PREVIEW_PATH)
-    b.design_html = b.files.get(DESIGN_MOCKUP)
+    b.engine_tokens = int(d.get("engine_tokens") or 0)
+    # builds saved before the split: the engine's reported cost is the total minus nothing known (API calls were a few cents)
+    b.engine_cost = float(d["engine_cost_usd"]) if d.get("engine_cost_usd") is not None else (b.cost if b.engine else 0.0)
+    if d.get("api_usage"):
+        b.api_usage = {**b.api_usage, **d["api_usage"]}
+    else:  # builds saved before usage was split: their API tokens are known only as a total
+        b.api_usage["unsplit"] = int(d.get("tokens") or 0)
+    b.preview_html = inline_html(b.files.get(PREVIEW_PATH) or "", PREVIEW_PATH, b.files) or None
+    b.design_html = inline_html(b.files.get(DESIGN_MOCKUP) or "", DESIGN_MOCKUP, b.files) or None
     b.design_turns = 1 if b.design_html else 0
     b.research_md = b.files.get(RESEARCH_PATH, "")
     b.research_refs = d.get("research", [])

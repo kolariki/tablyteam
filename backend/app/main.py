@@ -893,7 +893,7 @@ async def create_direct_build(body: dict, user: User = CurrentUser):
         if not cred or cred.source == "none":
             raise HTTPException(400, f"Falta la API key de {provider}")
     req = BuildRequest(session_id=sid, provider=provider, model=model or (cred.model or ""), target=target, review_rounds=0, council=True, design=bool(body.get("design", True)),
-                       design_review=False, research=bool(refs), references=refs, deep_analysis=bool(body.get("deep_analysis")), platform=config["platform"], language=config.get("language") or "español rioplatense")
+                       design_review=False, research=bool(refs), references=refs, deep_analysis=bool(body.get("deep_analysis")), platform=config["platform"], references_auto=bool(config.get("references_auto")), language=config.get("language") or "español rioplatense")
     b = start_build(user, req, cred, brief, title, agents, eff)
     b.chat.insert(0, {"role": "system", "text": "Vía rápida: brief escrito desde tu pedido (sin consejo) y construcción directa.", "ts": _t.time()})
     return {"session_id": sid, "id": b.id, "brief_by": f"{bp} · {bm}"}
@@ -979,6 +979,7 @@ async def create_build(req: BuildRequest, user: User = CurrentUser):
     if req.platform == "web":  # the request rarely says it: the session config decides (web / mobile / both)
         req.platform = data["config"].get("platform") or "web"
     req.language = data["config"].get("language") or req.language
+    req.references_auto = bool(data["config"].get("references_auto"))
     b = start_build(user, req, cred, brief, title, data["config"].get("agents", []), keystore.creds(user.id))
     return {"id": b.id}
 
@@ -1258,10 +1259,21 @@ def _build(user: User, build_id: str, session_id: str | None = None):
 def get_build(session_id: str, build_id: str, user: User = CurrentUser):
     b = BUILDS.get(build_id)
     if b and b.user.id == user.id:
-        return b.snapshot() | {"file_contents": b.files}
+        return b.snapshot() | {"file_contents": b.files, "preview_html": b.preview_html, "design_html": b.design_html}
     d = load_build(user, session_id, build_id)
     if not d:
         raise HTTPException(404)
+    from .builder import DESIGN_MOCKUP, PREVIEW_PATH, inline_html
+
+    fc = d.get("file_contents") or {}
+    from .builder import saved_usage
+    from .local_engine import is_engine
+
+    d["usage"] = saved_usage(d)
+    if d.get("engine_cost_usd") is None:
+        d["engine_cost_usd"] = float(d.get("cost_usd") or 0) if is_engine(d.get("provider") or "") else 0.0
+    d["preview_html"] = inline_html(fc.get(PREVIEW_PATH) or "", PREVIEW_PATH, fc) or None
+    d["design_html"] = inline_html(fc.get(DESIGN_MOCKUP) or "", DESIGN_MOCKUP, fc) or d.get("design_html")
     return d
 
 

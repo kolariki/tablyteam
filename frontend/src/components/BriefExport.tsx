@@ -22,7 +22,7 @@ const TARGET_HINT: Record<string, [string, string]> = {
 /** The ```text block under section 10 — the part you paste into the builder agent. */
 function extractPrompt(md: string): string | null {
   const body = md.split('<details>')[0]
-  const i = body.search(/\n##\s*\d+\.?\s*Prompt para el agente/i)
+  const i = body.search(/\n##\s*\d+\.?\s*Prompt (?:para el agente|for the builder agent)/i)
   const sec = i >= 0 ? body.slice(i) : body
   const m = sec.match(/```(?:text|txt|markdown|md)?\n([\s\S]*?)```/)
   return m ? m[1].trim() : null

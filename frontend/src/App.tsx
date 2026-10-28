@@ -260,14 +260,37 @@ function AppInner() {
     const d = await api.build(sessionId, id)
     const files = Object.fromEntries(Object.entries(d.files ?? {}).map(([k, v]) => [k, { ...(v as object), content: d.file_contents?.[k] } as never]))
     useBuild.getState().reset({
-      id, sessionId, provider: d.provider, model: d.model, title: d.title, engineSession: d.engine_session ?? null, workdir: d.workdir ?? null, versions: d.versions ?? [], pendingCouncil: d.pending_council ?? null, status: d.status === 'running' || d.status === 'reviewing' ? 'connecting' : d.status, files, chat: d.chat, stages: d.stages, cost: d.cost_usd, buildSeconds: (d as { build_seconds?: number }).build_seconds ?? 0, tokens: d.tokens, done: d.done,
+      id, sessionId, provider: d.provider, model: d.model, title: d.title, engineSession: d.engine_session ?? null, workdir: d.workdir ?? null, versions: d.versions ?? [], pendingCouncil: d.pending_council ?? null, status: d.status === 'running' || d.status === 'reviewing' ? 'connecting' : d.status, files, chat: d.chat, stages: d.stages, cost: d.cost_usd, buildSeconds: (d as { build_seconds?: number }).build_seconds ?? 0, usage: (d as { usage?: never }).usage ?? null, engineCost: (d as { engine_cost_usd?: number }).engine_cost_usd ?? 0, turns: (d as { turns?: number }).turns ?? 0, tokens: d.tokens, done: d.done,
       selected: Object.keys(files)[0] ?? null, team: d.team ?? [], reviews: d.reviews ?? [], reviewPlan: d.review_plan ?? null, mode: d.mode ?? 'build', auditReport: d.audit_report ?? null,
-      previewHtml: d.file_contents?.['preview/index.html'] ?? null, designHtml: d.file_contents?.['design/mockup.html'] ?? d.design_html ?? null, pane: d.audit_report ? 'report' : 'code', levels: d.levels ?? null,
+      previewHtml: d.preview_html ?? d.file_contents?.['preview/index.html'] ?? null, designHtml: d.design_html ?? d.file_contents?.['design/mockup.html'] ?? null, pane: d.audit_report ? 'report' : 'code', levels: d.levels ?? null,
     })
     if (show) st.set({ showBriefExport: false, view: 'builder' })
     buildWs.current?.()
     if (d.status === 'running' || d.status === 'reviewing' || d.status === 'design_review') openBuildWs(id)  // waiting for design approval is live too
   }
+
+  /** Deep link to a build (#build=<session>~<build>): the session is loaded quietly (for «← Council») and the build opens. */
+  const openBuildLink = async (sid: string, bid: string) => {
+    const data = await api.session(sid).catch(() => null)
+    cleanup.current?.()
+    useArena.getState().reset({ view: useArena.getState().view, source: 'replay', status: 'connecting', sessionId: sid })
+    if (data) for (const ev of data.events) useArena.getState().apply(ev)
+    useArena.getState().set({ showVerdict: false })
+    await openBuild(bid)
+  }
+
+  // while the builder is on screen the address names the build, so F5 comes back to it (and not to the council that sent it)
+  useEffect(() => {
+    const sync = () => {
+      const a = useArena.getState(), b = useBuild.getState()
+      if (a.view === 'builder' && b.id && b.sessionId) {
+        const h = `#build=${b.sessionId}~${b.id}`
+        if (location.hash !== h) history.replaceState(null, '', h)
+      } else if (a.view === 'arena' && a.sessionId && location.hash.startsWith('#build=')) history.replaceState(null, '', `#live=${a.sessionId}`)
+    }
+    const u1 = useArena.subscribe(sync), u2 = useBuild.subscribe(sync)
+    return () => { u1(); u2() }
+  }, [])
 
   /** «Correr app» from the home: the run view opens right there, over the home, without entering the builder. */
   const [runOverlay, setRunOverlay] = useState(false)
@@ -474,6 +497,11 @@ function AppInner() {
       useArena.getState().set({ view: 'tickets' })
       if (failed) toast.error('Notion no terminó de conectarse', 'Probá de nuevo o pegá el token de una integración interna.')
       return
+    }
+    const bm = location.hash.match(/^#build=([^~]+)~(.+)$/)
+    if (bm) {  // a reload inside the builder: back to that same build, never to the council's verdict
+      openBuildLink(bm[1], bm[2]).catch(() => openSaved(bm[1]).catch(leave))
+      return () => cleanup.current?.()
     }
     const m = location.hash.match(/^#(replay|live)=(.+)$/)
     if (!m) return

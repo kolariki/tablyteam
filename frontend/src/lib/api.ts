@@ -50,7 +50,25 @@ async function j<T>(res: Promise<Response>): Promise<T> {
     }
     throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail))
   }
-  return r.json()
+  const body = await r.json()
+  return (getLang() === 'en' ? useEnglish(body) : body) as T
+}
+
+/** Small backend objects carry English twins (hint / hint_en, label / label_en…): with the UI in English the twin wins. */
+function useEnglish(v: unknown, depth = 0): unknown {
+  if (depth > 4 || !v || typeof v !== 'object') return v
+  if (Array.isArray(v)) {
+    for (const x of v) useEnglish(x, depth + 1)
+    return v
+  }
+  const o = v as Record<string, unknown>
+  for (const k of Object.keys(o)) {
+    if (k.endsWith('_en')) {
+      const base = k.slice(0, -3)
+      if (base in o && typeof o[k] === 'string' && o[k]) o[base] = o[k]
+    } else if (o[k] && typeof o[k] === 'object') useEnglish(o[k], depth + 1)
+  }
+  return v
 }
 
 export interface User {

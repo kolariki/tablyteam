@@ -1,4 +1,5 @@
 import DOMPurify from 'dompurify'
+import { srv } from '../lib/serverText'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, CheckCircle2, Trophy, FlaskConical, Gauge, Home, ListChecks, Search, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2, CloudUpload, Clock3 } from 'lucide-react'
 import { marked } from 'marked'
@@ -118,6 +119,17 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
   useEffect(() => {
     chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: 'smooth' })
   }, [b.chat.length, live.say.length, live.files.length])
+  // when something below the chat grows (the step log opening, quick requests), keep the latest messages in view
+  const atBottom = useRef(true)
+  useEffect(() => {
+    const el = chatRef.current
+    if (!el) return
+    const onScroll = () => { atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80 }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    const ro = new ResizeObserver(() => { if (atBottom.current) el.scrollTop = el.scrollHeight })
+    ro.observe(el)
+    return () => { el.removeEventListener('scroll', onScroll); ro.disconnect() }
+  }, [b.id])
 
 
   // fetch a file's content lazily when selected (contents aren't streamed into the tree)
@@ -640,54 +652,50 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
 }
 
 /** The live strip under the chat box: the agent's current action with its path, this turn's counters and the clock. */
-/** What this build saved versus doing it by hand in a chat with an LLM: an estimate, with its assumptions stated. */
+/** What this build used, all measured: tokens (API calls + the CLI agent's own session logs), wall-clock and cost. */
 function SavingsCard() {
   const T = useT()
   const b = useBuild()
   const [open, setOpen] = useState(false)
-  const files = Object.values(b.files)
-  const codeTokens = Math.round(files.reduce((a, f) => a + (f.content?.length ?? 0), 0) / 4)
-  if (!codeTokens) return null
-  // by hand: K rounds of "paste the project, ask for the next piece"; every round resends what exists so far and the
-  // model rewrites it; each round costs a person ~8 minutes (prompting, pasting, running, reading)
-  const K = Math.min(14, Math.max(4, b.stages.length || Math.ceil(files.length / 6)))
-  const baselineTokens = Math.round((codeTokens * (K + 1)) / 2 + codeTokens * 1.4 + K * 1200)
-  const baselineMinutes = K * 8
-  const ourTokens = b.tokens || codeTokens
-  const price = b.cost > 0 && b.tokens > 0 ? b.cost / b.tokens : 20 / 1e6
-  const baselineCost = baselineTokens * price
-  const ourCost = (b.provider === 'claude-code' || b.provider === 'codex' || b.provider === 'muse-code') ? b.fees : b.cost
-  const tokSaved = Math.max(0, baselineTokens - ourTokens)
-  const minSaved = Math.max(0, baselineMinutes - Math.round(b.buildSeconds / 60))
-  const usdSaved = Math.max(0, baselineCost - ourCost)
-  const pct = baselineTokens ? Math.round((100 * tokSaved) / baselineTokens) : 0
+  const u = b.usage
+  if (!u || !u.total) return null
+  const engine = b.provider === 'claude-code' || b.provider === 'codex' || b.provider === 'muse-code'
+  const apiCost = Math.max(0, b.cost - b.engineCost)  // charged to the user's API keys (design, council, API builders)
+  const paid = apiCost + (b.fees || 0)
+  const saved = engine ? b.engineCost : 0  // the agent's API-equivalent price, covered by the user's subscription
   const fmtTok = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n))
-  const fmtMin = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m} min`)
+  const usd = (n: number) => `$${n.toFixed(2)}`
+  const read = u.input + u.cache_write + (u.unsplit ?? 0)
+  const name = b.provider === 'claude-code' ? 'Claude Code' : b.provider === 'codex' ? 'Codex' : 'Muse Code'
+  const cells: [string, string, string][] = [
+    [T('Tokens', 'Tokens'), fmtTok(u.total), `${fmtTok(u.output)} ${T('escritos', 'written')} · ${fmtTok(u.cache_read)} ${T('de caché', 'from cache')} · ${fmtTok(read)} ${T('leídos', 'read')}`],
+    [T('Tiempo', 'Time'), fmtDur(Math.round(b.buildSeconds)), `${b.turns} ${T('turnos del constructor', 'builder turns')}`],
+    engine
+      ? [T('Pagaste', 'You paid'), usd(paid), `${name} ${T('lo valúa en', 'prices it at')} ${usd(b.engineCost)} ${T('a precio de API; lo cubre tu suscripción', 'at API rates; your subscription covers it')}`]
+      : [T('Costo', 'Cost'), usd(b.cost + (b.fees || 0)), T('cobrado a tus API keys', 'charged to your API keys')],
+  ]
   return (
     <div className="rounded-2xl border border-accent/25 bg-accent-soft/40 px-4 py-3 text-sm">
       <div className="flex items-center gap-2">
         <Sparkles size={16} className="shrink-0 text-accent" />
-        <div className="font-semibold">{T('Lo que te ahorró Tably en esta construcción', 'What Tably saved you on this build')}</div>
-        <span className="ml-auto rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-white">{pct}% tokens</span>
+        <div className="font-semibold">{engine && saved > 0 ? T('Lo que te ahorró Tably en esta construcción', 'What Tably saved you on this build') : T('Lo que usó esta construcción', 'What this build used')}</div>
+        {engine && saved > 0 && <span className="ml-auto rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-white">{usd(saved)} {T('ahorrados', 'saved')}</span>}
       </div>
-      <div className="mt-2 grid grid-cols-3 gap-2">
-        {[
-          [T('Tokens', 'Tokens'), fmtTok(tokSaved), `${fmtTok(ourTokens)} ${T('vs', 'vs')} ~${fmtTok(baselineTokens)}`],
-          [T('Tiempo', 'Time'), fmtMin(minSaved), `${fmtMin(Math.round(b.buildSeconds / 60))} ${T('vs', 'vs')} ~${fmtMin(baselineMinutes)}`],
-          [T('Costo', 'Cost'), `$${usdSaved.toFixed(2)}`, `$${ourCost.toFixed(2)} ${T('vs', 'vs')} ~$${baselineCost.toFixed(2)}`],
-        ].map(([l, v, sub]) => (
-          <div key={l} className="rounded-xl border border-line bg-surface px-3 py-2">
+      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        {cells.map(([l, v, sub]) => (
+          <div key={l} className="min-w-0 rounded-xl border border-line bg-surface px-3 py-2">
             <div className="text-[10.5px] uppercase tracking-[0.2em] text-ink-3">{l}</div>
             <div className="font-mono text-[18px] leading-tight text-ink">{v}</div>
-            <div className="truncate text-[11px] text-ink-3" title={sub}>{sub}</div>
+            <div className="text-[11px] leading-snug text-ink-3">{sub}</div>
           </div>
         ))}
       </div>
-      <button onClick={() => setOpen((v) => !v)} className="mt-2 flex items-center gap-1 text-[11.5px] text-ink-3 hover:text-ink"><ChevronDown size={12} className={`transition ${open ? 'rotate-180' : ''}`} /> {T('Cómo se estima', 'How it is estimated')}</button>
+      {!u.measured && <p className="mt-2 text-[11.5px] text-gold">{T('No están los registros de Claude Code de esta carpeta: los tokens del constructor no se pudieron contar, solo los de las llamadas a la API.', "Claude Code's logs for this folder are missing: the builder's tokens could not be counted, only the API calls'.")}</p>}
+      <button onClick={() => setOpen((v) => !v)} className="mt-2 flex items-center gap-1 text-[11.5px] text-ink-3 hover:text-ink"><ChevronDown size={12} className={`transition ${open ? 'rotate-180' : ''}`} /> {T('De dónde salen', 'Where they come from')}</button>
       {open && (
         <p className="mt-1 text-[11.5px] leading-snug text-ink-3">
-          {T(`Comparado con construir lo mismo a mano en un chat con un LLM: ${K} rondas de «pegá el proyecto y pedí la siguiente parte», donde cada ronda reenvía lo que ya existe y el modelo lo reescribe, más unos 8 minutos de trabajo tuyo por ronda. El precio por token es el de tu modelo (o un promedio de lista). Lo tuyo son tokens, tiempo y costo medidos en esta construcción. Es una estimación: el orden de magnitud, no una factura.`,
-            `Compared with building the same thing by hand in a chat with an LLM: ${K} rounds of "paste the project and ask for the next part", where every round resends what already exists and the model rewrites it, plus about 8 minutes of your work per round. The token price is your model's (or a list average). Yours are the tokens, time and cost measured on this build. It is an estimate: the order of magnitude, not an invoice.`)}
+          {T(`Todo medido, nada estimado. Tokens: los que informa cada llamada a la API (diseño, consejo) más los que ${name} registra en sus propios logs de sesión para esta carpeta, incluida la caché. Tiempo: el reloj real de los turnos. ${engine ? `Ahorro: el precio a tarifa de API que informa ${name} por su trabajo, que no pagaste porque corrió con tu suscripción. Pagaste: lo cobrado a tus API keys y los cargos por uso.` : 'Costo: lo cobrado a tus API keys, por modelo y tokens.'}`,
+            `All measured, nothing estimated. Tokens: what every API call reports (design, council) plus what ${name} records in its own session logs for this folder, cache included. Time: the real clock of the turns. ${engine ? `Saved: the API-rate price ${name} reports for its work, which you did not pay because it ran on your subscription. You paid: what was charged to your API keys plus usage fees.` : 'Cost: what was charged to your API keys, by model and tokens.'}`)}
         </p>
       )}
     </div>
@@ -716,11 +724,14 @@ function LiveStatusBar() {
       {/* the step log, opening upward from the bar */}
       <AnimatePresence>
         {open && acts.length > 0 && (
-          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} className="absolute inset-x-0 bottom-full mb-2 max-h-64 overflow-y-auto scroll-thin rounded-xl border border-line bg-[#1E2622] p-3 font-mono text-[11.5px] text-[#E6ECE8] shadow-[0_18px_40px_-18px_rgba(30,38,34,.6)]">
-            {acts.slice(-14).reverse().map((a, i) => {
-              const I = ICON[a.kind] ?? Search
-              return <div key={`${a.ts}-${i}`} className={`flex items-center gap-2 ${i ? 'opacity-70' : ''}`}><span className="text-[#5E6B65]">{new Date(a.ts * (a.ts < 1e12 ? 1000 : 1)).toLocaleTimeString()}</span><I size={11} className="shrink-0 text-[#8FD3B0]" /><span className="truncate">{a.label}</span>{a.path && <span className="truncate text-[#7F8C86]">{a.path}</span>}</div>
-            })}
+          // in the flow (not floating): opening it takes its own room and pushes the chat up instead of covering it
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+            <div className="mb-2 max-h-64 overflow-y-auto scroll-thin rounded-xl border border-line bg-[#1E2622] p-3 font-mono text-[11.5px] text-[#E6ECE8]">
+              {acts.slice(-14).reverse().map((a, i) => {
+                const I = ICON[a.kind] ?? Search
+                return <div key={`${a.ts}-${i}`} className={`flex items-center gap-2 ${i ? 'opacity-70' : ''}`}><span className="text-[#5E6B65]">{new Date(a.ts * (a.ts < 1e12 ? 1000 : 1)).toLocaleTimeString()}</span><I size={11} className="shrink-0 text-[#8FD3B0]" /><span className="truncate">{srv(a.label)}</span>{a.path && <span className="truncate text-[#7F8C86]">{a.path}</span>}</div>
+              })}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -730,7 +741,7 @@ function LiveStatusBar() {
       <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.2em] text-white">{phase}{b.liveTurn ? ` · ${T('turno', 'turn')} ${b.liveTurn}` : ''}</span>
       <span className="h-3.5 w-px shrink-0 bg-white/30" />
       <span className="min-w-0 flex-1 truncate">
-        {b.thinking && !last ? <span className="italic text-white/80">{T('pensando…', 'thinking…')}</span> : last ? <><span className="text-white">{last.label}</span>{last.path && <span className="ml-1.5 font-mono text-[11px] text-white/70">{last.path}</span>}</> : <span className="text-white/80">{T('arrancando…', 'starting…')}</span>}
+        {b.thinking && !last ? <span className="italic text-white/80">{T('pensando…', 'thinking…')}</span> : last ? <><span className="text-white">{srv(last.label)}</span>{last.path && <span className="ml-1.5 font-mono text-[11px] text-white/70">{last.path}</span>}</> : <span className="text-white/80">{T('arrancando…', 'starting…')}</span>}
       </span>
       <span className="hidden shrink-0 items-center gap-1.5 lg:flex">
         {chips.filter(([, n]) => n).map(([l, n]) => <span key={l} className="rounded-full bg-white/15 px-2 py-0.5 text-[10.5px] text-white/85"><b className="text-white">{n}</b> {l}</span>)}

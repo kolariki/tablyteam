@@ -109,6 +109,27 @@ def _simulate_logged_out() -> bool:
     return bool(os.environ.get("ARENA_ENGINES_OFFLINE")) or (DATA_DIR.parent / ".engines-offline").exists()
 
 
+_HINT_EN = [
+    ("No está instalado en esta máquina.", "Not installed on this machine."),
+    ("Instalá Claude Code:", "Install Claude Code:"), ("Instalá Muse Code:", "Install Muse Code:"), ("Instalá Codex CLI:", "Install Codex CLI:"),
+    ("Cargá tu META_API_KEY en Modelos y API keys, o iniciá sesión en tu terminal:", "Add your META_API_KEY in Models and API keys, or sign in from your terminal:"),
+    ("Iniciá sesión en tu terminal:", "Sign in from your terminal:"),
+    ("No pude leer el estado de login", "Could not read the login status"),
+    ("Logueado con API key (factura por uso). Para usar tu plan de ChatGPT:", "Signed in with an API key (billed per use). To use your ChatGPT plan:"),
+]
+
+
+def _en(st: dict) -> dict:
+    """English copies of the user-facing strings (the UI picks them by its language)."""
+    h = st.get("hint")
+    if h:
+        for es, en in _HINT_EN:
+            h = h.replace(es, en)
+    st["hint_en"] = h
+    st["label_en"] = (st.get("label") or "").replace("tu suscripción", "your subscription")
+    return st
+
+
 def engine_status(user_id: str | None = None) -> list[dict]:
     out = []
     offline = _simulate_logged_out()
@@ -121,7 +142,7 @@ def engine_status(user_id: str | None = None) -> list[dict]:
         st = {"id": eid, "label": spec["label"], "logo": spec["logo"], "color": spec["color"], "installed": bool(path), "version": None, "auth": None, "ok": False, "hint": None, "token_set": token_set if eid == "claude-code" else False}
         if not path:
             st["hint"] = "No está instalado en esta máquina." + (" Instalá Claude Code: https://claude.com/claude-code" if eid == "claude-code" else " Instalá Muse Code: curl -fsSL https://dev.meta.ai/install.sh | sh" if eid == "muse-code" else " Instalá Codex CLI: npm i -g @openai/codex")
-            out.append(st)
+            out.append(_en(st))
             continue
         if eid == "muse-code":
             _, v = _run([path, "--version"])
@@ -134,7 +155,7 @@ def engine_status(user_id: str | None = None) -> list[dict]:
                 st["ok"] = True
             else:
                 st["hint"] = "Cargá tu META_API_KEY en Modelos y API keys, o iniciá sesión en tu terminal: `muse login`"
-            out.append(st)
+            out.append(_en(st))
             continue
         _, v = _run([path, "--version"])
         st["version"] = v.splitlines()[0][:40] if v else None
@@ -163,7 +184,7 @@ def engine_status(user_id: str | None = None) -> list[dict]:
                 st["hint"] = "Logueado con API key (factura por uso). Para usar tu plan de ChatGPT: `codex logout && codex login`."
             elif not st["ok"]:
                 st["hint"] = "Iniciá sesión en tu terminal: `codex login`"
-        out.append(st)
+        out.append(_en(st))
     return out
 
 
@@ -253,6 +274,45 @@ def describe_tool(name: str, inp: dict, cwd: Path) -> dict:
         short = re.sub(r"\s+", " ", first.split("\n")[0])[:48]
         return {"kind": "run", "label": "Ejecutando", "path": short}
     return {"kind": "run", "label": name, "path": ""}
+
+
+# ------------------------------------------------------------------ measured usage
+_USAGE_CACHE: dict[str, tuple[tuple, dict]] = {}
+
+
+def claude_usage(cwd: Path) -> dict | None:
+    """Real token usage of every Claude Code run in this folder, read from Claude Code's own session logs
+    (~/.claude/projects/<folder>/*.jsonl; each assistant message once, by id). None when there are no logs."""
+    slug = re.sub(r"[^A-Za-z0-9-]", "-", str(cwd.resolve()))
+    d = Path(os.path.expanduser("~/.claude/projects")) / slug
+    logs = sorted(d.glob("*.jsonl")) if d.is_dir() else []
+    if not logs:
+        return None
+    key = tuple((str(f), f.stat().st_mtime_ns, f.stat().st_size) for f in logs)
+    hit = _USAGE_CACHE.get(str(d))
+    if hit and hit[0] == key:
+        return hit[1]
+    seen: dict[str, dict] = {}
+    for f in logs:
+        with f.open(encoding="utf-8", errors="ignore") as fh:
+            for line in fh:
+                if '"usage"' not in line:
+                    continue
+                try:
+                    e = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                m = e.get("message")
+                if e.get("type") == "assistant" and isinstance(m, dict) and isinstance(m.get("usage"), dict):
+                    seen[m.get("id") or e.get("uuid") or str(len(seen))] = m["usage"]
+    u = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}
+    for x in seen.values():
+        u["input"] += int(x.get("input_tokens") or 0)
+        u["output"] += int(x.get("output_tokens") or 0)
+        u["cache_read"] += int(x.get("cache_read_input_tokens") or 0)
+        u["cache_write"] += int(x.get("cache_creation_input_tokens") or 0)
+    _USAGE_CACHE[str(d)] = (key, u)
+    return u
 
 
 # ------------------------------------------------------------------ claude code

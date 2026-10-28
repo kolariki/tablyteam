@@ -104,6 +104,62 @@ Si el debate no fijó un stack concreto, usá el stack por defecto de Tably Clou
 qué verificar al final de cada etapa, cuándo frenar a preguntar y qué NO hacer)"""
 
 
+# English headings for the brief (same numbering, so parsers that key on "6.1" / "17." keep working)
+BRIEF_HEADINGS_EN = [
+    ("Formato EXACTO (Markdown, con estos encabezados):", "EXACT format (Markdown, with these headings, written in English):"),
+    ("<Nombre del producto>", "<Product name>"),
+    ("<qué es, para quién y qué problema resuelve, en 2 líneas>", "<what it is, who it is for and what problem it solves, in 2 lines>"),
+    ("## 1. Resumen ejecutivo y métrica de éxito", "## 1. Executive summary and success metric"),
+    ("## 2. Decisiones del equipo", "## 2. Team decisions"),
+    ("(tabla: Decisión | Quién (rol) | Turno | Por qué · incluí las de la ronda de cierre)", "(table: Decision | Who (role) | Turn | Why · include the closing round ones)"),
+    ("## 3. Desacuerdos y resolución", "## 3. Disagreements and resolution"),
+    ("## 4. Alcance del MVP", "## 4. MVP scope"),
+    ('(lista "Incluye" / lista "Fuera de alcance" / supuestos)', '("Included" list / "Out of scope" list / assumptions)'),
+    ("## 5. Usuarios e historias de usuario", "## 5. Users and user stories"),
+    ('(checklist "- [ ] US-NN · como … quiero … para …" con criterios de aceptación verificables)', '(checklist "- [ ] US-NN · as a … I want … so that …" with verifiable acceptance criteria)'),
+    ("## 6. Stack y servicios externos", "## 6. Stack and external services"),
+    ("(tabla: Componente | Tecnología/servicio | Versión | Por qué)", "(table: Component | Technology/service | Version | Why)"),
+    ("### 6.1 Cuentas y API keys necesarias", "### 6.1 Accounts and API keys needed"),
+    ("(tabla: Servicio | Para qué | Dónde se obtiene (URL) | Variable de entorno | Plan/costo estimado · si no hace falta ninguna, decilo)", "(table: Service | What for | Where to get it (URL) | Environment variable | Plan/estimated cost · if none is needed, say so)"),
+    ("### 6.2 Variables de entorno", "### 6.2 Environment variables"),
+    ("(bloque ```env``` con TODAS las variables, valores de ejemplo y comentario)", "(```env``` block with ALL variables, example values and a comment)"),
+    ("## 7. Arquitectura", "## 7. Architecture"),
+    ("(diagrama ```mermaid```, módulos y responsabilidades, flujo de datos principal)", "(```mermaid``` diagram, modules and responsibilities, main data flow)"),
+    ("## 8. Modelo de datos", "## 8. Data model"),
+    ("(bloque ```sql``` con DDL completo: tablas, tipos, claves, índices, constraints; más reglas de negocio sobre los datos)", "(```sql``` block with the full DDL: tables, types, keys, indexes, constraints; plus business rules on the data)"),
+    ("## 9. Contratos: API / acciones", "## 9. Contracts: API / actions"),
+    ("(tabla o lista por endpoint/acción: método, ruta, auth, request, response, errores)", "(table or list per endpoint/action: method, path, auth, request, response, errors)"),
+    ("## 10. Pantallas y flujos de UI", "## 10. Screens and UI flows"),
+    ("(por pantalla: propósito, elementos, estados vacío/carga/error/éxito, navegación; accesibilidad)", "(per screen: purpose, elements, empty/loading/error/success states, navigation; accessibility)"),
+    ("## 11. Estructura del proyecto", "## 11. Project structure"),
+    ("(bloque con el árbol de carpetas y archivos principales)", "(block with the folder tree and main files)"),
+    ("## 12. Setup del entorno", "## 12. Environment setup"),
+    ("(comandos exactos en bloques ```bash``` para crear el proyecto, instalar dependencias, configurar servicios y correrlo local)", "(exact commands in ```bash``` blocks to create the project, install dependencies, configure services and run it locally)"),
+    ("## 13. Plan de construcción por etapas", "## 13. Staged build plan"),
+    ('(Etapa N — objetivo · tickets "T-NN: …" con criterio de terminado · entregable verificable al final de cada etapa)', '(Stage N — goal · tickets "T-NN: …" with a definition of done · a verifiable deliverable at the end of each stage)'),
+    ("## 14. Estrategia de pruebas y criterios de aceptación", "## 14. Testing strategy and acceptance criteria"),
+    ("(qué se testea en cada nivel, casos críticos, comandos para correrlos, gate de release)", "(what is tested at each level, critical cases, commands to run them, release gate)"),
+    ("## 15. Deploy y operación", "## 15. Deploy and operations"),
+    ("(entornos, CI/CD, hosting, dominios, observabilidad, backups, costos mensuales estimados)", "(environments, CI/CD, hosting, domains, observability, backups, estimated monthly costs)"),
+    ("## 16. Riesgos, seguridad y preguntas abiertas", "## 16. Risks, security and open questions"),
+    ("## 17. Prompt para el agente constructor", "## 17. Prompt for the builder agent"),
+    ("(un único bloque ```text``` autocontenido, listo para copiar y pegar: referencia este documento, indica por dónde empezar,\nqué verificar al final de cada etapa, cuándo frenar a preguntar y qué NO hacer)",
+     "(a single self-contained ```text``` block, ready to copy and paste: it references this document, says where to start,\nwhat to verify at the end of each stage, when to stop and ask, and what NOT to do)"),
+]
+
+
+def brief_system(language: str, howto: str) -> str:
+    """BRIEF_SYSTEM for the session language: in English the headings themselves are English too (every word of the brief follows the UI language)."""
+    from .intake import lang_code
+
+    s = BRIEF_SYSTEM.format(language=language, howto=howto)
+    if lang_code(language) == "en":
+        for es, en in BRIEF_HEADINGS_EN:
+            s = s.replace(es, en)
+        s += "\n\nLANGUAGE: the WHOLE document is in English — headings, tables (header rows and cells), lists, notes and the final prompt. Not a single Spanish word."
+    return s
+
+
 class BriefRequest(BaseModel):
     provider: str
     model: str
@@ -279,7 +335,7 @@ async def stream_brief(user: User, session_id: str, req: BriefRequest) -> AsyncI
     if req.provider not in PROVIDERS or not cred or cred.source == "none":
         raise ValueError(f"Proveedor sin configurar: {req.provider}")
     cfg = data["config"]
-    system = BRIEF_SYSTEM.format(language=cfg.get("language", "español"), howto=TARGETS[req.target]["howto"])
+    system = brief_system(cfg.get("language", "español"), TARGETS[req.target]["howto"])
     if cfg.get("mode") == "direct":
         # the fast lane: no debate, the (prompt-engineered) request is the whole input
         user_msg = ("PEDIDO DEL USUARIO (ya pasó por prompt engineering; no hubo debate de equipo). Convertilo en el brief completo: donde el pedido no decide algo, "

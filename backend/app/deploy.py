@@ -123,7 +123,7 @@ def parse_brief_services(brief: str) -> dict[str, dict]:
         if not line.strip().startswith("|"):
             continue
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if len(cells) < 4 or set(cells[0]) <= {"-", ":", " "} or cells[0].lower().startswith("servicio"):
+        if len(cells) < 4 or set(cells[0]) <= {"-", ":", " "} or cells[0].lower().startswith(("servicio", "service")):
             continue
         for var in re.findall(r"[A-Z][A-Z0-9_]{2,}", cells[3]):
             out[var] = {"service": cells[0], "purpose": cells[1], "url": re.sub(r"[<>]", "", cells[2]), "cost": cells[4] if len(cells) > 4 else None}
@@ -214,8 +214,8 @@ def render_env(values: dict[str, str], files: dict[str, str]) -> str:
 # ------------------------------------------------------------------ deploy
 
 TARGETS = {
-    "vercel": {"label": "Vercel", "bin": "vercel", "token_help": "https://vercel.com/account/tokens", "good_for": "frontends y apps Next.js/Vite (sin servidor propio)"},
-    "railway": {"label": "Railway", "bin": "railway", "token_help": "https://railway.com/account/tokens", "good_for": "backends, APIs y apps con base de datos"},
+    "vercel": {"label": "Vercel", "bin": "vercel", "token_help": "https://vercel.com/account/tokens", "good_for": "frontends y apps Next.js/Vite (sin servidor propio)", "good_for_en": "frontends and Next.js/Vite apps (no server of their own)"},
+    "railway": {"label": "Railway", "bin": "railway", "token_help": "https://railway.com/account/tokens", "good_for": "backends, APIs y apps con base de datos", "good_for_en": "backends, APIs and apps with a database"},
 }
 
 Log = Callable[[str], Awaitable[None] | None]
@@ -236,9 +236,10 @@ def deploy_status(user_id: str) -> list[dict]:
     for tid, t in TARGETS.items():
         path = shutil.which(t["bin"])
         token = get_key(user_id, tid)
-        st = {"id": tid, "label": t["label"], "installed": bool(path), "token": bool(token), "logged_in": False, "good_for": t["good_for"], "token_help": t["token_help"], "hint": None}
+        st = {"id": tid, "label": t["label"], "installed": bool(path), "token": bool(token), "logged_in": False, "good_for": t["good_for"], "good_for_en": t.get("good_for_en"), "token_help": t["token_help"], "hint": None, "hint_en": None}
         if not path:
             st["hint"] = f"Instalá el CLI: npm i -g {'vercel' if tid == 'vercel' else '@railway/cli'}"
+            st["hint_en"] = f"Install the CLI: npm i -g {'vercel' if tid == 'vercel' else '@railway/cli'}"
         elif token:
             st["logged_in"] = True
         else:
@@ -247,6 +248,7 @@ def deploy_status(user_id: str) -> list[dict]:
             st["logged_in"] = code == 0 and "login" not in txt.lower() and "unauthorized" not in txt.lower()
             if not st["logged_in"]:
                 st["hint"] = f"Cargá un token en Configuración → Deploy, o iniciá sesión en tu terminal: `{t['bin']} login`"
+                st["hint_en"] = f"Add a token in Settings → Deploy, or sign in from your terminal: `{t['bin']} login`"
         st["ok"] = st["installed"] and st["logged_in"]
         out.append(st)
     return out
