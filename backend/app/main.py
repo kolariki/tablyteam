@@ -2149,10 +2149,155 @@ def tickets_list(all: bool = False, user: User = CurrentUser):
         b = BUILDS.get(r.get("build_id") or "")
         out_runs[pid] = _ticket_status(r, b if b and b.user.id == user.id else None)
     pprop = (link.get("projects") or {}).get("prop")
-    for t in items:  # which Tably project takes each ticket (strict: a Feature without an assigned project is not resolvable)
-        t["project"] = ticketsmod.project_for_ticket(link, t.get("fields") or {})
+    assigned = ticketsmod.assigned_projects(user.id)
+    for t in items:  # which Tably project takes each ticket (by hand, by Feature, detected from its text, or the default one)
+        t["project"] = ticketsmod.project_for_ticket(link, t.get("fields") or {}, assigned.get(t["id"]))
         t["project_value"] = ", ".join(ticketsmod.project_values(t.get("fields") or {}, pprop)) or None
-    return {"link": link, "tickets": items, "runs": out_runs, "groupable": groupable}
+    return {"link": link, "tickets": items, "runs": out_runs, "groupable": groupable, "classify": _CLASSIFY_JOBS.get(user.id)}
+
+
+_CLASSIFY_JOBS: dict[str, dict] = {}
+
+
+def _user_builds(user: User) -> list[dict]:
+    """Every saved build of the user (session + build ids, title, repo url) for the project index."""
+    from .auth import user_dir
+    link = ticketsmod.get_link(user.id) or {}
+    out = []
+    for p in sorted(user_dir(user.id).glob("*.build.*.json"), reverse=True):
+        sid, _, bid = p.stem.partition(".build.")
+        if not sid or not bid:
+            continue
+        try:
+            d = json.loads(p.read_text())
+        except Exception:
+            continue
+        pj = ticketsmod.project_by_build(link, bid) or {}
+        out.append({"session_id": sid, "build_id": bid, "title": d.get("title") or bid, "repo_url": pj.get("repo_url")})
+    return out
+
+
+def _classify_model(user: User):
+    """Muse first, then any other configured API provider; none → only the deterministic match is used."""
+    eff = keystore.creds(user.id)
+    for pid in ("meta", "anthropic", "openai", "gemini", "deepseek", "xai", "groq", "kimi", "mistral", "openrouter"):
+        c = eff.get(pid)
+        if c and c.source != "none":
+            return pid, c.model or PROVIDERS[pid].default_model, c
+    return None
+
+
+async def _classify_llm(who, index: list[dict], title: str, text: str) -> dict | None:
+    """Ask the model which project the ticket belongs to, given each project's name and top-level layout."""
+    from .providers import CallResult, stream
+    projects = "\n".join(f"- id={pj['build_id']} · {pj['title']} · carpetas: {', '.join(pj['tree'][:20]) or '-'} · archivos: {', '.join(pj['sample'][:25]) or '-'}" for pj in index)
+    system = ("Sos el tech lead. Decidís a qué repositorio pertenece un ticket. Respondé SOLO un JSON: "
+              '{"build_id": "<id o null>", "confidence": 0..1, "why": "<una frase>"}. Si no hay evidencia suficiente, build_id null.')
+    user_msg = f"PROYECTOS:\n{projects}\n\nTICKET «{title}»:\n{text[:3500]}"
+    result = CallResult()
+    buf: list[str] = []
+    try:
+        async for kind, delta in stream(who[0], who[1], system, user_msg, temperature=0.1, max_tokens=300, result=result, cred=who[2]):
+            if kind == "text":
+                buf.append(delta)
+        mobj = re.search(r"\{.*\}", "".join(buf), re.S)
+        d = json.loads(mobj.group(0)) if mobj else {}
+    except Exception as e:
+        log.warning("classify llm failed: %s", e)
+        return None
+    bid = d.get("build_id")
+    pj = next((x for x in index if x["build_id"] == bid), None)
+    if not pj or float(d.get("confidence") or 0) < 0.7:
+        return None
+    return {"ok": True, "session_id": pj["session_id"], "build_id": pj["build_id"], "title": pj["title"], "confidence": round(float(d["confidence"]), 2), "evidence": f"modelo: {str(d.get('why') or '')[:200]}"}
+
+
+async def _classify_run(user: User, page_ids: list[str] | None) -> None:
+    """Background: read each open ticket and decide its project from the files/repo it names, then the model. Hand-made choices are kept."""
+    from .auth import user_dir
+    job = _CLASSIFY_JOBS[user.id]
+    try:
+        link = ticketsmod.get_link(user.id) or {}
+        token = keystore.get_key(user.id, "notion") or ""
+        index = ticketsmod.project_index(user_dir(user.id), _user_builds(user))
+        if not index:
+            job.update(status="error", error="No hay proyectos subidos: auditá o construí uno primero.")
+            return
+        items = ticketsmod.tickets(token, link["database_id"], link.get("props") or {})
+        done_st = (link.get("status_map") or {}).get("done")
+        items = [t for t in items if not ((done_st and t.get("status") == done_st) or (t.get("status") and _CLOSED_RX.search(t["status"])))]
+        if page_ids:
+            items = [t for t in items if t["id"] in page_ids]
+        assigned = ticketsmod.assigned_projects(user.id)
+        who = _classify_model(user)
+        if who and PROVIDERS[who[0]].kind == "mock":
+            who = None
+        job.update(total=len(items), done=0, detected=0, undecided=0)
+        for t in items:
+            if job.get("cancel"):
+                break
+            cur = assigned.get(t["id"])
+            if cur and cur.get("method") == "manual":
+                job["done"] += 1
+                continue
+            try:
+                page = await asyncio.to_thread(ticketsmod.page_markdown, token, t["id"])
+                text = f"{t['title']}\n" + "\n".join(f"{k}: {v}" for k, v in (page.get("fields") or {}).items()) + "\n" + page["markdown"]
+            except ticketsmod.NotionError as e:
+                log.warning("classify: %s", e)
+                job["done"] += 1
+                continue
+            r = ticketsmod.classify_ticket(text, index)
+            if not r["ok"] and who and len(index) > 1:
+                r = await _classify_llm(who, index, t["title"], text) or r
+            if r.get("ok"):
+                ticketsmod.save_assignment(user.id, t["id"], r["session_id"], r["build_id"], "llm" if str(r.get("evidence", "")).startswith("modelo:") else "auto", r.get("confidence"), r.get("evidence"))
+                job["detected"] += 1
+            else:
+                ticketsmod.save_assignment(user.id, t["id"], None, None, "auto")  # clears an older automatic guess
+                job["undecided"] += 1
+            job["done"] += 1
+            await asyncio.sleep(0.35)  # Notion allows ~3 requests/s
+        job.update(status="done", finished=time.time())
+    except Exception as e:
+        log.exception("classify failed")
+        job.update(status="error", error=str(e)[:300])
+
+
+@app.post("/api/tickets/classify")
+async def tickets_classify(body: dict | None = None, user: User = CurrentUser):
+    """Detect, for every open ticket, which uploaded project it belongs to (files, folders and repo names it mentions; the model as a fallback)."""
+    link = ticketsmod.get_link(user.id)
+    if not link or not link.get("database_id"):
+        raise HTTPException(400, "Vinculá la base de Notion primero.")
+    _notion_token(user)
+    cur = _CLASSIFY_JOBS.get(user.id)
+    if cur and cur.get("status") == "running":
+        return cur
+    _CLASSIFY_JOBS[user.id] = {"status": "running", "total": 0, "done": 0, "detected": 0, "undecided": 0, "started": time.time(), "error": None}
+    spawn(_classify_run(user, (body or {}).get("page_ids")))
+    return _CLASSIFY_JOBS[user.id]
+
+
+@app.get("/api/tickets/classify")
+def tickets_classify_status(user: User = CurrentUser):
+    return _CLASSIFY_JOBS.get(user.id) or {"status": "idle"}
+
+
+@app.put("/api/tickets/{page_id}/project")
+async def ticket_set_project(page_id: str, body: dict, user: User = CurrentUser):
+    """Choose the project of one ticket by hand (null clears it: the Feature mapping applies again and the ticket is re-detected)."""
+    sid, bid = body.get("session_id") or None, body.get("build_id") or None
+    if sid and bid:
+        _build_any(user, sid, bid)
+        ticketsmod.save_assignment(user.id, page_id, sid, bid, "manual", 1.0, "elegido a mano")
+    else:
+        ticketsmod.save_assignment(user.id, page_id, None, None, "manual")
+        cur = _CLASSIFY_JOBS.get(user.id)
+        if not (cur and cur.get("status") == "running"):
+            _CLASSIFY_JOBS[user.id] = {"status": "running", "total": 0, "done": 0, "detected": 0, "undecided": 0, "started": time.time(), "error": None, "quiet": True}
+            spawn(_classify_run(user, [page_id]))
+    return {"ok": True}
 
 
 @app.get("/api/tickets/{page_id}")
@@ -2175,7 +2320,7 @@ async def ticket_resolve(page_id: str, user: User = CurrentUser):
         page = ticketsmod.page_markdown(token, page_id)
     except ticketsmod.NotionError as e:
         raise HTTPException(400, str(e))
-    proj = ticketsmod.project_for_ticket(link, page.get("fields") or {})
+    proj = ticketsmod.project_for_ticket(link, page.get("fields") or {}, ticketsmod.assigned_projects(user.id).get(page_id))
     if not proj["ok"]:
         if proj["reason"] == "sin_proyecto":
             raise HTTPException(400, "Vinculá un proyecto de Tably a los tickets primero.")

@@ -183,7 +183,10 @@ export const api = {
   notionDatabases: () => j<{ databases: { id: string; title: string; url: string | null }[] }>(authed('/api/notion/databases')),
   ticketsConfig: () => j<TicketsConfig>(authed('/api/tickets/config')),
   saveTicketsConfig: (body: Record<string, unknown>) => j<TicketsConfig>(authed('/api/tickets/config', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })),
-  tickets: (all = false) => j<{ link: TicketsConfig['link']; tickets: Ticket[]; runs: Record<string, TicketRun>; groupable: GroupableProp[] }>(authed(`/api/tickets${all ? '?all=true' : ''}`)),
+  tickets: (all = false) => j<{ link: TicketsConfig['link']; tickets: Ticket[]; runs: Record<string, TicketRun>; groupable: GroupableProp[]; classify?: ClassifyJob | null }>(authed(`/api/tickets${all ? '?all=true' : ''}`)),
+  ticketsClassify: (pageIds?: string[]) => j<ClassifyJob>(post('/api/tickets/classify', pageIds ? { page_ids: pageIds } : {})),
+  ticketsClassifyStatus: () => j<ClassifyJob>(authed('/api/tickets/classify')),
+  ticketSetProject: (pageId: string, body: { session_id: string | null; build_id: string | null }) => j<{ ok: boolean }>(authed(`/api/tickets/${pageId}/project`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })),
   ticket: (pageId: string) => j<{ id: string; title: string; url: string | null; fields: Record<string, string>; markdown: string }>(authed(`/api/tickets/${pageId}`)),
   ticketResolve: (pageId: string) => j<{ ok: boolean; build_id: string; session_id: string; branch: string; repo_url: string | null }>(post(`/api/tickets/${pageId}/resolve`, {})),
   levels: (sessionId: string, id: string) => j<LevelsPayload>(authed(`/api/sessions/${sessionId}/builds/${id}/levels`)),
@@ -279,7 +282,8 @@ export interface CloudStatus {
 }
 /** Notion tickets resolved by the team. */
 export interface Ticket { id: string; title: string; status: string | null; priority: string | null; assignee: string | null; due: string | null; pr: string | null; url: string | null; bucket: 'urgent' | 'high' | 'medium' | 'low' | 'none'; created: string; edited: string; extra: Record<string, string>; fields?: Record<string, string>; project_value?: string | null; project?: TicketProject }
-export interface TicketProject { ok: boolean; key: string | null; session_id?: string; build_id?: string; repo_url?: string | null; reason?: 'sin_proyecto' | 'ticket_sin_valor' | 'valor_sin_proyecto'; prop?: string }
+export interface TicketProject { ok: boolean; key: string | null; method?: 'manual' | 'feature' | 'auto' | 'llm' | 'default'; confidence?: number | null; evidence?: string | null; session_id?: string; build_id?: string; repo_url?: string | null; reason?: 'sin_proyecto' | 'ticket_sin_valor' | 'valor_sin_proyecto'; prop?: string }
+export interface ClassifyJob { status: 'idle' | 'running' | 'done' | 'error'; quiet?: boolean; total?: number; done?: number; detected?: number; undecided?: number; error?: string | null; finished?: number }
 export interface ProjectMapEntry { session_id: string | null; build_id: string | null; repo_url: string | null }
 export interface GroupableProp { name: string; type: string; options: { name: string; color: string | null }[] }
 export interface TicketRun { user_id: string; page_id: string; title: string | null; session_id: string | null; build_id: string | null; status: 'queued' | 'building' | 'reviewing' | 'built' | 'changes' | 'pr' | 'approved' | string; base_commit: string | null; branch: string | null; pr_url: string | null; council_session: string | null; error: string | null; started: number; updated: number }

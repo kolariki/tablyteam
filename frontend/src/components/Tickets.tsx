@@ -1,9 +1,9 @@
 import DOMPurify from 'dompurify'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AlertTriangle, Check, ChevronDown, ExternalLink, GitPullRequest, Hammer, Loader2, Search, Settings2, Users, X } from 'lucide-react'
+import { AlertTriangle, Sparkles, Check, ChevronDown, ExternalLink, GitPullRequest, Hammer, Loader2, Search, Settings2, Users, X } from 'lucide-react'
 import { marked } from 'marked'
 import { useEffect, useMemo, useState } from 'react'
-import { api, type ProjectMapEntry, type DashboardSession, type GroupableProp, type Ticket, type TicketRun, type TicketsConfig } from '../lib/api'
+import { api, type ClassifyJob, type ProjectMapEntry, type DashboardSession, type GroupableProp, type Ticket, type TicketRun, type TicketsConfig } from '../lib/api'
 import { useT } from '../lib/i18n'
 import { useArena } from '../store'
 import PageHeader from './PageHeader'
@@ -97,13 +97,14 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
   const [who, setWho] = useState<string>('')
   const [groupBy, setGroupBy] = useState<string>(() => { try { return localStorage.getItem('tickets.groupBy') || 'urgency' } catch { return 'urgency' } })
   const [showAll, setShowAll] = useState(false)
+  const [job, setJob] = useState<ClassifyJob | null>(null)
   // which project's tickets to show: 'mine' = every Feature value with an assigned project, a value, or 'all'
   const [projFilter, setProjFilter] = useState<string>(() => { try { return localStorage.getItem('tickets.project') || 'mine' } catch { return 'mine' } })
   const [open, setOpen] = useState<Record<string, { markdown: string; fields: Record<string, string> } | 'loading' | undefined>>({})
 
   const loadStatus = () => api.notionStatus().then(setNotion).catch(() => {})
   const loadCfg = () => api.ticketsConfig().then(setCfg).catch(() => {})
-  const loadTickets = () => api.tickets(showAll).then((d) => { setData({ tickets: d.tickets, runs: d.runs, groupable: d.groupable ?? [] }); setErr(null) }).catch((e) => setErr((e as Error).message))
+  const loadTickets = () => api.tickets(showAll).then((d) => { setData({ tickets: d.tickets, runs: d.runs, groupable: d.groupable ?? [] }); if (d.classify) setJob(d.classify); setErr(null) }).catch((e) => setErr((e as Error).message))
   useEffect(() => {
     loadStatus(); loadCfg()
     api.dashboard().then((d) => setProjects(d.sessions.filter((s) => (s.builds ?? []).length > 0))).catch(() => {})
@@ -120,6 +121,20 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
     const t = setInterval(loadTickets, 8000)
     return () => clearInterval(t)
   }, [active])
+  // detection runs in the background: poll it, then reload the tickets with their detected projects
+  useEffect(() => {
+    if (job?.status !== 'running') return
+    const t = setInterval(() => api.ticketsClassifyStatus().then((j) => { setJob(j); if (j.status !== 'running') loadTickets() }).catch(() => {}), 2500)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job?.status])
+  const detect = async () => {
+    try { setJob(await api.ticketsClassify()) } catch (e) { toast.error(T('No se pudo detectar', 'Could not detect'), (e as Error).message) }
+  }
+  const setProject = async (t: Ticket, value: string) => {
+    const [sid, bid] = value.split('|')
+    try { await api.ticketSetProject(t.id, { session_id: sid || null, build_id: bid || null }); loadTickets() } catch (e) { toast.error(T('No se pudo guardar', 'Could not save'), (e as Error).message) }
+  }
 
   const link = cfg?.link
   const schema = cfg?.schema && !('error' in cfg.schema) ? cfg.schema : null
@@ -133,7 +148,9 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
     return [...new Set([...fromSchema, ...seen, ...Object.keys(projMap)])]
   }, [schema, projProp, data, projMap])
   const strict = !!link?.projects?.prop
-  const canResolve = strict ? Object.values(projMap).some((m) => m.build_id) : !!link?.build_id
+  const anyDetected = (data?.tickets ?? []).some((x) => x.project?.ok)
+  const canResolve = anyDetected || (strict ? Object.values(projMap).some((m) => m.build_id) : !!link?.build_id)
+  const multi = projects.reduce((n, p) => n + (p.builds ?? []).length, 0) > 1  // several uploaded projects: tickets must be told apart
   const saveProjects = (prop: string | null, map: Record<string, ProjectMapEntry>) => saveCfg({ projects: { prop, map } })
   const showSetup = setup || !ready
 
@@ -165,8 +182,9 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
 
   const people = useMemo(() => [...new Set((data?.tickets ?? []).map((t) => t.assignee).filter(Boolean) as string[])], [data])
   const mapped = Object.entries(projMap).filter(([, m]) => m.build_id)
-  const inProject = (t: Ticket) => !strict || projFilter === 'all' || (projFilter === 'mine' ? !!t.project?.ok : t.project?.key === projFilter)
-  const hidden = strict ? (data?.tickets ?? []).filter((t) => !inProject(t)).length : 0
+  const filtering = strict || (multi && anyDetected)
+  const inProject = (t: Ticket) => !filtering || projFilter === 'all' || (projFilter === 'mine' ? !!t.project?.ok : t.project?.key === projFilter)
+  const hidden = filtering ? (data?.tickets ?? []).filter((t) => !inProject(t)).length : 0
   const visible = (data?.tickets ?? []).filter((t) => inProject(t) && (!q || t.title.toLowerCase().includes(q.toLowerCase())) && (!who || (t.assignee ?? '').includes(who)))
   const project = projects.find((p) => p.id === link?.session_id)
   const build = project?.builds?.find((b) => b.id === link?.build_id)
@@ -280,7 +298,7 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
           <>
             <div className="mt-6 flex flex-wrap items-center gap-2">
               <span className="text-[11px] uppercase tracking-[0.25em] text-ink-3">{link?.database_title}</span>
-              {strict ? (
+              {filtering ? (
                 <label className="flex items-center gap-1.5 text-[12px] text-ink-3"><Hammer size={11} />
                   <select value={projFilter} onChange={(e) => setProjFilter(e.target.value)} className={SELECT}>
                     <option value="mine">{T('Mis proyectos', 'My projects')} · {mapped.length}</option>
@@ -303,9 +321,20 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
                 )}
                 <label className="flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[12px] text-ink-2"><input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> {T('incluir cerrados', 'include closed')}</label>
                 <label className="flex h-9 items-center gap-2 rounded-full border border-line bg-surface px-3 text-[13px]"><Search size={13} className="text-ink-3" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder={T('buscar…', 'search…')} className="w-36 bg-transparent outline-none" /></label>
+                {multi && (
+                  <button onClick={detect} disabled={job?.status === 'running'} className={PILL} title={T('Lee cada ticket y detecta a cuál de tus proyectos pertenece por los archivos, carpetas y repos que nombra; si no alcanza, pregunta al modelo', 'Reads every ticket and detects which of your projects it belongs to from the files, folders and repos it names; the model decides when that is not enough')}>
+                    {job?.status === 'running' ? <><Loader2 size={13} className="animate-spin" /> {T(`Detectando ${job.done ?? 0}/${job.total ?? '…'}`, `Detecting ${job.done ?? 0}/${job.total ?? '…'}`)}</> : <><Sparkles size={13} /> {T('Detectar proyectos', 'Detect projects')}</>}
+                  </button>
+                )}
                 <button onClick={loadTickets} className={PILL}>{T('Actualizar', 'Refresh')}</button>
               </div>
             </div>
+            {job && !job.quiet && job.status !== 'running' && job.status !== 'idle' && (
+              <div className={`mt-3 text-[11.5px] ${job.status === 'error' ? 'text-danger' : 'text-ink-3'}`}>
+                {job.status === 'error' ? job.error : T(`Detección lista: ${job.detected ?? 0} ticket(s) con proyecto, ${job.undecided ?? 0} sin evidencia suficiente (elegilo a mano en la card).`, `Detection done: ${job.detected ?? 0} ticket(s) with a project, ${job.undecided ?? 0} without enough evidence (pick it by hand on the card).`)}
+                <button onClick={() => setJob(null)} className="ml-2 text-accent hover:underline">{T('ok', 'ok')}</button>
+              </div>
+            )}
             {!canResolve && !showSetup && <div className="mt-4 flex items-center gap-2 rounded-xl border border-gold/30 bg-gold/10 px-4 py-2.5 text-[13px] text-ink-2"><Hammer size={14} className="text-gold" /> {T('Para resolver tickets falta elegir el proyecto de Tably que los trabaja.', 'To resolve tickets, pick the Tably project that works on them.')} <button onClick={() => setSetup(true)} className="ml-auto text-accent hover:underline">{T('Elegir proyecto', 'Pick project')}</button></div>}
             {err && <div className="mt-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{err}</div>}
             {!data && !err && <div className="mt-10 flex justify-center text-ink-3"><Loader2 size={18} className="animate-spin" /></div>}
@@ -346,9 +375,15 @@ export default function Tickets({ onBack }: { onBack: () => void }) {
                                 {t.url && <a href={t.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-accent"><ExternalLink size={11} /> Notion</a>}
                                 {lbl && <span className={`flex items-center gap-1 font-semibold ${lbl[2]}`}>{working && <Loader2 size={11} className="animate-spin" />}{run.status === 'pr' && <GitPullRequest size={11} />}{en ? lbl[1] : lbl[0]}{run.error && run.status !== 'pr' ? ` · ${run.error}` : ''}</span>}
                                 {run?.pr_url && <a href={run.pr_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-accent hover:underline"><GitPullRequest size={11} /> {T('Ver PR', 'View PR')}</a>}
-                                {strict && (tp?.ok
-                                  ? <span className="flex items-center gap-1 text-ink-2"><Hammer size={11} /> {tp.key} → {tproj?.title || tproj?.topic || '…'}{tbuild ? ` · v${tbuild.version ?? 1}` : ''}</span>
-                                  : <span className="flex items-center gap-1 text-danger"><AlertTriangle size={11} /> {noProjectMsg} <button onClick={() => setSetup(true)} className="text-accent hover:underline">{T('asignar', 'assign')}</button></span>)}
+                                {(strict || multi) && (tp?.ok
+                                  ? <span className="flex items-center gap-1 text-ink-2" title={tp.evidence ?? undefined}><Hammer size={11} /> {tp.method === 'feature' ? `${tp.key} → ` : tp.method === 'manual' ? T('a mano → ', 'by hand → ') : tp.method === 'auto' || tp.method === 'llm' ? T('detectado → ', 'detected → ') : ''}{tproj?.title || tproj?.topic || '…'}{tbuild ? ` · v${tbuild.version ?? 1}` : ''}{(tp.method === 'auto' || tp.method === 'llm') && tp.evidence ? <span className="text-ink-3"> · {tp.evidence.slice(0, 90)}</span> : null}</span>
+                                  : <span className="flex items-center gap-1 text-danger"><AlertTriangle size={11} /> {noProjectMsg}{strict && <button onClick={() => setSetup(true)} className="text-accent hover:underline">{T('asignar', 'assign')}</button>}</span>)}
+                                {(strict || multi) && !working && (
+                                  <select value={tp?.method === 'manual' && tp.build_id ? `${tp.session_id}|${tp.build_id}` : ''} onChange={(e) => setProject(t, e.target.value)} className="h-6 rounded-md border border-line bg-surface px-1 text-[11px] text-ink-2 outline-none focus:border-accent" title={T('Elegir el proyecto de este ticket a mano', 'Pick this ticket\'s project by hand')}>
+                                    <option value="">{tp?.method === 'manual' ? T('quitar elección', 'clear choice') : T('cambiar proyecto…', 'change project…')}</option>
+                                    {projects.map((p) => (p.builds ?? []).map((b) => <option key={b.id} value={`${p.id}|${b.id}`}>{p.title || p.topic} · v{b.version ?? 1}</option>))}
+                                  </select>
+                                )}
                               </div>
                             </div>
                             <div className="flex shrink-0 items-center gap-2">

@@ -39,6 +39,11 @@ with _db() as _c:
     )
     if "projects" not in {r[1] for r in _c.execute("PRAGMA table_info(notion_links)")}:
         _c.execute("ALTER TABLE notion_links ADD COLUMN projects TEXT")
+    _c.execute(
+        """CREATE TABLE IF NOT EXISTS ticket_projects (
+            user_id TEXT NOT NULL, page_id TEXT NOT NULL, session_id TEXT, build_id TEXT, method TEXT NOT NULL, confidence REAL,
+            evidence TEXT, updated REAL NOT NULL, PRIMARY KEY (user_id, page_id))"""
+    )
 
 
 class NotionError(Exception):
@@ -232,24 +237,128 @@ def project_values(fields: dict, prop: str | None) -> list[str]:
     return [v.strip() for v in str(fields[prop]).split(",") if v.strip()]
 
 
-def project_for_ticket(link: dict, fields: dict) -> dict:
-    """Which Tably project resolves this ticket. With a project property configured, the ticket's value decides, strictly:
-    a value without an assigned project cannot be resolved (so a Codifier ticket never lands on the Preprocessor).
-    Without one, the single default project applies."""
+def project_for_ticket(link: dict, fields: dict, assigned: dict | None = None) -> dict:
+    """Which Tably project resolves this ticket, in this order: a choice made by hand for the ticket, the project mapped to the
+    ticket's Feature value, the project Tably detected from the ticket text (files and repo it names), and, with no project
+    property at all, the single default project. A ticket with none of those cannot be resolved (so a Codifier ticket never
+    lands on the Preprocessor)."""
     pr = link.get("projects") or {}
     prop = pr.get("prop")
-    if not prop:
-        if link.get("build_id") and link.get("session_id"):
-            return {"ok": True, "key": None, "session_id": link["session_id"], "build_id": link["build_id"], "repo_url": link.get("repo_url")}
-        return {"ok": False, "key": None, "reason": "sin_proyecto"}
-    vals = project_values(fields, prop)
-    if not vals:
-        return {"ok": False, "key": None, "reason": "ticket_sin_valor", "prop": prop}
+    if assigned and assigned.get("method") == "manual" and assigned.get("build_id"):
+        return {"ok": True, "key": None, "method": "manual", "session_id": assigned["session_id"], "build_id": assigned["build_id"], "repo_url": (project_by_build(link, assigned["build_id"]) or {}).get("repo_url")}
+    vals = project_values(fields, prop) if prop else []
     for v in vals:
         m = (pr.get("map") or {}).get(v)
         if m and m.get("build_id") and m.get("session_id"):
-            return {"ok": True, "key": v, "session_id": m["session_id"], "build_id": m["build_id"], "repo_url": m.get("repo_url")}
+            return {"ok": True, "key": v, "method": "feature", "session_id": m["session_id"], "build_id": m["build_id"], "repo_url": m.get("repo_url")}
+    if assigned and assigned.get("build_id"):
+        return {"ok": True, "key": None, "method": assigned.get("method") or "auto", "confidence": assigned.get("confidence"), "evidence": assigned.get("evidence"),
+                "session_id": assigned["session_id"], "build_id": assigned["build_id"], "repo_url": (project_by_build(link, assigned["build_id"]) or {}).get("repo_url")}
+    if not prop:
+        if link.get("build_id") and link.get("session_id"):
+            return {"ok": True, "key": None, "method": "default", "session_id": link["session_id"], "build_id": link["build_id"], "repo_url": link.get("repo_url")}
+        return {"ok": False, "key": None, "reason": "sin_proyecto"}
+    if not vals:
+        return {"ok": False, "key": None, "reason": "ticket_sin_valor", "prop": prop}
     return {"ok": False, "key": vals[0], "reason": "valor_sin_proyecto", "prop": prop}
+
+
+# ------------------------------------------------------------------------------------------------ which project a ticket belongs to
+
+_PATH_RX = re.compile(r"(?<![\w/])((?:[\w.-]+/)+[\w.-]+\.[a-z0-9]{1,5}|[\w-]+\.(?:py|ts|tsx|js|jsx|go|rs|java|kt|rb|php|yaml|yml|toml|sql|md|cs|swift|dart))\b")
+_DIR_RX = re.compile(r"(?<![\w/.])([a-z][\w-]{2,})/(?=[\w.-])")
+_GENERIC_FILES = {"readme.md", "package.json", "pyproject.toml", "index.ts", "index.js", "main.py", "app.py", "setup.py", "dockerfile", "makefile", ".env", "config.py", "utils.py", "types.ts", "index.tsx", "app.tsx", "main.ts", "main.tsx", "requirements.txt", "changelog.md"}
+_GENERIC_DIRS = {"src", "app", "lib", "tests", "test", "docs", "scripts", "api", "utils", "components", "pages", "public", "static", "config", "bin", "build", "dist", "data"}
+
+
+def project_index(user_dir, builds: list[dict]) -> list[dict]:
+    """What each uploaded project is made of: title, repo name, file paths, top-level folders (from the saved build or its workdir)."""
+    import json as _json
+    from pathlib import Path
+
+    out = []
+    for b in builds:
+        path = Path(user_dir) / f"{b['session_id']}.build.{b['build_id']}.json"
+        try:
+            d = _json.loads(path.read_text())
+        except Exception:
+            continue
+        paths: set[str] = set(d.get("files") or {})
+        wd = d.get("workdir")
+        if wd and Path(wd).is_dir():
+            skip = {"node_modules", ".git", ".venv", "venv", "__pycache__", "dist", "build", ".next", "target"}
+            root = Path(wd)
+            n = 0
+            for p in root.rglob("*"):
+                if n > 20000:
+                    break
+                if any(part in skip for part in p.relative_to(root).parts):
+                    continue
+                if p.is_file():
+                    paths.add(str(p.relative_to(root)).replace("\\", "/"))
+                    n += 1
+        title = (d.get("title") or b.get("title") or "").strip()
+        names = {_slug(title)}
+        repo = (b.get("repo_url") or "").rstrip("/").split("/")[-1].lower() if b.get("repo_url") else None
+        if repo:
+            names.add(repo)
+        names |= {x for x in re.split(r"[\s·:·-]+", title.lower()) if len(x) > 3 and x not in ("auditoría", "audit", "proyecto", "project", "core", "test")}
+        dirs = {p.split("/")[0].lower() for p in paths if "/" in p}
+        base = {p.rsplit("/", 1)[-1].lower() for p in paths}
+        out.append({"session_id": b["session_id"], "build_id": b["build_id"], "title": title, "names": {n for n in names if n}, "paths": {p.lower() for p in paths}, "dirs": dirs, "base": base,
+                    "tree": sorted(dirs)[:30], "sample": sorted(p for p in paths if p.count("/") <= 1)[:40]})
+    return out
+
+
+def classify_ticket(text: str, index: list[dict]) -> dict:
+    """Score every project against the paths, folders and repo names the ticket mentions. Decided when one project clearly wins."""
+    low = text.lower()
+    mentioned_paths = {m.lower().strip("/") for m in _PATH_RX.findall(text)}
+    mentioned_dirs = {m.lower() for m in _DIR_RX.findall(text)}
+    scores = []
+    for pj in index:
+        pts, ev = 0.0, []
+        for n in pj["names"]:
+            if len(n) >= 4 and re.search(r"(?<![\w-])" + re.escape(n) + r"(?![\w-])", low):
+                pts += 4
+                ev.append(f"«{n}»")
+        for mp in mentioned_paths:
+            b = mp.rsplit("/", 1)[-1]
+            if mp in pj["paths"] or any(p.endswith("/" + mp) for p in pj["paths"]):
+                pts += 3
+                ev.append(mp)
+            elif b not in _GENERIC_FILES and b in pj["base"]:
+                others = sum(1 for o in index if o is not pj and b in o["base"])
+                if not others:
+                    pts += 2
+                    ev.append(b)
+        for dname in mentioned_dirs:
+            if dname in pj["dirs"] and dname not in _GENERIC_DIRS and sum(1 for o in index if o is not pj and dname in o["dirs"]) == 0:
+                pts += 1
+                ev.append(dname + "/")
+        scores.append((pts, pj, ev))
+    scores.sort(key=lambda x: -x[0])
+    if not scores or scores[0][0] < 3:
+        return {"ok": False, "scores": [(round(s), pj["title"]) for s, pj, _ in scores]}
+    best, second = scores[0], (scores[1] if len(scores) > 1 else None)
+    if second and second[0] > 0 and best[0] < 2 * second[0]:
+        return {"ok": False, "scores": [(round(s), pj["title"]) for s, pj, _ in scores]}
+    conf = min(0.99, 0.6 + best[0] / 20)
+    return {"ok": True, "session_id": best[1]["session_id"], "build_id": best[1]["build_id"], "title": best[1]["title"], "confidence": round(conf, 2), "evidence": ", ".join(dict.fromkeys(best[2]))[:300]}
+
+
+def assigned_projects(user_id: str) -> dict[str, dict]:
+    with _db() as c:
+        return {r["page_id"]: dict(r) for r in c.execute("SELECT * FROM ticket_projects WHERE user_id = ?", (user_id,))}
+
+
+def save_assignment(user_id: str, page_id: str, session_id: str | None, build_id: str | None, method: str, confidence: float | None = None, evidence: str | None = None) -> None:
+    with _db() as c:
+        if not build_id:
+            c.execute("DELETE FROM ticket_projects WHERE user_id = ? AND page_id = ?", (user_id, page_id))
+        else:
+            c.execute("INSERT OR REPLACE INTO ticket_projects (user_id, page_id, session_id, build_id, method, confidence, evidence, updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                      (user_id, page_id, session_id, build_id, method, confidence, evidence, time.time()))
 
 
 def project_by_build(link: dict, build_id: str) -> dict | None:
