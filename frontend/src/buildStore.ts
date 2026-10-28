@@ -1,5 +1,5 @@
 import type { CloudApp, LevelsInfo } from './lib/api'
-export interface Usage { input: number; output: number; cache_read: number; cache_write: number; unsplit?: number; total: number; engine: number; api: number; measured: boolean }
+export interface Usage { input: number; output: number; cache_read: number; cache_write: number; unsplit?: number; total: number; engine: number; api: number; measured: boolean; engine_value_usd: number; cache_saved_usd: number; api_cost_usd: number; models: string[] }
 import { srv } from './lib/serverText'
 import { create } from 'zustand'
 

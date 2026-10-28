@@ -652,7 +652,8 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
 }
 
 /** The live strip under the chat box: the agent's current action with its path, this turn's counters and the clock. */
-/** What this build used, all measured: tokens (API calls + the CLI agent's own session logs), wall-clock and cost. */
+/** What this build used and saved, all measured: tokens (API calls + the CLI agent's own session logs), wall-clock,
+ *  and at official list prices what the agent's work is worth (covered by the subscription) and what the cache saved. */
 function SavingsCard() {
   const T = useT()
   const b = useBuild()
@@ -660,42 +661,44 @@ function SavingsCard() {
   const u = b.usage
   if (!u || !u.total) return null
   const engine = b.provider === 'claude-code' || b.provider === 'codex' || b.provider === 'muse-code'
-  const apiCost = Math.max(0, b.cost - b.engineCost)  // charged to the user's API keys (design, council, API builders)
-  const paid = apiCost + (b.fees || 0)
-  const saved = engine ? b.engineCost : 0  // the agent's API-equivalent price, covered by the user's subscription
+  const name = b.provider === 'claude-code' ? 'Claude Code' : b.provider === 'codex' ? 'Codex' : 'Muse Code'
+  const paid = (u.api_cost_usd ?? 0) + (b.fees || 0)
+  const credits = engine ? u.engine_value_usd ?? 0 : 0  // API credits not spent: the agent ran on the subscription
+  const cache = u.cache_saved_usd ?? 0
+  const saved = credits + cache
   const fmtTok = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n))
   const usd = (n: number) => `$${n.toFixed(2)}`
   const read = u.input + u.cache_write + (u.unsplit ?? 0)
-  const name = b.provider === 'claude-code' ? 'Claude Code' : b.provider === 'codex' ? 'Codex' : 'Muse Code'
-  const cells: [string, string, string][] = [
-    [T('Tokens', 'Tokens'), fmtTok(u.total), `${fmtTok(u.output)} ${T('escritos', 'written')} · ${fmtTok(u.cache_read)} ${T('de caché', 'from cache')} · ${fmtTok(read)} ${T('leídos', 'read')}`],
-    [T('Tiempo', 'Time'), fmtDur(Math.round(b.buildSeconds)), `${b.turns} ${T('turnos del constructor', 'builder turns')}`],
-    engine
-      ? [T('Pagaste', 'You paid'), usd(paid), `${name} ${T('lo valúa en', 'prices it at')} ${usd(b.engineCost)} ${T('a precio de API; lo cubre tu suscripción', 'at API rates; your subscription covers it')}`]
-      : [T('Costo', 'Cost'), usd(b.cost + (b.fees || 0)), T('cobrado a tus API keys', 'charged to your API keys')],
-  ]
+  const pct = u.total ? Math.round((100 * u.cache_read) / u.total) : 0
+  const Cell = ({ l, v, sub, hot }: { l: string; v: string; sub: string; hot?: boolean }) => (
+    <div className={`min-w-0 rounded-xl border px-3 py-2 ${hot ? 'border-accent/40 bg-accent-soft' : 'border-line bg-surface'}`}>
+      <div className={`text-[10.5px] uppercase tracking-[0.2em] ${hot ? 'text-accent' : 'text-ink-3'}`}>{l}</div>
+      <div className="font-mono text-[18px] leading-tight text-ink">{v}</div>
+      <div className="text-[11px] leading-snug text-ink-3">{sub}</div>
+    </div>
+  )
   return (
     <div className="rounded-2xl border border-accent/25 bg-accent-soft/40 px-4 py-3 text-sm">
       <div className="flex items-center gap-2">
         <Sparkles size={16} className="shrink-0 text-accent" />
-        <div className="font-semibold">{engine && saved > 0 ? T('Lo que te ahorró Tably en esta construcción', 'What Tably saved you on this build') : T('Lo que usó esta construcción', 'What this build used')}</div>
-        {engine && saved > 0 && <span className="ml-auto rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-white">{usd(saved)} {T('ahorrados', 'saved')}</span>}
+        <div className="font-semibold">{saved > 0 ? T('Lo que te ahorró Tably en esta construcción', 'What Tably saved you on this build') : T('Lo que usó esta construcción', 'What this build used')}</div>
+        {saved > 0 && <span className="ml-auto rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-white">{usd(saved)} {T('ahorrados', 'saved')}</span>}
+      </div>
+      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {engine && <Cell hot l={T('Créditos de API ahorrados', 'API credits saved')} v={usd(credits)} sub={T(`Lo que costaría el trabajo de ${name} a precio de lista; lo cubrió tu suscripción`, `What ${name}'s work costs at list price; your subscription covered it`)} />}
+        <Cell hot l={T('Ahorro de la caché', 'Saved by the cache')} v={usd(cache)} sub={T(`${fmtTok(u.cache_read)} tokens (${pct}%) salieron de la caché en lugar de procesarse de nuevo`, `${fmtTok(u.cache_read)} tokens (${pct}%) came from the cache instead of being processed again`)} />
       </div>
       <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-        {cells.map(([l, v, sub]) => (
-          <div key={l} className="min-w-0 rounded-xl border border-line bg-surface px-3 py-2">
-            <div className="text-[10.5px] uppercase tracking-[0.2em] text-ink-3">{l}</div>
-            <div className="font-mono text-[18px] leading-tight text-ink">{v}</div>
-            <div className="text-[11px] leading-snug text-ink-3">{sub}</div>
-          </div>
-        ))}
+        <Cell l={T('Tokens', 'Tokens')} v={fmtTok(u.total)} sub={`${fmtTok(u.output)} ${T('escritos', 'written')} · ${fmtTok(u.cache_read)} ${T('de caché', 'from cache')} · ${fmtTok(read)} ${T('leídos', 'read')}`} />
+        <Cell l={T('Tiempo', 'Time')} v={fmtDur(Math.round(b.buildSeconds))} sub={`${b.turns} ${T('turnos del constructor', 'builder turns')}`} />
+        <Cell l={T('Pagaste', 'You paid')} v={usd(engine ? paid : b.cost + (b.fees || 0))} sub={engine ? T('llamadas a tus API keys y cargos por uso', 'calls on your API keys and usage fees') : T('cobrado a tus API keys', 'charged to your API keys')} />
       </div>
       {!u.measured && <p className="mt-2 text-[11.5px] text-gold">{T('No están los registros de Claude Code de esta carpeta: los tokens del constructor no se pudieron contar, solo los de las llamadas a la API.', "Claude Code's logs for this folder are missing: the builder's tokens could not be counted, only the API calls'.")}</p>}
       <button onClick={() => setOpen((v) => !v)} className="mt-2 flex items-center gap-1 text-[11.5px] text-ink-3 hover:text-ink"><ChevronDown size={12} className={`transition ${open ? 'rotate-180' : ''}`} /> {T('De dónde salen', 'Where they come from')}</button>
       {open && (
         <p className="mt-1 text-[11.5px] leading-snug text-ink-3">
-          {T(`Todo medido, nada estimado. Tokens: los que informa cada llamada a la API (diseño, consejo) más los que ${name} registra en sus propios logs de sesión para esta carpeta, incluida la caché. Tiempo: el reloj real de los turnos. ${engine ? `Ahorro: el precio a tarifa de API que informa ${name} por su trabajo, que no pagaste porque corrió con tu suscripción. Pagaste: lo cobrado a tus API keys y los cargos por uso.` : 'Costo: lo cobrado a tus API keys, por modelo y tokens.'}`,
-            `All measured, nothing estimated. Tokens: what every API call reports (design, council) plus what ${name} records in its own session logs for this folder, cache included. Time: the real clock of the turns. ${engine ? `Saved: the API-rate price ${name} reports for its work, which you did not pay because it ran on your subscription. You paid: what was charged to your API keys plus usage fees.` : 'Cost: what was charged to your API keys, by model and tokens.'}`)}
+          {T(`Todo medido, nada estimado. Tokens: los que informa cada llamada a la API (diseño, consejo) más los que ${name} registra en sus logs de sesión para esta carpeta${u.models?.length ? ` (${u.models.join(', ')})` : ''}. Los montos usan el precio de lista oficial de cada modelo. Créditos ahorrados: esos tokens a precio de API, que no pagaste porque corrieron con tu suscripción. Caché: cada token leído de la caché cobrado como entrada normal, menos su precio de lectura de caché. Tiempo: el reloj real de los turnos.`,
+            `All measured, nothing estimated. Tokens: what every API call reports (design, council) plus what ${name} records in its session logs for this folder${u.models?.length ? ` (${u.models.join(', ')})` : ''}. Amounts use each model's official list price. Credits saved: those tokens at API price, which you did not pay because they ran on your subscription. Cache: every token read from the cache billed as normal input, minus its cache-read price. Time: the real clock of the turns.`)}
         </p>
       )}
     </div>

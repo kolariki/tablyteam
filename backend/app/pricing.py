@@ -1,13 +1,22 @@
-"""Approximate USD prices per 1M tokens (input, output). Estimates for on-screen comparison only —
+"""USD list prices per 1M tokens (input, output) —
 edit freely or override with ARENA_PRICE_<MODEL>=in,out env vars. Matching is by longest prefix."""
 import os
 
 PRICES: dict[str, tuple[float, float]] = {
     # Anthropic
-    "claude-fable": (15.0, 75.0),  # placeholder: same tier as Opus until the list price is confirmed; override with ARENA_PRICE_CLAUDE_FABLE
-    "claude-opus": (15.0, 75.0),
-    "claude-sonnet": (3.0, 15.0),
-    "claude-haiku": (1.0, 5.0),
+    # Anthropic first-party list prices (Oct 2026)
+    "claude-fable": (10.0, 50.0),
+    "claude-mythos": (10.0, 50.0),
+    "claude-opus-5-5": (4.0, 20.0),
+    "claude-opus-5": (5.0, 25.0),
+    "claude-opus-4": (5.0, 25.0),
+    "claude-opus": (4.0, 20.0),
+    "claude-sonnet-5": (2.0, 10.0),
+    "claude-sonnet-4": (3.0, 15.0),
+    "claude-sonnet": (2.0, 10.0),
+    "claude-haiku-5": (0.10, 0.50),
+    "claude-haiku-4": (1.0, 5.0),
+    "claude-haiku": (0.10, 0.50),
     # Meta Model API, list prices Oct 2026 (dev.meta.ai/docs/pricing-rate-limits): Standard mode; Contributor mode is the discounted variant
     "muse-wonder": (4.0, 20.0),
     "muse-spark-1.3-contributor": (0.10, 0.20),
@@ -64,8 +73,27 @@ def price_for(model: str) -> tuple[float, float]:
     return PRICES.get(best, (0.0, 0.0)) if best else (0.0, 0.0)
 
 
+# cache reads per 1M tokens where the list price is not the usual 10% of input; cache writes are 1.25x input (5-minute cache)
+CACHE_READ: dict[str, float] = {"claude-fable-5-1": 0.25, "claude-mythos-5-1": 0.25, "claude-opus-5-5": 0.20, "claude-sonnet-5-5": 0.20}
+
+
+def cache_read_price(model: str) -> float:
+    name = model.lower().split("/")[-1]
+    best = max((p for p in CACHE_READ if name.startswith(p)), key=len, default=None)
+    return CACHE_READ[best] if best else price_for(model)[0] * 0.1
+
+
 def cost_usd(model: str, input_tokens: int, output_tokens: int, cached_input: int = 0, cache_write: int = 0) -> float:
     """input_tokens is the whole prompt; cached_input/cache_write are the parts served from / written to the prompt cache."""
     pin, pout = price_for(model)
     plain = max(0, input_tokens - cached_input - cache_write)
-    return round((plain * pin + cached_input * pin * 0.1 + cache_write * pin * 1.25 + output_tokens * pout) / 1_000_000, 6)
+    return round((plain * pin + cached_input * cache_read_price(model) + cache_write * pin * 1.25 + output_tokens * pout) / 1_000_000, 6)
+
+
+def usage_value(model: str, u: dict) -> dict:
+    """List-price value of measured usage {input, output, cache_read, cache_write} (input = uncached prompt tokens), and
+    what the cache saved: the same cache-read tokens billed as plain input minus what they cost as cache reads."""
+    pin, pout = price_for(model)
+    cr, cw, i, o = int(u.get("cache_read") or 0), int(u.get("cache_write") or 0), int(u.get("input") or 0), int(u.get("output") or 0)
+    value = cost_usd(model, i + cr + cw, o, cr, cw)
+    return {"value_usd": value, "cache_saved_usd": round(cr * (pin - cache_read_price(model)) / 1_000_000, 6), "price": [pin, pout, cache_read_price(model)]}

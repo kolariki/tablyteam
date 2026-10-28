@@ -258,26 +258,46 @@ def inline_html(html: str, path: str, files: dict[str, str]) -> str:
     return (out[: i + 6] + _STORAGE_SHIM + out[i + 6:]) if i >= 0 else _STORAGE_SHIM + out
 
 
+def summarize_usage(api: dict, api_by_model: dict, eng: dict | None, engine_tokens: int, cost: float, engine_cost: float, engine: str | None) -> dict:
+    """Token totals (API calls + the CLI agent's measured usage per model) and, at list prices, what the agent's work is
+    worth and what the prompt cache saved (cache-read tokens billed as plain input minus their cache-read price)."""
+    from .pricing import usage_value
+
+    u = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0, "unsplit": 0}
+    for k in u:
+        u[k] += int(api.get(k) or 0)
+    engine_value = cache_saved = 0.0
+    for model, mu in (eng or {}).items():
+        for k in ("input", "output", "cache_read", "cache_write"):
+            u[k] += mu[k]
+        v = usage_value(model, mu)
+        engine_value += v["value_usd"]
+        cache_saved += v["cache_saved_usd"]
+    for model, mu in (api_by_model or {}).items():
+        cache_saved += usage_value(model, mu)["cache_saved_usd"]
+    if not eng and engine_tokens:
+        u["input"] += engine_tokens  # Codex / Muse only report a total
+    return u | {"total": sum(u.values()), "engine": sum(sum(m.values()) for m in eng.values()) if eng else engine_tokens,
+                "api": sum(int(api.get(k) or 0) for k in u), "measured": bool(eng) or engine != "claude-code",
+                "engine_value_usd": round(engine_value if eng else engine_cost, 4), "cache_saved_usd": round(cache_saved, 4),
+                "api_cost_usd": round(max(0.0, cost - engine_cost), 4), "models": sorted((eng or {}).keys())}
+
+
 def saved_usage(d: dict) -> dict:
     """Build.usage() for a build saved on disk (the same sources: API counters + Claude Code's session logs)."""
-    from .local_engine import claude_usage
+    from .local_engine import claude_usage, is_engine
 
     api = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0, "unsplit": 0}
     if d.get("api_usage"):
         api.update(d["api_usage"])
     else:
         api["unsplit"] = int(d.get("tokens") or 0)
-    u = dict(api)
-    wd = d.get("workdir")
-    eng = claude_usage(Path(wd)) if d.get("provider") == "claude-code" and wd and Path(wd).exists() else None
-    if eng:
-        for k in eng:
-            u[k] += eng[k]
-    elif d.get("engine_tokens"):
-        u["input"] += int(d["engine_tokens"])
-    return u | {"total": sum(u.values()), "engine": sum(eng.values()) if eng else int(d.get("engine_tokens") or 0),
-                "api": sum(api.values()), "measured": bool(eng) or d.get("provider") != "claude-code"}
-
+    wd, prov = d.get("workdir"), d.get("provider") or ""
+    eng = claude_usage(Path(wd)) if prov == "claude-code" and wd and Path(wd).exists() else None
+    cost = float(d.get("cost_usd") or 0)
+    ec = d.get("engine_cost_usd")
+    engine_cost = float(ec) if ec is not None else (cost if is_engine(prov) else 0.0)
+    return summarize_usage(api, d.get("api_by_model") or {}, eng, int(d.get("engine_tokens") or 0), cost, engine_cost, prov if is_engine(prov) else None)
 
 def research_context(md: str, clone: bool = False) -> str:
     if not md:
@@ -381,6 +401,7 @@ class Build:
         self.engine_cost = 0.0  # what the CLI agent itself reports (Claude Code: total_cost_usd, its API-equivalent price)
         self.engine_tokens = 0  # tokens the CLI agents report (Codex / Muse); Claude Code is read from its own logs
         self.api_usage = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0, "unsplit": 0}  # API calls (design, review, API builders)
+        self.api_by_model: dict[str, dict] = {}  # the same, per model (to value the cache at each model's price)
         self.live: dict | None = None  # {turn, phase, raw} while a model turn is streaming
         self.team = [a for a in (team or []) if role_of(a.get("role"))]  # reviewers = session agents with a role
         self.creds_all = creds or {}
@@ -856,28 +877,20 @@ class Build:
     def _lang_note(self) -> str:
         return f"\n\nIDIOMA: tus mensajes, resúmenes, README/NOTES y todo el texto de la interfaz van en {self.req.language}."
 
-    def _add_api_usage(self, result: Any) -> None:
+    def _add_api_usage(self, result: Any, model: str | None = None) -> None:
         cr, cw = int(getattr(result, "cached_input_tokens", 0) or 0), int(getattr(result, "cache_write_tokens", 0) or 0)
-        self.api_usage["input"] += max(0, int(result.input_tokens or 0) - cr - cw)
-        self.api_usage["output"] += int(result.output_tokens or 0)
-        self.api_usage["cache_read"] += cr
-        self.api_usage["cache_write"] += cw
+        add = {"input": max(0, int(result.input_tokens or 0) - cr - cw), "output": int(result.output_tokens or 0), "cache_read": cr, "cache_write": cw}
+        m = self.api_by_model.setdefault(model or self.req.model or "?", {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0})
+        for k, v in add.items():
+            self.api_usage[k] += v
+            m[k] += v
 
     def usage(self) -> dict:
-        """Measured tokens of the whole build: API calls + the CLI agent (Claude Code from its session logs)."""
+        """Measured tokens and their list-price value for the whole build: API calls + the CLI agent (Claude Code from its logs)."""
         from .local_engine import claude_usage
 
-        u = dict(self.api_usage)
         eng = claude_usage(self.workdir) if self.engine == "claude-code" and self.workdir else None
-        if eng:
-            for k in eng:
-                u[k] += eng[k]
-        engine_total = sum(eng.values()) if eng else self.engine_tokens
-        if not eng and self.engine_tokens:
-            u["input"] += self.engine_tokens  # Codex / Muse only report a total
-        api_total = sum(self.api_usage.values())
-        return u | {"total": sum(u.values()), "engine": engine_total, "api": api_total,
-                    "measured": bool(eng) or self.engine != "claude-code"}
+        return summarize_usage(self.api_usage, self.api_by_model, eng, self.engine_tokens, self.cost, self.engine_cost, self.engine)
 
     def _publish_pages(self, changed: list[str]) -> None:
         """Re-emit the prototype / mockup when they or a stylesheet or script they load changed, inlined for the pane."""
@@ -1146,7 +1159,7 @@ class Build:
                 break
         self.cost += cost_usd(model, result.input_tokens, result.output_tokens, result.cached_input_tokens, result.cache_write_tokens)
         self.tokens += result.input_tokens + result.output_tokens
-        self._add_api_usage(result)
+        self._add_api_usage(result, model)
         return "".join(buf)
 
     def _note(self, text: str) -> None:
@@ -1662,7 +1675,7 @@ class Build:
                     cost = cost_usd(model, result.input_tokens, result.output_tokens)
                     self.cost += cost
                     self.tokens += result.input_tokens + result.output_tokens
-                    self._add_api_usage(result)
+                    self._add_api_usage(result, model)
                     obs.safe_update(gen, output=text[:8000], usage_details={"input": result.input_tokens, "output": result.output_tokens}, cost_details={"total": cost})
             res = _parse_review(text, mode) | {"agent_id": agent["id"], "name": agent["name"], "role": agent["role"], "role_label": role["label"], "provider": provider, "model": model}
             self.emit("review.result", round=rnd, **res)
@@ -1749,7 +1762,7 @@ class Build:
             cost = cost_usd(model, result.input_tokens, result.output_tokens, result.cached_input_tokens, result.cache_write_tokens)
             self.cost += cost
             self.tokens += result.input_tokens + result.output_tokens
-            self._add_api_usage(result)
+            self._add_api_usage(result, model)
             obs.safe_update(gen, output=text[:20000], usage_details={"input": result.input_tokens, "output": result.output_tokens}, cost_details={"total": cost})
         return text
 
@@ -1793,7 +1806,7 @@ class Build:
 
     def _save(self) -> None:
         try:
-            self._path().write_text(json.dumps({**self.snapshot(), "context": self.context, "file_contents": self.files, "events": self.events, "history": self.history, "engine_tokens": self.engine_tokens, "api_usage": self.api_usage}, ensure_ascii=False))
+            self._path().write_text(json.dumps({**self.snapshot(), "context": self.context, "file_contents": self.files, "events": self.events, "history": self.history, "engine_tokens": self.engine_tokens, "api_usage": self.api_usage, "api_by_model": self.api_by_model}, ensure_ascii=False))
         except Exception as e:  # pragma: no cover
             log.warning("could not save build: %s", e)
 
@@ -1843,6 +1856,7 @@ def rehydrate(user: User, session_id: str, build_id: str, cred: Cred, team: list
     b.engine_tokens = int(d.get("engine_tokens") or 0)
     # builds saved before the split: the engine's reported cost is the total minus nothing known (API calls were a few cents)
     b.engine_cost = float(d["engine_cost_usd"]) if d.get("engine_cost_usd") is not None else (b.cost if b.engine else 0.0)
+    b.api_by_model = dict(d.get("api_by_model") or {})
     if d.get("api_usage"):
         b.api_usage = {**b.api_usage, **d["api_usage"]}
     else:  # builds saved before usage was split: their API tokens are known only as a total

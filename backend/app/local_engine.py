@@ -280,8 +280,8 @@ def describe_tool(name: str, inp: dict, cwd: Path) -> dict:
 _USAGE_CACHE: dict[str, tuple[tuple, dict]] = {}
 
 
-def claude_usage(cwd: Path) -> dict | None:
-    """Real token usage of every Claude Code run in this folder, read from Claude Code's own session logs
+def claude_usage(cwd: Path) -> dict[str, dict] | None:
+    """Real token usage per model of every Claude Code run in this folder, read from Claude Code's own session logs
     (~/.claude/projects/<folder>/*.jsonl; each assistant message once, by id). None when there are no logs."""
     slug = re.sub(r"[^A-Za-z0-9-]", "-", str(cwd.resolve()))
     d = Path(os.path.expanduser("~/.claude/projects")) / slug
@@ -304,15 +304,16 @@ def claude_usage(cwd: Path) -> dict | None:
                     continue
                 m = e.get("message")
                 if e.get("type") == "assistant" and isinstance(m, dict) and isinstance(m.get("usage"), dict):
-                    seen[m.get("id") or e.get("uuid") or str(len(seen))] = m["usage"]
-    u = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}
+                    seen[m.get("id") or e.get("uuid") or str(len(seen))] = {**m["usage"], "_model": m.get("model") or "claude"}
+    by_model: dict[str, dict] = {}
     for x in seen.values():
+        u = by_model.setdefault(x["_model"], {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0})
         u["input"] += int(x.get("input_tokens") or 0)
         u["output"] += int(x.get("output_tokens") or 0)
         u["cache_read"] += int(x.get("cache_read_input_tokens") or 0)
         u["cache_write"] += int(x.get("cache_creation_input_tokens") or 0)
-    _USAGE_CACHE[str(d)] = (key, u)
-    return u
+    _USAGE_CACHE[str(d)] = (key, by_model)
+    return by_model
 
 
 # ------------------------------------------------------------------ claude code

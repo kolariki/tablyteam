@@ -1267,11 +1267,8 @@ def get_build(session_id: str, build_id: str, user: User = CurrentUser):
 
     fc = d.get("file_contents") or {}
     from .builder import saved_usage
-    from .local_engine import is_engine
 
     d["usage"] = saved_usage(d)
-    if d.get("engine_cost_usd") is None:
-        d["engine_cost_usd"] = float(d.get("cost_usd") or 0) if is_engine(d.get("provider") or "") else 0.0
     d["preview_html"] = inline_html(fc.get(PREVIEW_PATH) or "", PREVIEW_PATH, fc) or None
     d["design_html"] = inline_html(fc.get(DESIGN_MOCKUP) or "", DESIGN_MOCKUP, fc) or d.get("design_html")
     return d
