@@ -43,8 +43,9 @@ export default function CouncilVerdict() {
     api.providers().then((all) => { const ps = visibleProviders(all); setProviders(ps.filter((p) => p.configured && p.id !== 'mock').concat(ps.filter((p) => p.id === 'mock' && p.configured))) }).catch(() => {})
   }, [])
   useEffect(() => {
-    if (bProvider) return
-    if (buildProvider) { setBProvider(buildProvider); setBModel(buildModel || 'default'); return }
+    const visible = (id: string) => engines.some((e) => e.id === id) || providers.some((p) => p.id === id)
+    if (bProvider && visible(bProvider)) return
+    if (buildProvider && visible(buildProvider)) { setBProvider(buildProvider); setBModel(buildModel || 'default'); return }
     const ok = engines.find((e) => e.ok)
     if (ok) { setBProvider(ok.id); setBModel('default') } else if (providers[0]) { setBProvider(providers[0].id); setBModel(providers[0].default_model) }
   }, [engines, providers, buildProvider, buildModel, bProvider])
@@ -212,18 +213,18 @@ export default function CouncilVerdict() {
         {/* footer: what to do with the list */}
         {!deliberating && ro && (
           <div className="border-t border-line bg-paper px-7 py-4">
-            <div className="flex flex-nowrap items-center gap-2 overflow-x-auto scroll-thin">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 [&>*]:min-w-0">
               {chosen.length > 0 ? (
-                <button disabled={busy} onClick={build} className={`${primary} shrink-0`}>
+                <button disabled={busy} onClick={build} className={`${primary} w-full justify-center`}>
                   {busy ? <Loader2 size={16} className="animate-spin" /> : <Hammer size={16} />} {T('Construir con estos', 'Build with these')} {chosen.length} {chosen.length === 1 ? T('cambio', 'change') : T('cambios', 'changes')}
                 </button>
               ) : council.approved ? (
-                <button onClick={openBuild} className={primary}><CheckCircle2 size={16} /> {T('Ver el proyecto aprobado', 'View the approved project')}</button>
+                <button onClick={openBuild} className={`${primary} w-full justify-center`}><CheckCircle2 size={16} /> {T('Ver el proyecto aprobado', 'View the approved project')}</button>
               ) : (
-                <button onClick={openBuild} className={primary}><Hammer size={16} /> {T('Volver al constructor', 'Back to the builder')}</button>
+                <button onClick={openBuild} className={`${primary} w-full justify-center`}><Hammer size={16} /> {T('Volver al constructor', 'Back to the builder')}</button>
               )}
               {chosen.length > 0 && (
-                <div className="flex h-11 shrink-0 items-center gap-2 rounded-full border border-line bg-surface pl-2 pr-2 text-[12px] text-ink-2 shadow-sm" title={T('Quién aplica los cambios: un agente local con tu suscripción o un modelo por API', 'Who applies the changes: a local agent on your subscription or an API model')}>
+                <div className="flex h-11 w-full min-w-0 items-center gap-2 rounded-full border border-line bg-surface pl-2 pr-2 text-[12px] text-ink-2 shadow-sm" title={T('Quién aplica los cambios: un agente local con tu suscripción o un modelo por API', 'Who applies the changes: a local agent on your subscription or an API model')}>
                   <ProviderLogo provider={engines.find((e) => e.id === bProvider)?.logo ?? bProvider} size={16} />
                   <select
                     value={bProvider}
@@ -233,7 +234,7 @@ export default function CouncilVerdict() {
                       setBProvider(id)
                       setBModel(eng ? 'default' : providers.find((p) => p.id === id)?.default_model ?? '')
                     }}
-                    className="h-8 max-w-[220px] appearance-none rounded-full bg-transparent pr-1 text-[12.5px] text-ink outline-none"
+                    className="h-8 min-w-0 max-w-[45%] shrink appearance-none truncate rounded-full bg-transparent pr-1 text-[12.5px] text-ink outline-none"
                   >
                     {engines.length > 0 && (
                       <optgroup label={T('Con tu suscripción', 'On your subscription')}>
@@ -244,20 +245,20 @@ export default function CouncilVerdict() {
                       {providers.map((p) => <option key={p.id} value={p.id}>{p.label.split(' · ')[0]}</option>)}
                     </optgroup>
                   </select>
-                  {!isEngineSel && bProvider && <span className="w-[200px]"><ModelSelect provider={bProvider} value={bModel} onChange={setBModel} /></span>}
+                  {!isEngineSel && bProvider && <span className="min-w-0 flex-1"><ModelSelect provider={bProvider} value={bModel} onChange={setBModel} /></span>}
                 </div>
               )}
               {chosen.length > 0 && (
-                <div className="flex h-11 shrink-0 items-center gap-2 rounded-full border border-line bg-surface px-3 text-[12px] text-ink-2 shadow-sm">
+                <div className="flex h-11 w-full items-center justify-center gap-2 rounded-full border border-line bg-surface px-3 text-[12px] text-ink-2 shadow-sm">
                   <span className="whitespace-nowrap">{T('Luego revisa', 'Then reviews')}</span>
                   <button type="button" onClick={() => setRounds((r) => Math.max(0, r - 1))} className="flex h-6 w-6 items-center justify-center rounded-full border border-line bg-paper transition hover:border-accent hover:text-accent"><Minus size={11} /></button>
                   <span className="w-14 whitespace-nowrap text-center font-mono text-[12px] text-ink">{rounds === 0 ? T('no', 'no') : `${rounds}×`}</span>
                   <button type="button" onClick={() => setRounds((r) => Math.min(3, r + 1))} className="flex h-6 w-6 items-center justify-center rounded-full border border-line bg-paper transition hover:border-accent hover:text-accent"><Plus size={11} /></button>
                 </div>
               )}
-              <div className="ml-auto flex shrink-0 items-center gap-2">
-                <button onClick={() => ro && set({ showVerdict: false, pendingBuild: { buildId: ro.build_id, sessionId: ro.session_id, fde: changes.filter((c) => c.severity === 'bloqueante').map((c) => `- ${c.text}`).join('\n') } })} className={`${pill} h-11 whitespace-nowrap border-gold/40 text-gold hover:border-gold hover:bg-gold/10 hover:text-gold`} title={T('Un ingeniero nuestro resuelve esto por vos, precio fijo', 'One of our engineers solves this for you, fixed price')}><HardHat size={15} /> {T('Pedir un developer', 'Request a developer')}</button>
-                <button onClick={openBuild} className={`${pill} h-11 whitespace-nowrap`} title={T('Abrir el constructor sin aplicar cambios', 'Open the builder without applying changes')}><Hammer size={15} /> {T('Constructor sin cambios', 'Builder, no changes')}</button>
+              <div className="contents">
+                <button onClick={() => ro && set({ showVerdict: false, pendingBuild: { buildId: ro.build_id, sessionId: ro.session_id, fde: changes.filter((c) => c.severity === 'bloqueante').map((c) => `- ${c.text}`).join('\n') } })} className={`${pill} h-11 w-full justify-center whitespace-nowrap border-gold/40 text-gold hover:border-gold hover:bg-gold/10 hover:text-gold`} title={T('Un ingeniero nuestro resuelve esto por vos, precio fijo', 'One of our engineers solves this for you, fixed price')}><HardHat size={15} /> {T('Pedir un developer', 'Request a developer')}</button>
+                <button onClick={openBuild} className={`${pill} h-11 w-full justify-center whitespace-nowrap`} title={T('Abrir el constructor sin aplicar cambios', 'Open the builder without applying changes')}><Hammer size={15} /> {T('Constructor sin cambios', 'Builder, no changes')}</button>
               </div>
             </div>
             {/* references + reverse engineering for the build that applies this list */}
