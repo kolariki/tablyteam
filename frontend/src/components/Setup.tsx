@@ -44,6 +44,9 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   const { prompt: askName, dialog: nameDialog } = usePrompt()
   const { confirm: confirmDelete, dialog: deleteDialog } = useConfirm()
   const [refDraft, setRefDraft] = useState('')
+  // the preset's own reference apps: never shown; used only when the user adds none (the user's always win)
+  const [presetRefs, setPresetRefs] = useState<string[]>([])
+  const effectiveRefs = (c: SessionConfig) => { const mine = (c.references ?? []).map((r) => r.trim()).filter(Boolean); return mine.length ? mine : presetRefs }
   const [rstatus, setRstatus] = useState<{ rea: { ok: boolean; fee_usd: number }; deep_fee_usd: number } | null>(null)
   useEffect(() => { api.researchStatus().then(setRstatus).catch(() => {}) }, [])
   // the direct lane's builder: a local engine (subscription) or an API provider + model; remembered, defaults to the first engine that is ready
@@ -154,7 +157,8 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
     baseline.current = { preset: p, title, topic, language, agents: Object.fromEntries(agents.map((a) => [a.id, { name: a.name, persona: a.persona }])) }
     setIdea(topic)
     setPromptMd(null)
-    setCfg((c) => ({ ...c, topic, title, language, mode: p.mode, max_turns: p.max_turns, agents, platform: p.platform ?? 'web', references: p.references ?? [] }))
+    setCfg((c) => ({ ...c, topic, title, language, mode: p.mode, max_turns: p.max_turns, agents, platform: p.platform ?? 'web', references: [] }))
+    setPresetRefs(p.references ?? [])
   }
   // Muse first: as soon as the Meta key is connected, the seats that were waiting for it (simulated) move to Muse with their recommended model
   useEffect(() => {
@@ -236,7 +240,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   const research = async (direct = false) => {
     if (!validate()) return
     let context = cfg.context ?? null
-    const refs = (cfg.references ?? []).map((r) => r.trim()).filter(Boolean)
+    const refs = effectiveRefs(cfg)
     if (refs.length) {
       setBusy(true)
       try {
@@ -271,7 +275,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
       setDirectBusy(true)
       setOpening(T('Escribiendo el brief y arrancando el constructor…', 'Writing the brief and starting the builder…'))
       try {
-        await onDirect({ ...cfg, context, builder: builder.provider ? builder : undefined })
+        await onDirect({ ...cfg, references: effectiveRefs(cfg), context, builder: builder.provider ? builder : undefined })
       } catch (e) {
         setError((e as Error).message)
         setOpening(null)
@@ -286,7 +290,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   const start = async () => {
     setBusy(true)
     try {
-      await onStart({ ...cfg, context: launchContext.current ?? cfg.context ?? null, min_turns: Math.min(cfg.min_turns, cfg.max_turns) })
+      await onStart({ ...cfg, references: effectiveRefs(cfg), context: launchContext.current ?? cfg.context ?? null, min_turns: Math.min(cfg.min_turns, cfg.max_turns) })
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -320,7 +324,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
               )}
               <div className="relative p-4 pt-16">
                 <div className="font-semibold text-sm leading-tight">{pick(p, 'title')}</div>
-                <div className="mt-1 text-[11px] text-ink-3">{p.agents.length} {T('agentes', 'agents')}{p.references?.length ? ` · ${p.references.length} ${T('referentes', 'reference apps')}` : ` · ${pick(MODE_INFO[p.mode], 'label')}`}</div>
+                <div className="mt-1 text-[11px] text-ink-3">{p.agents.length} {T('agentes', 'agents')} · {pick(MODE_INFO[p.mode], 'label')}</div>
               </div>
             </button>
   )
