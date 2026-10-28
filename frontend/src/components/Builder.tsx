@@ -239,6 +239,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
           <div className="serif truncate text-[17px] leading-tight" title={b.title}>{b.title}</div>
           <div className="mt-0.5 flex items-center gap-2 text-[11.5px] text-ink-3">
             <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} /> <span className="font-mono">{b.model}</span></span>
+            {b.id && b.sessionId && <TeamLanguage />}
             {b.engineSession && b.workdir && (
               <>
                 <span className="h-3 w-px bg-line" />
@@ -652,6 +653,41 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
 }
 
 /** The live strip under the chat box: the agent's current action with its path, this turn's counters and the clock. */
+/** The language the team speaks on this project: a build started in Spanish can switch to English (and back). It applies
+ *  from the next builder turn and the next council round; what was already written stays as it is. */
+function TeamLanguage() {
+  const T = useT()
+  const b = useBuild()
+  const [busy, setBusy] = useState(false)
+  const code = /^(en|ingl)/i.test(b.language ?? '') ? 'en' : 'es'
+  const pick = async (to: 'es' | 'en') => {
+    if (to === code || busy || !b.sessionId || !b.id) return
+    setBusy(true)
+    try {
+      const r = await api.setBuildLanguage(b.sessionId, b.id, to === 'en' ? 'English' : 'español rioplatense')
+      useBuild.getState().set({ language: r.language })
+      toast.ok(T('Idioma del equipo cambiado', 'Team language changed'), to === 'en' ? T('El equipo habla en inglés desde el próximo turno y la próxima ronda del consejo.', 'The team speaks English from the next turn and the next council round.') : T('El equipo habla en español desde el próximo turno y la próxima ronda del consejo.', 'The team speaks Spanish from the next turn and the next council round.'))
+    } catch (e) {
+      toast.error(T('No se pudo cambiar el idioma', 'Could not change the language'), (e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <>
+      <span className="h-3 w-px bg-line" />
+      <span className="flex items-center gap-1 whitespace-nowrap" title={T('Idioma en el que habla el equipo (constructor y consejo)', 'Language the team speaks (builder and council)')}>
+        <span>{T('Equipo', 'Team')}</span>
+        <span role="group" aria-label={T('Idioma del equipo', 'Team language')} className={`flex overflow-hidden rounded-full border border-line ${busy ? 'opacity-50' : ''}`}>
+          {(['es', 'en'] as const).map((l) => (
+            <button key={l} type="button" onClick={() => void pick(l)} aria-pressed={code === l} className={`px-1.5 py-px font-mono text-[10.5px] uppercase transition ${code === l ? 'bg-accent text-white' : 'text-ink-3 hover:text-accent'}`}>{l}</button>
+          ))}
+        </span>
+      </span>
+    </>
+  )
+}
+
 /** What this build used and saved, all measured: tokens (API calls + the CLI agent's own session logs), wall-clock,
  *  and at official list prices what the agent's work is worth (covered by the subscription) and what the cache saved. */
 function SavingsCard() {

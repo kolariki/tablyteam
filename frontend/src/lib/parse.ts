@@ -10,11 +10,13 @@ export function partialTags(raw: string): { thinking?: string; message?: string;
   return out
 }
 
-export const STANCE: Record<string, { label: string; color: string; emoji: string }> = {
-  agree: { label: 'De acuerdo', color: '#3B7F55', emoji: '🤝' },
-  disagree: { label: 'En desacuerdo', color: '#B0473B', emoji: '⚔️' },
-  propose: { label: 'Propone', color: '#9C7622', emoji: '💡' },
-  neutral: { label: 'Neutral', color: '#7C8681', emoji: '😐' },
+/** Stance chips; the label follows the UI language (read at render time). */
+const stance = (es: string, en: string, color: string, emoji: string) => ({ get label() { return getLang() === 'en' ? en : es }, color, emoji })
+export const STANCE: Record<string, { readonly label: string; color: string; emoji: string }> = {
+  agree: stance('De acuerdo', 'Agrees', '#3B7F55', '🤝'),
+  disagree: stance('En desacuerdo', 'Disagrees', '#B0473B', '⚔️'),
+  propose: stance('Propone', 'Proposes', '#9C7622', '💡'),
+  neutral: stance('Neutral', 'Neutral', '#7C8681', '😐'),
 }
 
 export const fmtMs = (ms?: number | null) => (ms == null ? '—' : ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`)

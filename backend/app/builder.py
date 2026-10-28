@@ -1557,9 +1557,13 @@ class Build:
         if not design_focus:
             prior += self.levels_block()
         ref_names = ", ".join(r.replace("https://", "").replace("http://", "").strip("/") for r in self.req.references[:3]) if self.req.references else ""
+        refs_label = ref_names or self.tx("los referentes", "the references")
         cfg = SessionConfig(
-            topic=(f"Auditoría · ronda {rnd}: ¿qué hay que cambiar en {self.title} antes de salir a producción?" if audit else f"Revisión de diseño · ronda {rnd}: ¿las pantallas de {self.title} están al nivel de {ref_names or 'los referentes'}?" if design_focus else f"Revisión pre-producción · ronda {rnd}: ¿{self.title} está listo para salir?"),
-            title=(f"Auditoría · {self.title} · ronda {rnd}" if audit else f"Consejo · {self.title} · ronda {rnd}") + (" · diseño" if design_focus else ""),
+            topic=(self.tx(f"Auditoría · ronda {rnd}: ¿qué hay que cambiar en {self.title} antes de salir a producción?", f"Audit · round {rnd}: what must change in {self.title} before going to production?") if audit
+                   else self.tx(f"Revisión de diseño · ronda {rnd}: ¿las pantallas de {self.title} están al nivel de {refs_label}?", f"Design review · round {rnd}: are the screens of {self.title} on par with {refs_label}?") if design_focus
+                   else self.tx(f"Revisión pre-producción · ronda {rnd}: ¿{self.title} está listo para salir?", f"Pre-production review · round {rnd}: is {self.title} ready to ship?")),
+            title=(self.tx(f"Auditoría · {self.title} · ronda {rnd}", f"Audit · {self.title} · round {rnd}") if audit else self.tx(f"Consejo · {self.title} · ronda {rnd}", f"Council · {self.title} · round {rnd}")) + (self.tx(" · diseño", " · design") if design_focus else ""),
+            language=self.req.language,
             mode="review", agents=[{k: v for k, v in a.items() if k in ("id", "role", "name", "provider", "model", "persona", "wanted_provider", "skills") and v is not None} for a in agents],
             max_turns=min(60, max(4, 2 * len(agents))), min_turns=min(len(agents), 4), final_vote=False, closing_round=True, pace_ms=500, max_tokens=1600,
             auto_skills=True,  # the council picks catalog skills the review needs (per role, on top of the user's)

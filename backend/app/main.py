@@ -1274,6 +1274,20 @@ def get_build(session_id: str, build_id: str, user: User = CurrentUser):
     return d
 
 
+@app.put("/api/sessions/{session_id}/builds/{build_id}/language")
+def build_language(session_id: str, build_id: str, body: dict, user: User = CurrentUser):
+    """The language the team speaks on this project (builder messages, council rounds, reports). Takes effect from the next
+    turn or council round; what was already written stays as it is."""
+    from .intake import lang_code
+
+    code = "en" if lang_code(str(body.get("language") or "")) == "en" else "es"
+    b = _build(user, build_id, session_id)
+    b.req.language = "English" if code == "en" else "español rioplatense"
+    b._save()
+    b.emit("build.language", language=b.req.language)
+    return {"language": b.req.language, "code": code}
+
+
 @app.put("/api/sessions/{session_id}/builds/{build_id}/files")
 def build_file_save(session_id: str, build_id: str, body: dict, user: User = CurrentUser):
     """The user edited a file in the editor: it replaces the build's copy (and the working folder on disk, when the

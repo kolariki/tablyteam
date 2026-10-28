@@ -177,6 +177,16 @@ def _norm_conf(s: str | None) -> int | None:
     return max(0, min(100, int(m.group()))) if m else None
 
 
+
+def lang_rule(language: str | None) -> str:
+    """The instructions are written in Spanish; in an English session that alone drags the answers into Spanish."""
+    from .intake import lang_code
+
+    if lang_code(language) != "en":
+        return ""
+    return ("\n\nLANGUAGE: English. Write EVERY word in English (messages, stances, reasons, change lists, verdicts, headlines), "
+            "even though these instructions, the brief or earlier messages are in Spanish. Keep file paths and code as they are.")
+
 class Session:
     def __init__(self, config: SessionConfig, owner: User, creds: dict[str, Cred]):
         self.owner = owner
@@ -321,6 +331,7 @@ class Session:
             f"y todo se transmite en pantalla. Idioma: {self.config.language}. Sé conciso, concreto y con carácter; "
             f"podés discrepar con fuerza. No repitas lo que ya se dijo.\n\n"
             f"Los otros participantes:\n{roster}\n\n{protocol}"
+            + lang_rule(self.config.language)
         )
 
     def _user(self, agent: AgentConfig, caller: str | None, reason: str | None, vote: bool = False) -> str:
@@ -658,7 +669,7 @@ class Session:
         tb = self.verdict.get("tiebreak")
         tie_txt = f"\nHUBO EMPATE entre {', '.join(self.agents[k].name for k in tb['tied'])}; se desempató por confianza promedio {tb['confidence']}." if tb else ""
         user = f"TEMA: {cfg.topic}\n\nTRANSCRIPCIÓN:\n{transcript}\n\nVOTOS:\n{votes}\n\nDATOS:\n{numbers}{tie_txt}\n\nGANADOR: {winner.name} ({winner.model})."
-        system = JUDGE_SYSTEM.format(model=judge.model, winner=winner.name, language=cfg.language)
+        system = JUDGE_SYSTEM.format(model=judge.model, winner=winner.name, language=cfg.language) + lang_rule(cfg.language)
         self.emit("judge.started", judge_id=judge.id, model=judge.model, provider=judge.provider)
         try:
             text, _, _ = await self._call(judge, system, user, turn=None, vote=False, judge=True, mock_script=self._mock_judge(winner.id, facts))
@@ -699,7 +710,7 @@ class Session:
         focus_txt = ("\n\nENFOQUE DE LA RONDA: DISEÑO. Los <changes> son únicamente de UI/UX (layout, componentes, paleta, tipografía, estados, interacciones, responsive, pulido) con pantalla y archivo. "
                      "Descartá cualquier pedido de tests, CI, deploy, legales, rendimiento o deuda técnica aunque algún rol lo haya mencionado.") if (cfg.review_of or {}).get("focus") == "design" else ""
         user = f"PROYECTO: {(cfg.review_of or {}).get('title') or cfg.topic}\n\nDEBATE DEL CONSEJO:\n{transcript}\n\nVEREDICTOS FINALES POR ROL:\n{verdicts}{prior_txt}{prio_txt}{level_txt}{focus_txt}"
-        system = COUNCIL_SYSTEM.format(model=judge.model, language=cfg.language)
+        system = COUNCIL_SYSTEM.format(model=judge.model, language=cfg.language) + lang_rule(cfg.language)
         self.emit("judge.started", judge_id=judge.id, model=judge.model, provider=judge.provider)
         try:
             text, _, jres = await self._call(judge, system, user, turn=None, vote=False, judge=True, mock_script=self._mock_council(closing), max_tokens=4000)
