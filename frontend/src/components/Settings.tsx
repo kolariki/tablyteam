@@ -3,7 +3,7 @@ import { Check, CloudUpload, Copy, Database, ExternalLink, Globe, KeyRound, Load
 import { useEffect, useState } from 'react'
 import { api, type ProviderSetting } from '../lib/api'
 import { tr, useT } from '../lib/i18n'
-import { MUSE_FIRST, MUSE_ONLY } from '../lib/flags'
+import { MUSE_FIRST, MUSE_ONLY, TICKETS_ENABLED } from '../lib/flags'
 import ModelSelect, { invalidateModels } from './ModelSelect'
 import ProviderLogo, { LogoWatermark } from './ProviderLogo'
 import PageHeader from './PageHeader'
@@ -101,7 +101,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
           </details>
         )}
         <TablyCloudSettings />
-        <NotionAppSettings />
+        {TICKETS_ENABLED && <NotionAppSettings />}
         <DeploySettings />
         <LangfuseSettings />
       </div>

@@ -22,6 +22,7 @@ import RunModal from './components/RunModal'
 import AgentSessions from './components/AgentSessions'
 import Marketplace from './components/Marketplace'
 import Tickets from './components/Tickets'
+import { TICKETS_ENABLED } from './lib/flags'
 import ResearchOverlay from './components/ResearchOverlay'
 import { api, auth, connect, connectBuild, replay } from './lib/api'
 import { tr, useT } from './lib/i18n'
@@ -467,7 +468,7 @@ function AppInner() {
   // deep links: #replay=<id> / #live=<id>  (handy for re-recording a take)
   useEffect(() => {
     if (!user) return
-    if (location.hash.startsWith('#tickets')) {  // back from Notion's OAuth consent: straight to the tickets screen
+    if (TICKETS_ENABLED && location.hash.startsWith('#tickets')) {  // back from Notion's OAuth consent: straight to the tickets screen
       const failed = location.hash === '#tickets=error'
       history.replaceState(null, '', location.pathname)
       useArena.getState().set({ view: 'tickets' })
@@ -521,7 +522,7 @@ function AppInner() {
   if (view === 'audit') return <>{banner}{demoLayer}<AuditSetup onBack={() => useArena.getState().set({ view: 'setup' })} onStart={startAudit} /></>
   if (view === 'settings') return <>{banner}{demoLayer}<Settings onBack={() => useArena.getState().set({ view: 'setup' })} /></>
   if (view === 'agents') return <>{banner}{demoLayer}<AgentSessions onBack={() => useArena.getState().set({ view: 'setup' })} /></>
-  if (view === 'tickets') return <>{banner}{demoLayer}<Tickets onBack={() => useArena.getState().set({ view: 'setup' })} /></>
+  if (view === 'tickets' && TICKETS_ENABLED) return <>{banner}{demoLayer}<Tickets onBack={() => useArena.getState().set({ view: 'setup' })} /></>
   if (view === 'market') return <>{banner}{demoLayer}<Marketplace onBack={() => useArena.getState().set({ view: 'setup' })} /></>
   if (view === 'setup') return <>{banner}{demoLayer}<Setup key={user.id} user={user} onLogout={logout} onSettings={() => useArena.getState().set({ view: 'settings' })} onAudit={() => useArena.getState().set({ view: 'audit' })} onStart={start} onDirect={direct} onReplay={startReplay} onOpen={(id, mode) => (mode === 'run' ? runApp(id) : openSaved(id, mode !== 'arena', mode === 'builder')).catch((e) => toast.error(tr('No se pudo abrir', 'Could not open'), (e as Error).message))} />{runOverlayLayer}</>
 
