@@ -10,8 +10,8 @@ export const MUSE_ONLY = true
 
 /** The providers a picker may show. */
 export const visibleProviders = <T extends { id: string }>(ps: T[]): T[] => (MUSE_ONLY ? ps.filter((p) => p.id === 'meta' || p.id === 'mock') : ps)
-/** The desktop coding agents a picker may show (none until Muse Code is wired as an engine). */
-export const visibleEngines = <T extends { id: string }>(es: T[]): T[] => (MUSE_ONLY ? es.filter((e) => e.id === 'muse-code') : es)
+/** The desktop coding agents a picker may show: Muse Code and the user's own Claude Code stay available as builders even in Muse-only mode. */
+export const visibleEngines = <T extends { id: string }>(es: T[]): T[] => (MUSE_ONLY ? es.filter((e) => e.id === 'muse-code' || e.id === 'claude-code') : es)
 
 /** Tickets (Notion → the team resolves them and opens the PR) is built but hidden for now: the product focuses on creating
  *  apps, the points scheme and the marketplace. Flip to true to bring it back (nothing was removed). */
