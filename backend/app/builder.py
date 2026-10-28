@@ -500,6 +500,7 @@ class Build:
                     await self.research_phase()
                 if resume_with is None and self.req.design and DESIGN_MOCKUP not in self.files and not self._stop.is_set():
                     await self.design_phase()
+                    await self._ensure_mockup()
                     # the user looks at the mockup before a line of code exists: approve, or ask for changes and redesign
                     while self.req.design_review and self.status != "error" and not self._stop.is_set() and self.design_rounds < 6:
                         self.status = "design_review"
@@ -516,6 +517,7 @@ class Build:
                         fb, self.design_feedback = self.design_feedback, None
                         self.chat.append({"role": "user", "text": f"Cambios al diseño: {fb}", "ts": time.time()})
                         await self.design_phase(feedback=fb)
+                        await self._ensure_mockup()
                 if self.status != "error":
                     await self.run(resume_with)
                 # a last pass that makes the UI match the design (typography, tokens, states, first impact): the difference
@@ -1121,6 +1123,43 @@ class Build:
                     dest.write_text(self.files[rel])
         self._push_history("(fase de diseño)", f"Diseño entregado en design/: {', '.join(parsed.get('files', []))}")
         self._save()
+
+    async def _ensure_mockup(self, tries: int = 2) -> None:
+        """The design review is about the mockup: if the designer's turn ran out before writing design/mockup.html (it is the
+        longest of the three files), ask for that file alone, with DESIGN.md and tokens.css as the source."""
+        for _ in range(tries):
+            if DESIGN_MOCKUP in self.files or self._stop.is_set() or self.status == "error":
+                return
+            self.chat.append({"role": "system", "text": "Falta la maqueta (design/mockup.html): el diseñador la entrega ahora.", "ts": time.time()})
+            ask = (f"Faltó {DESIGN_MOCKUP}. Entregá SOLO ese archivo, completo, con el protocolo <say>…</say><file path=\"{DESIGN_MOCKUP}\">…</file>: un único HTML autocontenido "
+                   "(CSS inline en <style>, sin frameworks; Google Fonts por <link> si el diseño define una familia) que copia el :root de tokens.css y muestra las 3-5 pantallas clave "
+                   "en alta fidelidad, navegables entre sí con JS mínimo, con datos reales del dominio, un estado vacío y uno de error, responsive. Sé eficiente con el largo: CSS compartido "
+                   f"en clases, sin repetir estilos inline. Idioma del copy: {self.req.language}.\n\n"
+                   f"===== design/DESIGN.md =====\n{self.files.get('design/DESIGN.md', '')[:14000]}\n\n===== design/tokens.css =====\n{self.files.get('design/tokens.css', '')[:6000]}")
+            self.turns += 1
+            self.design_turns += 1
+            self.emit("turn.started", turn=self.turns, phase="design")
+            if self.engine and not self._designer():
+                assert self.workdir
+                res = await run_engine(self.engine, ask.split("\n\n=====")[0] + " Escribilo directamente en el archivo; DESIGN.md y tokens.css ya están en design/.", self.workdir, resume_session=self.engine_session, model=self._engine_model())
+                self.cost += float(res.get("cost") or 0)
+                self._sync_from_disk()
+            else:
+                who = self._designer()
+                provider, model, cred = who if who else (self.req.provider, self.req.model, self.cred)
+                system = design_system_prompt(self.req.language, self.req.platform)
+                text = await self._turn(system, ask, phase="design", provider=provider, model=model, cred=cred)
+                if text is None:
+                    return
+                self._apply(text, phase="design")
+                if self.workdir and DESIGN_MOCKUP in self.files:
+                    dest = self.workdir / DESIGN_MOCKUP
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    dest.write_text(self.files[DESIGN_MOCKUP])
+            if DESIGN_MOCKUP in self.files:
+                self.design_html = self.files[DESIGN_MOCKUP]
+                self.emit("design.ready", path=DESIGN_MOCKUP, html=self.design_html)
+            self._save()
 
     async def _engine_design(self) -> None:
         assert self.engine and self.workdir

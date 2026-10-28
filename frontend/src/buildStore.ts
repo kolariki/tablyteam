@@ -136,7 +136,7 @@ interface BuildState {
   cloudApp: CloudApp | null
   cloudGithub: string | null
   councilSession: string | null
-  researching: { refs: string[]; started: number; visited: { name?: string; url?: string | null; ok?: boolean }[]; finished: boolean; opening?: boolean } | null  // references being benchmarked before a council round; opening = the council is up, play the fusion and leave
+  researching: { refs: string[]; hidden?: boolean; started: number; visited: { name?: string; url?: string | null; ok?: boolean }[]; finished: boolean; opening?: boolean } | null  // references being benchmarked before a council round; opening = the council is up, play the fusion and leave
   councilSessionsKnown: number  // how many council rounds the build had when the research started (the poll detects the new one)
   pendingCouncil: string | null
   versions: BuildVersion[]
@@ -194,7 +194,7 @@ const empty = {
   cloudApp: null as CloudApp | null,
   cloudGithub: null as string | null,
   councilSession: null as string | null,
-  researching: null as { refs: string[]; started: number; visited: { name?: string; url?: string | null; ok?: boolean }[]; finished: boolean; opening?: boolean } | null,
+  researching: null as { refs: string[]; hidden?: boolean; started: number; visited: { name?: string; url?: string | null; ok?: boolean }[]; finished: boolean; opening?: boolean } | null,
   councilSessionsKnown: 0,
   pendingCouncil: null as string | null,
   versions: [] as BuildVersion[],

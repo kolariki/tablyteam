@@ -64,7 +64,7 @@ export default function CouncilVerdict() {
     setBusy(true)
     try {
       const r = await api.councilApply(ro.build_id, ro.session_id, chosen, rounds, useArena.getState().sessionId, rounds > 0 ? priorities.trim() : '', refs, deep, bProvider ? { provider: bProvider, model: bModel } : undefined)
-      if (r.researching) useBuild.getState().set({ researching: { refs, started: Date.now(), visited: [], finished: false } })
+      if (r.researching) useBuild.getState().set({ researching: { refs, hidden: refs.length === 0, started: Date.now(), visited: [], finished: false } })
       set({ showVerdict: false, pendingBuild: { buildId: ro.build_id, sessionId: ro.session_id } })
     } catch (e) {
       toast.error(tr('No se pudo lanzar la construcción', 'Could not start the build'), (e as Error).message)

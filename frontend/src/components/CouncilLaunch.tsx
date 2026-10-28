@@ -114,13 +114,15 @@ export default function CouncilLaunch({ team, onLaunch, onClose, defaultRounds =
             {team.map((t) => {
               const theme = brandTheme(t.provider)
               return (
-                <div key={t.id} className="flex items-center gap-2.5 rounded-xl border px-3 py-2 text-[12.5px] shadow-[0_8px_20px_-16px_rgba(30,38,34,.45)]" style={{ background: theme.bg, borderColor: theme.border }}>
+                <div key={t.id} className="flex min-w-0 flex-col gap-2 rounded-xl border px-3 py-2.5 text-[12.5px] shadow-[0_8px_20px_-16px_rgba(30,38,34,.45)]" style={{ background: theme.bg, borderColor: theme.border }}>
+                  <div className="flex min-w-0 items-center gap-2.5">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface shadow-sm" style={{ border: `1.5px solid ${theme.accent}` }}><ProviderLogo provider={t.provider} size={17} /></span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold">{t.name} <span className="font-normal text-ink-3">· {t.role_label}</span></span>
                     <span className="mt-0.5 flex items-center gap-1 truncate font-mono text-[10.5px] text-ink-2" title={`${t.provider} · ${t.model}`}><span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: theme.accent }} /> {t.model}</span>
                   </span>
-                  <div className="shrink-0"><SkillPicker compact value={t.skills ?? []} onChange={async (ids) => {
+                  </div>
+                  <div className="min-w-0"><SkillPicker value={t.skills ?? []} onChange={async (ids) => {
                     const b = useBuild.getState()
                     if (!b.id) return
                     try {

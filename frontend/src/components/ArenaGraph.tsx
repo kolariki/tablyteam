@@ -319,13 +319,15 @@ function Graph() {
       byLevel.set(l, [...(byLevel.get(l) ?? []), a.id])
     }
     const cols = [...byLevel.entries()].sort((a, b) => a[0] - b[0]).map(([, ids]) => ids)
-    // a crowded column splits so nobody overlaps (at most 3 in parallel on a wide stage)
-    const maxPar = vertical ? 2 : 3
+    // a crowded column splits so nobody overlaps: as many in parallel as fit with their name/model labels (max 3)
+    const across = vertical ? rx : ry
+    const slot = NODE + (vertical ? 40 : 64)
+    const maxPar = Math.max(1, Math.min(vertical ? 2 : 3, Math.floor((2 * across) / slot) + 1))
     const out: string[][] = []
     for (const c of cols) for (let i = 0; i < c.length; i += maxPar) out.push(c.slice(i, i + maxPar))
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agents.map((a) => `${a.id}:${a.role ?? ''}:${a.name}`).join(','), vertical])
+  }, [agents.map((a) => `${a.id}:${a.role ?? ''}:${a.name}`).join(','), vertical, rx, ry])
   const levelIndex = useMemo(() => Object.fromEntries(columns.flatMap((c, i) => c.map((id) => [id, i]))) as Record<string, number>, [columns])
 
   const nodes = useMemo<Node[]>(() => {
@@ -336,7 +338,7 @@ function Graph() {
     const maxPar = Math.max(1, ...columns.map((c) => c.length))
     columns.forEach((col, ci) => {
       const t = nCols === 1 ? 0 : -along + (2 * along * ci) / (nCols - 1)
-      const gap = Math.min(NODE + (vertical ? 40 : 150), maxPar > 1 ? (2 * across) / (maxPar - 1) : 0)
+      const gap = Math.max(NODE + (vertical ? 40 : 64), Math.min(NODE + (vertical ? 40 : 150), maxPar > 1 ? (2 * across) / (maxPar - 1) : 0))
       col.forEach((id, ri) => {
         const u = col.length === 1 ? 0 : -((col.length - 1) * gap) / 2 + ri * gap
         const x = vertical ? u : t

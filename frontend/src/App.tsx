@@ -500,8 +500,8 @@ function AppInner() {
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
   const researching = useBuild((s) => s.researching)
-  const demoLayer = demo === 'research'
-    ? <ResearchOverlay demo onClose={() => { history.replaceState(null, '', location.pathname); setDemo(null) }} />
+  const demoLayer = demo === 'research' || demo === 'models'
+    ? <ResearchOverlay demo hiddenDemo={demo === 'models'} onClose={() => { history.replaceState(null, '', location.pathname); setDemo(null) }} />
     : <AnimatePresence>{researching && <ResearchOverlay key="research" />}</AnimatePresence>
 
   const banner = <OfflineBanner />

@@ -20,7 +20,7 @@ export default function Verdict({ onRedebate, onRerun }: { onRedebate?: (note: s
   const [edits, setEdits] = useState<Record<string, string>>({})
   const [editing, setEditing] = useState(false)
   const [expanded, setExpanded] = useState(false)
-  const [refs, setRefs] = useState<string[]>(() => useArena.getState().config?.references ?? [])
+  const [refs, setRefs] = useState<string[]>(() => { const c = useArena.getState().config; return c?.references_auto ? [] : c?.references ?? [] })
   const [deep, setDeep] = useState<boolean>(() => !!useArena.getState().config?.deep_analysis)
   const verdict = useArena((s) => s.verdict)
   const show = useArena((s) => s.showVerdict)
@@ -76,7 +76,7 @@ export default function Verdict({ onRedebate, onRerun }: { onRedebate?: (note: s
   const decisionsText = decisions.map((d) => `- ${d.agent!.name}: ${textOf(d)}`).join('\n')
   const edited = Object.keys(edits).some((k) => { const d = decisions.find((x) => x.agent!.id === k); return d && edits[k] !== d.text })
   /** The references live on the session config: the brief, the build and the next debate all read them from there. */
-  const saveRefs = () => { const cfg = useArena.getState().config; if (cfg) set({ config: { ...cfg, references: refs, deep_analysis: deep } }) }
+  const saveRefs = () => { const cfg = useArena.getState().config; if (cfg) set({ config: { ...cfg, ...(refs.length || !cfg.references_auto ? { references: refs, references_auto: false } : {}), deep_analysis: deep } }) }
   const goBuild = () => { saveRefs(); set({ showVerdict: false, showBriefExport: true, decisionNotes: edited ? decisionsText : '' }) }
   const redebate = async () => {
     if (!onRedebate || !note.trim()) return

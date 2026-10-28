@@ -1,35 +1,48 @@
-import { createAvatar } from '@dicebear/core'
-import * as notionists from '@dicebear/notionists'
-import { useMemo } from 'react'
 import ProviderLogo from './ProviderLogo'
 
 /**
- * Each role is a person: a deterministic illustrated portrait (same role + name → same face, everywhere), with the
- * provider's logo printed on the shirt. Nothing is fetched: the SVG is generated locally.
+ * Each role is a person: an editorial portrait per role (public/avatars/<role>.webp, generated once for Tably), with the
+ * provider's mark as a small badge on the corner. Custom roles are matched by name; anything else gets the neutral one.
  */
-const cache = new Map<string, string>()
+const ROLES = new Set([
+  'ceo', 'cto', 'coo', 'cfo', 'cpo', 'founder', 'product-manager', 'product-owner', 'ux-researcher', 'growth', 'head-engineering', 'tech-lead',
+  'backend', 'frontend', 'mobile', 'devops', 'ai-engineer', 'data-engineer', 'data-scientist', 'product-designer', 'brand', 'qa', 'security',
+  'legal', 'sales', 'customer-support', 'investor', 'devils-advocate', 'end-user', 'philosopher', 'scientist', 'custom',
+])
+const BY_NAME: [RegExp, string][] = [
+  [/\bceo\b/, 'ceo'], [/\bcto\b/, 'cto'], [/\bcoo\b/, 'coo'], [/\bcfo\b/, 'cfo'], [/\bcpo\b/, 'cpo'], [/founder|fundador/, 'founder'],
+  [/head of eng|head eng|ingenier[ií]a/, 'head-engineering'], [/tech lead|l[ií]der t[eé]cnico/, 'tech-lead'], [/product owner/, 'product-owner'],
+  [/product|producto|\bpm\b/, 'product-manager'], [/dise[nñ]|design|ux|ui\b/, 'product-designer'], [/research/, 'ux-researcher'],
+  [/growth|marketing/, 'growth'], [/brand|marca|content|contenido/, 'brand'], [/back/, 'backend'], [/front/, 'frontend'], [/mobile|m[oó]vil/, 'mobile'],
+  [/devops|platform|infra/, 'devops'], [/\bai\b|\bia\b|ml\b/, 'ai-engineer'], [/data sci|cient[ií]fic. de datos/, 'data-scientist'], [/data|datos/, 'data-engineer'],
+  [/\bqa\b|test|calidad/, 'qa'], [/secur|seguridad/, 'security'], [/legal|compliance/, 'legal'], [/sales|ventas/, 'sales'], [/support|soporte/, 'customer-support'],
+  [/invest|inversor/, 'investor'], [/devil|diablo/, 'devils-advocate'], [/user|usuario/, 'end-user'], [/fil[oó]sof|ethic|[eé]tic/, 'philosopher'], [/scien|cient/, 'scientist'],
+]
 
-export function avatarUri(seed: string): string {
-  let uri = cache.get(seed)
-  if (!uri) {
-    uri = createAvatar(notionists, { seed, backgroundColor: ['transparent'], radius: 50, scale: 108, translateY: -4 }).toDataUri()
-    cache.set(seed, uri)
-  }
-  return uri
+export function avatarRole(agent?: { name?: string; role?: string | null } | null): string {
+  if (agent?.role && ROLES.has(agent.role)) return agent.role
+  const n = (agent?.name ?? '').toLowerCase()
+  return BY_NAME.find(([rx]) => rx.test(n))?.[1] ?? 'custom'
+}
+
+export function avatarUri(agent?: { name?: string; role?: string | null } | null): string {
+  return `${import.meta.env.BASE_URL}avatars/${avatarRole(agent)}.webp`
 }
 
 export default function AgentAvatar({ agent, size = 40, className = '', ring = true, logo: logoRatio = 0.24, chip = false }: { agent?: { name?: string; role?: string | null; provider?: string | null; wanted_provider?: string | null; color?: string | null } | null; size?: number; className?: string; ring?: boolean; logo?: number; chip?: boolean }) {
-  const seed = `${agent?.role ?? ''}:${agent?.name ?? '?'}`
-  const uri = useMemo(() => avatarUri(seed), [seed])
   const provider = agent?.wanted_provider ?? agent?.provider ?? undefined
-  const logo = Math.round(size * logoRatio)
+  const badge = Math.max(14, Math.round(size * Math.min(0.3, logoRatio + 0.04)))
   return (
-    <span className={`relative inline-block shrink-0 overflow-hidden rounded-full bg-[#F6F3EC] ${ring ? 'ring-1 ring-black/10' : ''} ${className}`} style={{ width: size, height: size }} aria-hidden>
-      <img src={uri} alt="" width={size} height={size} draggable={false} className="block h-full w-full select-none" />
-      {/* the provider's mark, printed on the shirt (chest area of the notionists body) */}
+    <span className={`relative inline-block shrink-0 ${className}`} style={{ width: size, height: size }} aria-hidden>
+      <span className={`block h-full w-full overflow-hidden rounded-full bg-[#EEF1EC] ${ring ? 'ring-1 ring-black/10' : ''}`}>
+        <img src={avatarUri(agent)} alt="" width={size} height={size} loading="lazy" draggable={false} className="block h-full w-full select-none object-cover" />
+      </span>
       {provider && (
-        <span className={`absolute left-1/2 flex -translate-x-1/2 items-center justify-center ${chip ? 'rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,.25)] ring-1 ring-black/10' : ''}`} style={{ bottom: Math.round(size * (chip ? 0.02 : 0.035)), width: chip ? logo + 6 : logo, height: chip ? logo + 6 : logo }}>
-          <ProviderLogo provider={provider} size={logo} />
+        <span
+          className={`absolute flex items-center justify-center rounded-full bg-white ring-1 ring-black/10 ${chip ? 'shadow-[0_1px_3px_rgba(0,0,0,.25)]' : 'shadow-sm'}`}
+          style={{ right: Math.round(size * 0.02), bottom: Math.round(size * 0.02), width: badge, height: badge }}
+        >
+          <ProviderLogo provider={provider} size={Math.round(badge * 0.62)} />
         </span>
       )}
     </span>

@@ -15,7 +15,7 @@ const RING = MUSE_FIRST ? Array(6).fill('meta') as string[] : ['meta', 'anthropi
  * elsewhere would race the job) and shows what is happening: each reference visited, captured and analysed, the live
  * activity feed, the elapsed time. It leaves by itself when the council opens.
  */
-export default function ResearchOverlay({ demo = false, onClose }: { demo?: boolean; onClose?: () => void } = {}) {
+export default function ResearchOverlay({ demo = false, hiddenDemo = false, onClose }: { demo?: boolean; hiddenDemo?: boolean; onClose?: () => void } = {}) {
   const T = useT()
   const b = useBuild()
   const r = b.researching
@@ -24,7 +24,7 @@ export default function ResearchOverlay({ demo = false, onClose }: { demo?: bool
     if (!demo) return
     const refs = ['windy.com', 'accuweather.com', 'apple.com/weather']
     const steps: { at: number; apply: () => void }[] = [
-      { at: 0, apply: () => useBuild.getState().set({ researching: { refs, started: Date.now(), visited: [], finished: false }, activity: [{ kind: 'search', label: 'Buscando referentes', path: '', ts: Date.now() }] }) },
+      { at: 0, apply: () => useBuild.getState().set({ researching: { refs, hidden: hiddenDemo, started: Date.now(), visited: [], finished: false }, activity: [{ kind: 'search', label: 'Buscando referentes', path: '', ts: Date.now() }] }) },
       { at: 2500, apply: () => useBuild.getState().set({ activity: [...useBuild.getState().activity, { kind: 'search', label: 'Entrando a windy.com', path: 'https://windy.com', ts: Date.now() }] }) },
       { at: 5500, apply: () => useBuild.getState().set({ activity: [...useBuild.getState().activity, { kind: 'read', label: 'Analizando Windy', path: 'https://windy.com', ts: Date.now() }] }) },
       { at: 8000, apply: () => { const st = useBuild.getState(); st.set({ researching: st.researching && { ...st.researching, visited: [{ name: 'windy.com', url: 'https://windy.com', ok: true }] }, activity: [...st.activity, { kind: 'search', label: 'Entrando a accuweather.com', path: 'https://accuweather.com', ts: Date.now() }] }) } },
@@ -98,6 +98,8 @@ export default function ResearchOverlay({ demo = false, onClose }: { demo?: bool
   ]
   const ICON: Record<string, typeof Search> = { search: Globe, read: FileSearch, plan: Gavel, write: Camera, think: Eye }
   const stamp = (ts: number) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}` }
+  // Tably's own references (the user added none): the work is shown, the names are not
+  const hidden = !!r?.hidden
   const SKEL = [
     { w: '38%', h: 14, y: 0 }, { w: '100%', h: 36, y: 26 }, { w: '62%', h: 10, y: 74 }, { w: '48%', h: 10, y: 92 },
     { w: '31%', h: 70, y: 118, x: '0%' }, { w: '31%', h: 70, y: 118, x: '34.5%' }, { w: '31%', h: 70, y: 118, x: '69%' },
@@ -132,11 +134,11 @@ export default function ResearchOverlay({ demo = false, onClose }: { demo?: bool
         <div className="flex flex-wrap items-end gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.35em] text-accent"><span className="h-2 w-2 rounded-full bg-accent animate-pulse" /> {T('Reverse engineering · antes del consejo', 'Reverse engineering · before the council')}</div>
-            <h2 className="mt-1.5 text-[34px] leading-tight">{r?.finished ? T('Listo: abriendo el consejo…', 'Done: opening the council…') : T('El equipo está investigando las referencias', 'The team is researching the references')}</h2>
-            <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-ink-2">{T('Entra a cada app, saca capturas y anota qué emular y qué evitar. Con eso en la mano, el consejo revisa tu proyecto. Quedate acá: se abre solo al terminar.', 'It visits each app, takes screenshots and notes what to emulate and avoid. With that in hand the council reviews your project. Stay here: it opens by itself when done.')}</p>
+            <h2 className="mt-1.5 text-[34px] leading-tight">{r?.finished ? T('Listo: abriendo el consejo…', 'Done: opening the council…') : hidden ? T('Analizando modelos de referencia', 'Analysing reference models') : T('El equipo está investigando las referencias', 'The team is researching the references')}</h2>
+            <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-ink-2">{hidden ? T('El equipo estudia los mejores productos de la categoría: estructura, jerarquía, flujos y estados. Con eso como vara, el consejo revisa tu proyecto. Quedate acá: se abre solo al terminar.', 'The team studies the best products in the category: structure, hierarchy, flows and states. With that as the bar, the council reviews your project. Stay here: it opens by itself when done.') : T('Entra a cada app, saca capturas y anota qué emular y qué evitar. Con eso en la mano, el consejo revisa tu proyecto. Quedate acá: se abre solo al terminar.', 'It visits each app, takes screenshots and notes what to emulate and avoid. With that in hand the council reviews your project. Stay here: it opens by itself when done.')}</p>
           </div>
           <div className="grid grid-cols-3 gap-2">
-            {[[String(r?.refs.length || visited.length || '—'), T('referentes', 'references')], [String(captured.length), T('capturas', 'captures')], [`${mm}:${ss}`, T('transcurrido', 'elapsed')]].map(([v, l]) => (
+            {[[String(r?.refs.length || visited.length || '—'), hidden ? T('modelos', 'models') : T('referentes', 'references')], [String(captured.length), T('capturas', 'captures')], [`${mm}:${ss}`, T('transcurrido', 'elapsed')]].map(([v, l]) => (
               <div key={l} className="rounded-xl border border-line bg-surface px-4 py-2.5 text-center shadow-sm"><div className="font-mono text-xl leading-none">{v}</div><div className="mt-1 text-[10px] uppercase tracking-widest text-ink-3">{l}</div></div>
             ))}
           </div>
@@ -162,7 +164,7 @@ export default function ResearchOverlay({ demo = false, onClose }: { demo?: bool
             <div className="relative overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_24px_60px_-28px_rgba(30,38,34,.55)]">
               <div className="flex h-9 items-center gap-1.5 border-b border-line bg-surface-2/70 px-3">
                 <span className="h-2.5 w-2.5 rounded-full bg-[#E6A19A]" /><span className="h-2.5 w-2.5 rounded-full bg-[#E9C97A]" /><span className="h-2.5 w-2.5 rounded-full bg-[#9FCDA8]" />
-                <span className="ml-3 flex h-6 min-w-0 flex-1 items-center gap-1.5 rounded-md border border-line bg-surface px-2 font-mono text-[11px] text-ink-2"><Globe size={11} className="shrink-0 text-ink-3" /><span className="truncate">{currentHost ? `https://${currentHost}` : T('buscando referentes…', 'finding references…')}</span></span>
+                <span className="ml-3 flex h-6 min-w-0 flex-1 items-center gap-1.5 rounded-md border border-line bg-surface px-2 font-mono text-[11px] text-ink-2"><Globe size={11} className="shrink-0 text-ink-3" /><span className="truncate">{hidden ? T('analizando modelos…', 'analysing models…') : currentHost ? `https://${currentHost}` : T('buscando referentes…', 'finding references…')}</span></span>
                 <span className={`ml-2 flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${phase === 1 ? 'border-danger/40 bg-danger/10 text-danger' : phase === 2 ? 'border-accent/40 bg-accent-soft text-accent' : 'border-line bg-surface text-ink-3'}`}><span className={`h-1.5 w-1.5 rounded-full ${phase === 1 ? 'bg-danger animate-pulse' : phase === 2 ? 'bg-accent animate-pulse' : 'bg-ink-4'}`} /> {phase === 1 ? T('capturando', 'capturing') : phase === 2 ? T('analizando', 'analysing') : phase === 3 ? T('redactando', 'writing') : r?.finished ? T('listo', 'done') : T('buscando', 'searching')}</span>
               </div>
               {/* the page being read: a skeleton that builds up, a scan beam, and the orbit watching from the corner */}
@@ -200,14 +202,32 @@ export default function ResearchOverlay({ demo = false, onClose }: { demo?: bool
               {captured.map((v, i) => (
                 <motion.div key={`${v.url ?? v.name ?? 'ref'}-${i}`} initial={{ opacity: 0, y: 8, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 20 }} className="relative h-14 w-24 shrink-0 overflow-hidden rounded-lg border border-line shadow-sm" style={{ background: `linear-gradient(135deg, hsl(${(i * 67) % 360} 45% 92%) 0%, hsl(${(i * 67 + 40) % 360} 40% 84%) 100%)` }}>
                   <span className="absolute left-1.5 top-1.5 h-1.5 w-10 rounded-full bg-white/70" /><span className="absolute left-1.5 top-4 h-4 w-16 rounded bg-white/60" /><span className="absolute bottom-1.5 left-1.5 right-1.5 h-3 rounded bg-white/50" />
-                  <span className="absolute bottom-0 inset-x-0 truncate bg-ink/60 px-1.5 py-0.5 font-mono text-[9px] text-white">{(v.name || v.url || '').replace(/^https?:\/\//, '')}</span>
+                  <span className="absolute bottom-0 inset-x-0 truncate bg-ink/60 px-1.5 py-0.5 font-mono text-[9px] text-white">{hidden ? `${T('modelo', 'model')} ${i + 1}` : (v.name || v.url || '').replace(/^https?:\/\//, '')}</span>
                   <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-ok text-white"><Check size={9} strokeWidth={3} /></span>
                 </motion.div>
               ))}
             </div>
           </div>
 
-          {/* references + log */}
+          {/* references + log (hidden mode: one calm status card, no names, no log) */}
+          {hidden ? (
+            <div className="rounded-2xl border border-line bg-surface p-5 shadow-[0_12px_28px_-18px_rgba(30,38,34,.4)]">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-accent">{r?.finished ? <Check size={18} strokeWidth={3} /> : <Loader2 size={18} className="animate-spin" />}</span>
+                <div className="min-w-0">
+                  <div className="text-[14px] font-semibold">{r?.finished ? T('Análisis terminado', 'Analysis finished') : T('Analizando modelos…', 'Analysing models…')}</div>
+                  <div className="text-[12px] text-ink-3">{STEPS[Math.min(phase, STEPS.length - 1)].label}</div>
+                </div>
+                <span className="ml-auto font-mono text-[12px] text-ink-2">{captured.length}/{Math.max(refs.length, visited.length) || '—'}</span>
+              </div>
+              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-surface-2"><motion.div className="h-full rounded-full bg-accent" animate={{ width: `${Math.round(((r?.finished ? STEPS.length : phase) / STEPS.length) * 100)}%` }} transition={{ duration: 0.6 }} /></div>
+              <ul className="mt-4 space-y-2 text-[12.5px] text-ink-2">
+                {[T('Estructura y navegación', 'Structure and navigation'), T('Jerarquía visual y densidad', 'Visual hierarchy and density'), T('Flujos clave y estados', 'Key flows and states'), T('Qué emular y qué evitar', 'What to emulate and avoid')].map((t, i) => (
+                  <li key={t} className="flex items-center gap-2">{i < phase || r?.finished ? <Check size={13} className="text-ok" strokeWidth={3} /> : <span className="h-1.5 w-1.5 rounded-full bg-ink-4" />}{t}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
           <div className="flex min-h-0 flex-col gap-4">
             <div className="rounded-2xl border border-line bg-surface p-4 shadow-[0_12px_28px_-18px_rgba(30,38,34,.4)]">
               <div className="flex items-center text-[10.5px] uppercase tracking-[0.25em] text-ink-3">{T('Referencias', 'References')}<span className="ml-auto font-mono normal-case tracking-normal text-ink-2">{captured.length}/{Math.max(refs.length, visited.length) || '—'}</span></div>
@@ -249,6 +269,7 @@ export default function ResearchOverlay({ demo = false, onClose }: { demo?: bool
               </div>
             </div>
           </div>
+          )}
         </div>
       </motion.div>
     </motion.div>,

@@ -181,13 +181,18 @@ export default function LevelsPanel() {
                 </button>
               </div>
             </div>
-            <ol className="mt-3 flex flex-col divide-y divide-line">
+            <ol className="mt-3 flex list-none flex-col divide-y divide-line">
               {next.checks.map((c, i) => (
                 <li key={c.id} className="flex items-start gap-3 py-2.5">
                   <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${c.ok ? 'bg-ok text-white' : 'border border-line bg-surface-2 text-ink-3'}`}>{c.ok ? <Check size={11} /> : i + 1}</span>
                   <div className="min-w-0 flex-1">
                     <div className={`text-[13px] ${c.ok ? 'text-ink-3 line-through decoration-ink-3/40' : 'text-ink'}`}>{en ? c.label_en : c.label}</div>
                     {c.evidence && <div className={`mt-0.5 font-mono text-[11px] ${c.ok ? 'text-ok' : 'text-ink-3'}`}>{c.ok ? '✓ ' : ''}{c.evidence}</div>}
+                    {!c.ok && c.id === 'approved' && (
+                      <button onClick={council} disabled={running || !!busy || Object.keys(b.files).length === 0} className="mt-1.5 inline-flex h-8 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40">
+                        {busy === 'council' ? <Loader2 size={13} className="animate-spin" /> : <Gavel size={13} />} {T('Enviar a revisión', 'Send for review')}
+                      </button>
+                    )}
                     {!c.ok && c.id === 'published' && <div className="mt-0.5 text-[11px] text-ink-3">{T('Panel «Publicar» → un clic y queda en una URL pública.', '"Publish" pane → one click and it is on a public URL.')}</div>}
                     {!c.ok && c.id === 'republished' && <div className="mt-0.5 text-[11px] text-ink-3">{T('Volvé a publicar la última versión desde «Publicar».', 'Publish the latest version again from "Publish".')}</div>}
                     {!c.ok && c.id === 'visits' && data?.app?.url && <div className="mt-0.5 text-[11px] text-ink-3">{T('Compartí la URL: cada visita cuenta.', 'Share the URL: every visit counts.')} <a href={data.app.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">{data.app.url}</a></div>}

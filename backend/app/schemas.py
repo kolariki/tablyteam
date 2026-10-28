@@ -36,5 +36,6 @@ class SessionConfig(BaseModel):
     auto_skills: bool = Field(default=False, description="let the council pick catalog skills per role from the task before starting")
     platform: Literal["web", "mobile", "both"] = Field(default="web", description="what gets built: a web app, a mobile app (iOS + Android, Expo) or both")
     references: list[str] = Field(default_factory=list, description="reference apps / URLs the team studies before designing (research phase of the build)")
+    references_auto: bool = Field(default=False, description="the references are the preset's own (never shown to the user); the user's, when given, replace them")
     deep_analysis: bool = Field(default=False, description="paid per use: REA reverse-engineering of the reference apps during the build (needs REA + a local engine)")
     review_of: dict | None = Field(default=None, description="review mode: {build_id, session_id, title, round} of the build under review")

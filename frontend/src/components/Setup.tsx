@@ -245,7 +245,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
       setBusy(true)
       try {
         const job = await api.researchJobStart(refs, `${cfg.title ?? ''}\n\n${cfg.topic}`, !!cfg.deep_analysis)
-        useBuild.getState().set({ researching: { refs, started: Date.now(), visited: [], finished: false }, activity: [] })
+        useBuild.getState().set({ researching: { refs, hidden: !(cfg.references ?? []).some((r) => r.trim()), started: Date.now(), visited: [], finished: false }, activity: [] })
         const md = await new Promise<string>((resolve) => {
           const tick = async () => {
             try {
@@ -275,7 +275,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
       setDirectBusy(true)
       setOpening(T('Escribiendo el brief y arrancando el constructor…', 'Writing the brief and starting the builder…'))
       try {
-        await onDirect({ ...cfg, references: effectiveRefs(cfg), context, builder: builder.provider ? builder : undefined })
+        await onDirect({ ...cfg, references: effectiveRefs(cfg), references_auto: !(cfg.references ?? []).some((r) => r.trim()), context, builder: builder.provider ? builder : undefined })
       } catch (e) {
         setError((e as Error).message)
         setOpening(null)
@@ -290,7 +290,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
   const start = async () => {
     setBusy(true)
     try {
-      await onStart({ ...cfg, references: effectiveRefs(cfg), context: launchContext.current ?? cfg.context ?? null, min_turns: Math.min(cfg.min_turns, cfg.max_turns) })
+      await onStart({ ...cfg, references: effectiveRefs(cfg), references_auto: !(cfg.references ?? []).some((r) => r.trim()), context: launchContext.current ?? cfg.context ?? null, min_turns: Math.min(cfg.min_turns, cfg.max_turns) })
     } catch (e) {
       setError((e as Error).message)
     } finally {

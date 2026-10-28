@@ -106,8 +106,8 @@ export default function SkillPicker({ value, onChange, compact = false, busy = f
     }
   }
   return (
-    <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen(!open)} className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11.5px] ${value.length ? 'border-accent/40 bg-accent-soft text-accent' : 'border-line bg-surface text-ink-3 hover:text-ink'} ${compact ? '' : 'w-full'}`} title={T('Skills: conocimiento que este rol aplica (guías, convenciones, datos)', 'Skills: knowledge this role applies (guides, conventions, data)')}>
+    <div ref={ref} className="relative min-w-0">
+      <button type="button" onClick={() => setOpen(!open)} className={`flex min-w-0 max-w-full items-center gap-1.5 rounded-lg border px-2 py-1 text-[11.5px] ${value.length ? 'border-accent/40 bg-accent-soft text-accent' : 'border-line bg-surface text-ink-3 hover:text-ink'} ${compact ? '' : 'w-full'}`} title={T('Skills: conocimiento que este rol aplica (guías, convenciones, datos)', 'Skills: knowledge this role applies (guides, conventions, data)')}>
         {busy ? <Loader2 size={12} className="animate-spin" /> : <Puzzle size={12} />}
         {value.length ? `${value.length} skill${value.length === 1 ? '' : 's'}` : 'skills'}
         {compact && selected.length > 0 && <span className="truncate text-ink-2 font-normal">· {selected.map((s) => pick(s, 'name')).join(', ')}</span>}

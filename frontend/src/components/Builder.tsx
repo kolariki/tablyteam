@@ -308,7 +308,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
             if (r.session_id) useBuild.getState().set({ councilSession: r.session_id })
             else {
               // the benchmark runs in the background: open the build socket so its events (references, done, council) arrive
-              useBuild.getState().set({ researching: { refs: references, started: Date.now(), visited: [], finished: false }, councilSessionsKnown: b.councilSessionsKnown })
+              useBuild.getState().set({ researching: { refs: references, hidden: references.length === 0, started: Date.now(), visited: [], finished: false }, councilSessionsKnown: b.councilSessionsKnown })
               reconnectBuild(b.id)
             }
             setCouncilOpen(false)
