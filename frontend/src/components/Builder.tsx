@@ -272,6 +272,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
           <BuilderMenu onDownload={downloadZip} onRecord={toggleRecording} />
         </div>
       </div>
+      <DeployWatcher />
       {runOpen && <RunModal onClose={() => setRunOpen(false)} onDownload={downloadZip} />}
       {fdeOpen !== null && <FdeModal onClose={() => setFdeOpen(null)} prefill={fdeOpen ? `${T('Resolver los bloqueantes del consejo:', 'Resolve the council blockers:')}\n${fdeOpen}` : ''} />}
       {councilOpen && (
@@ -624,6 +625,31 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
 /** The live strip under the chat box: the agent's current action with its path, this turn's counters and the clock. */
 /** The language the team speaks on this project: a build started in Spanish can switch to English (and back). It applies
  *  from the next builder turn and the next council round; what was already written stays as it is. */
+/** While the app deploys on Railway: polls its record and tells the user when it is live (or failed), panel open or not. */
+function DeployWatcher() {
+  const T = useT()
+  const deploying = useBuild((s) => s.cloudApp?.status === 'deploying')
+  const ids = useBuild((s) => (s.sessionId && s.id ? `${s.sessionId}~${s.id}` : null))
+  useEffect(() => {
+    if (!deploying || !ids) return
+    const [sid, bid] = ids.split('~')
+    const tick = () => api.cloud(sid, bid).then((d) => {
+      const st = useBuild.getState()
+      if (st.id !== bid) return
+      st.set({ cloudApp: d.app })
+      if (d.app?.status === 'live' && d.app.url) {
+        const url = d.app.url
+        toast.ok(T('Tu app está en línea', 'Your app is live'), url, { label: T('Abrir', 'Open'), onClick: () => window.open(url, '_blank', 'noopener') })
+      } else if (d.app?.status === 'error') {
+        toast.error(T('El despliegue falló', 'The deploy failed'), d.app.error ?? '')
+      }
+    }).catch(() => {})
+    const t = window.setInterval(tick, 8000)
+    return () => window.clearInterval(t)
+  }, [deploying, ids]) // eslint-disable-line react-hooks/exhaustive-deps
+  return null
+}
+
 /** The secondary actions of the builder, folded in one menu so the header stays clean. */
 function BuilderMenu({ onDownload, onRecord }: { onDownload: () => void; onRecord: () => void }) {
   const T = useT()

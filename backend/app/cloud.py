@@ -121,7 +121,8 @@ def public(app: dict | None) -> dict | None:
     if not app:
         return None
     db = app.get("db") or {}
-    return {**app, "db": {k: {"provider": v.get("provider"), "ok": v.get("ok"), "vars": v.get("vars", []), "host": v.get("host"), "ts": v.get("ts")} for k, v in db.items()}}
+    return {**app, "deploy_logs": (db.get("railway") or {}).get("logs"),
+            "db": {k: {"provider": v.get("provider"), "ok": v.get("ok"), "vars": v.get("vars", []), "host": v.get("host"), "ts": v.get("ts")} for k, v in db.items() if k != "railway"}}
 
 
 def slug_for(user_id: str, build_id: str, title: str) -> str:
@@ -378,6 +379,31 @@ async def _wait_until_up(url: str, logf: Log, timeout: float = 900) -> bool:
     return False
 
 
+_INTERNAL_SECRET = re.compile(r"(^|_)(SECRET|SECRET_KEY|TOKEN|SALT|PEPPER|SIGNING_KEY|ENCRYPTION_KEY|COOKIE_KEY)$")
+
+
+def _internal_secrets(root: Path, values: dict[str, str]) -> dict[str, str]:
+    """Variables of .env.example the app signs or checks with itself (JWT_SECRET, SESSION_SECRET, METRICS_TOKEN…) and that
+    have no value yet: random values. Keys of outside services (STRIPE_SECRET_KEY, GITHUB_TOKEN…) are never invented."""
+    out: dict[str, str] = {}
+    for ex in [root / ".env.example", *root.glob("*/.env.example"), *root.glob("*/*/.env.example")][:12]:
+        try:
+            rows = deploymod.parse_env_example(ex.read_text(errors="replace"))
+        except OSError:
+            continue
+        for r in rows:
+            var = r["var"]
+            if var in values or var in out or not _INTERNAL_SECRET.search(var):
+                continue
+            svc = deploymod.classify(var)
+            if svc["service"] != "Secreto propio" and svc["url"]:  # a known outside service: its key comes from its dashboard
+                continue
+            if any(re.search(rx, var, re.I) for rx, service, _u, _p in deploymod.KNOWN if service not in ("Secreto propio",)):
+                continue
+            out[var] = secrets.token_urlsafe(48)
+    return out
+
+
 def _last_line(text: str) -> str:
     return (text.strip().splitlines() or ["?"])[-1][:300]
 
@@ -457,12 +483,11 @@ async def _publish_railway(root: Path, cls: dict, slug: str, values: dict[str, s
         meta["url"] = url
     if not url:
         return {"ok": False, "url": None, "error": "La app quedó desplegada pero Railway no devolvió la URL pública", "railway": meta}
-    # the build runs on Railway (minutes): wait until the app answers on its URL instead of following the log stream
-    await _call(logf, "· Railway está construyendo la imagen y arrancando la app (puede tardar varios minutos)…")
-    if not await _wait_until_up(url, logf):
-        return {"ok": False, "url": None, "error": "La app no respondió en su URL después de 15 minutos. Mirá el build en Railway" + (f": {logs}" if logs else ".") + " Cuando termine, tocá «Publicar» de nuevo (reusa el mismo proyecto).", "railway": meta}
-    await _call(logf, f"✓ publicada en {url}")
-    return {"ok": True, "url": url, "railway": meta}
+    # the build runs on Railway (minutes): the app is «deploying» and a watcher marks it live when its URL answers
+    meta["logs"] = logs
+    await _call(logf, f"· Railway está construyendo la imagen y arrancando la app en {url}: te avisamos cuando esté en línea")
+    return {"ok": True, "deploying": True, "url": url, "railway": meta}
+
 
 
 async def publish(user_id: str, build_id: str, title: str, root: Path, files: dict[str, str], version: int, logf: Log) -> dict:
@@ -482,6 +507,11 @@ async def publish(user_id: str, build_id: str, title: str, root: Path, files: di
 
     _save(app)
     values = deploymod.load_secrets(user_id, build_id)
+    gen = _internal_secrets(root, values)
+    if gen:  # the app's own secrets (JWT, sessions…): generated once, saved with the build, the same on every republish
+        deploymod.save_secrets(user_id, build_id, gen)
+        values.update(gen)
+        await log_(f"· generé {len(gen)} secreto(s) propio(s) de la app ({', '.join(gen)}); quedan guardados en «Servicios y deploy»")
     (root / ".env").write_text(deploymod.render_env(values, files)) if values and not (root / ".env").exists() else None
     cls = classify(root)
     app["kind"] = cls["kind"]
@@ -509,9 +539,60 @@ async def publish(user_id: str, build_id: str, title: str, root: Path, files: di
     except Exception as e:  # noqa: BLE001
         log.exception("publish failed")
         res = {"ok": False, "url": None, "error": str(e)[:300]}
-    app.update(status="live" if res.get("ok") else "error", url=res.get("url") or app.get("url"), error=res.get("error"), updated=time.time())
+    app.update(status=("deploying" if res.get("deploying") else "live") if res.get("ok") else "error", url=res.get("url") or app.get("url"), error=res.get("error"), updated=time.time())
     _save(app)
+    if app["status"] == "deploying":
+        _watch(user_id, build_id)
     return app
+
+
+_WATCHING: set[tuple[str, str]] = set()
+
+
+def _watch(user_id: str, build_id: str) -> None:
+    """In the background: the deploying app goes live when its URL answers (or fails after 15 minutes, with the build logs)."""
+    if (user_id, build_id) in _WATCHING:
+        return
+    _WATCHING.add((user_id, build_id))
+    from .tasks import spawn
+
+    async def run() -> None:
+        try:
+            app = get_app(user_id, build_id)
+            if not app or app.get("status") != "deploying" or not app.get("url"):
+                return
+            lines = list(app.get("log") or [])
+
+            async def note(line: str) -> None:
+                lines.append(line)
+                cur = get_app(user_id, build_id) or app
+                cur["log"] = lines[-200:]
+                _save(cur)
+
+            ok = await _wait_until_up(app["url"], note)
+            cur = get_app(user_id, build_id) or app
+            if cur.get("status") != "deploying":  # republished or taken down meanwhile
+                return
+            logs = ((cur.get("db") or {}).get("railway") or {}).get("logs")
+            if ok:
+                lines.append(f"✓ en línea en {cur['url']}")
+                cur.update(status="live", error=None, log=lines[-200:], updated=time.time())
+            else:
+                cur.update(status="error", log=lines[-200:], updated=time.time(),
+                           error="La app no respondió en su URL después de 15 minutos. Mirá el build en Railway" + (f": {logs}" if logs else ".") + " Cuando lo corrijas, tocá «Publicar» de nuevo (reusa el mismo proyecto).")
+            _save(cur)
+        finally:
+            _WATCHING.discard((user_id, build_id))
+
+    spawn(run())
+
+
+def resume_watchers() -> None:
+    """After a restart: the apps that were still deploying get their watcher back."""
+    with _db() as c:
+        rows = c.execute("SELECT user_id, build_id FROM cloud_apps WHERE status = 'deploying'").fetchall()
+    for r in rows:
+        _watch(r["user_id"], r["build_id"])
 
 
 async def unpublish(user_id: str, build_id: str, logf: Log | None = None) -> dict | None:

@@ -431,8 +431,9 @@ export interface CloudApp {
   slug: string
   provider: 'local' | 'cloudflare' | 'fly' | string
   kind: 'static' | 'server' | 'unknown' | string
-  status: 'building' | 'live' | 'error' | 'down' | string
+  status: 'building' | 'deploying' | 'live' | 'error' | 'down' | string
   url: string | null
+  deploy_logs?: string | null  // Railway build logs while it deploys
   version: number | null
   error: string | null
   log: string[]

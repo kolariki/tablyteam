@@ -2124,6 +2124,7 @@ async def _startup():
     from .tasks import start_runner
 
     start_runner()
+    cloudmod.resume_watchers()  # Tably Cloud apps still deploying on Railway get their «is it up yet?» watcher back
 
 
 # ================================================================================================ Tably Cloud · git propio, publicar, base de datos, migrar

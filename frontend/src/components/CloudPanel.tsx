@@ -98,7 +98,7 @@ export default function CloudPanel() {
   useEffect(reload, [b.sessionId, b.id, b.publishing, b.cloudApp?.status, b.cloudApp?.updated, b.cloudGithub])
   useEffect(() => { if (b.publishing) setLogOpen(true) }, [b.publishing])
   // a finished build has no live socket: while something is being published, poll until it settles
-  const inFlight = !!info?.publishing || info?.app?.status === 'building' || b.publishing
+  const inFlight = !!info?.publishing || info?.app?.status === 'building' || info?.app?.status === 'deploying' || b.cloudApp?.status === 'deploying' || b.publishing
   useEffect(() => {
     if (!inFlight) return
     const id = window.setInterval(reload, 2500)
@@ -109,6 +109,7 @@ export default function CloudPanel() {
   const app = b.cloudApp ?? info?.app ?? null
   const st = info?.status
   const live = app?.status === 'live' && !!app.url
+  const deploying = app?.status === 'deploying'
   const publishing = b.publishing || !!info?.publishing || app?.status === 'building'
   const finished = ['completed', 'approved', 'audited', 'stopped', 'error', 'design_review'].includes(b.status)
 
@@ -139,10 +140,10 @@ export default function CloudPanel() {
             <p className="mt-1 text-[13px] leading-relaxed text-ink-2">{T('La app sale funcionando con una URL, con base de datos y auth si las necesita, y con su repositorio git. Cuando quieras, te la llevás a tus propias cuentas.', 'The app goes live with a URL, with database and auth when needed, and its own git repository. Whenever you want, take it to your own accounts.')}</p>
           </div>
           {app && (
-            <span className={`mt-1 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11.5px] font-medium ${live ? 'border-ok/30 bg-ok/10 text-ok' : app.status === 'error' ? 'border-danger/30 bg-danger/5 text-danger' : publishing ? 'border-accent/30 bg-accent-soft text-accent' : 'border-line bg-surface text-ink-3'}`}>
+            <span className={`mt-1 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11.5px] font-medium ${live ? 'border-ok/30 bg-ok/10 text-ok' : app.status === 'error' ? 'border-danger/30 bg-danger/5 text-danger' : publishing || deploying ? 'border-accent/30 bg-accent-soft text-accent' : 'border-line bg-surface text-ink-3'}`}>
               {live && <span className="h-2 w-2 rounded-full bg-ok shadow-[0_0_0_3px_rgba(23,137,106,.18)]" />}
-              {(publishing) && <Loader2 size={11} className="animate-spin" />}
-              {live ? T('En línea', 'Live') : app.status === 'error' ? T('Falló', 'Failed') : publishing ? T('Publicando', 'Publishing') : T('Dada de baja', 'Taken down')}
+              {(publishing || deploying) && <Loader2 size={11} className="animate-spin" />}
+              {live ? T('En línea', 'Live') : deploying ? T('Desplegando', 'Deploying') : app.status === 'error' ? T('Falló', 'Failed') : publishing ? T('Publicando', 'Publishing') : T('Dada de baja', 'Taken down')}
             </span>
           )}
         </div>
@@ -167,9 +168,19 @@ export default function CloudPanel() {
               <ExternalLink size={15} className="text-accent opacity-70 transition group-hover:opacity-100" />
             </a>
           )}
+          {deploying && (
+            <div className="mt-3 flex items-start gap-3 rounded-xl border border-accent/30 bg-accent-soft/50 px-3.5 py-3 text-[13px]">
+              <Loader2 size={16} className="mt-0.5 shrink-0 animate-spin text-accent" />
+              <div className="min-w-0">
+                <div className="font-semibold text-ink">{T('Desplegando la aplicación en Railway…', 'Deploying the app on Railway…')}</div>
+                <div className="mt-0.5 text-ink-2">{T('Railway construye la imagen y la arranca; suele tardar unos minutos. Te avisamos cuando esté en línea, aunque cierres este panel.', 'Railway builds the image and starts it; it usually takes a few minutes. We let you know when it is live, even if you close this panel.')}</div>
+                <div className="mt-1 flex flex-wrap gap-x-3 text-[12px]">{app?.url && <span className="font-mono text-ink-3">{app.url}</span>}{app?.deploy_logs && <a href={app.deploy_logs} target="_blank" rel="noreferrer" className="text-accent hover:underline">{T('Ver el build en Railway', 'See the build on Railway')} ↗</a>}</div>
+              </div>
+            </div>
+          )}
           {app?.status === 'error' && app.error && <div className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-[12.5px] leading-snug text-danger">{app.error}</div>}
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button disabled={publishing || !finished || Object.keys(b.files).length === 0} onClick={() => act('publish', () => api.cloudPublish(b.sessionId!, b.id!))} className={PRIMARY} title={!finished ? T('Esperá a que el constructor termine', 'Wait for the builder to finish') : undefined}>
+            <button disabled={publishing || deploying || !finished || Object.keys(b.files).length === 0} onClick={() => act('publish', () => api.cloudPublish(b.sessionId!, b.id!))} className={PRIMARY} title={!finished ? T('Esperá a que el constructor termine', 'Wait for the builder to finish') : undefined}>
               {publishing ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} {publishing ? T('Publicando…', 'Publishing…') : live ? T('Republicar', 'Republish') + (info && app && info.version !== app.version ? ` · v${info.version}` : '') : T('Publicar ahora', 'Publish now')}
             </button>
             {live && app?.url && <CopyBtn text={app.url} label={T('Copiar URL', 'Copy URL')} />}
