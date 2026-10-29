@@ -163,6 +163,13 @@ export const api = {
   addEmployeeFile: (id: string, file: File) => { const form = new FormData(); form.append('file', file, file.name); return j<{ docs: KnowledgeDoc[] }>(authed(`/api/team/employees/${id}/docs/file`, { method: 'POST', body: form })) },
   deleteEmployeeDoc: (id: string, did: string) => j<{ docs: KnowledgeDoc[] }>(authed(`/api/team/employees/${id}/docs/${did}`, { method: 'DELETE' })),
   buildLevelPending: (sessionId: string, buildId: string, scope?: { focus?: 'analytics'; ids?: string[] }) => j<{ ok: boolean; items: number }>(post(`/api/sessions/${sessionId}/builds/${buildId}/levels/build-pending`, scope ?? {})),
+  accountExport: async () => {
+    const r = await authed('/api/account/export', { method: 'POST' })
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail ?? `HTTP ${r.status}`)
+    const name = /filename="([^"]+)"/.exec(r.headers.get('content-disposition') ?? '')?.[1] ?? 'tably.tably'
+    return { blob: await r.blob(), code: r.headers.get('x-tably-code') ?? '', name, summary: JSON.parse(r.headers.get('x-tably-summary') ?? '{}') as { session_files: number; project_files: number; rows: Record<string, number> } }
+  },
+  accountImport: (file: File, code: string) => { const form = new FormData(); form.append('file', file, file.name); form.append('code', code); return j<{ ok: boolean; files: number; skipped_files: number; rows: Record<string, number> }>(authed('/api/account/import', { method: 'POST', body: form })) },
   analytics: () => j<{ apps: AnalyticsApp[]; collector: string; collector_public: boolean }>(authed('/api/analytics')),
   teamScores: () => j<{ roles: RoleScore[] }>(authed('/api/team/scores')),
   teamMemoryDecide: (id: string, action: 'accept' | 'dismiss' | 'edit' | 'forget', text?: string) => j<TeamMemory>(post(`/api/team/memory/${id}`, { action, text })),

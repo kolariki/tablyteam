@@ -40,6 +40,7 @@ from . import auth, keystore, trial
 from . import memory as memorymod
 from . import scores as scoresmod
 from . import team as teammod
+from . import portability
 from . import observability as obs
 from .tasks import spawn
 from . import research
@@ -1435,6 +1436,29 @@ def _learn_from_council(user: User, council_session: str, chosen: list[dict]) ->
 @app.get("/api/team/memory")
 def team_memory(user: User = CurrentUser):
     return memorymod.listing(user.id)
+
+
+# ---------------------------------------------------------------------------------------------- move an account between installs
+@app.post("/api/account/export")
+def account_export(user: User = CurrentUser):
+    """Everything of this account as one encrypted file; the code to open it goes in a header and is never stored."""
+    code = portability.new_code()
+    blob, summary = portability.export_bundle(user.id, code)
+    name = f"tably-{time.strftime('%Y%m%d-%H%M')}.tably"
+    return Response(blob, media_type="application/octet-stream", headers={
+        "Content-Disposition": f'attachment; filename="{name}"', "X-Tably-Code": code, "X-Tably-Summary": json.dumps(summary),
+        "Access-Control-Expose-Headers": "X-Tably-Code, X-Tably-Summary, Content-Disposition"})
+
+
+@app.post("/api/account/import")
+async def account_import(file: UploadFile = File(...), code: str = Form(...), user: User = CurrentUser):
+    """Bring an export from another installation into this account (nothing that exists here is overwritten)."""
+    data = await file.read()
+    try:
+        summary = portability.import_bundle(user.id, data, code)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True, **summary}
 
 
 @app.get("/api/team/employees")

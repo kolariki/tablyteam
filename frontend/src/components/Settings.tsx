@@ -11,6 +11,7 @@ import HomeLoader from './HomeLoader'
 import { readCache, writeCache } from '../lib/cache'
 import { brandTheme } from '../lib/brand'
 import SubscriptionPanel from './SubscriptionPanel'
+import AccountTransfer from './AccountTransfer'
 
 const KEY_URL: Record<string, string> = {
   anthropic: 'https://console.anthropic.com/settings/keys',
@@ -104,6 +105,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
         {TICKETS_ENABLED && <NotionAppSettings />}
         <DeploySettings />
         <LangfuseSettings />
+        <AccountTransfer />
       </div>
     </div>
   )
