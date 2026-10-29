@@ -29,6 +29,7 @@ import logging
 import re
 import secrets
 
+import httpx
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -2602,8 +2603,29 @@ def analytics_snippet():
     return Response(levelsmod.SNIPPET_JS, media_type="application/javascript", headers={"Cache-Control": "public, max-age=300"})
 
 
+_ONLINE_SNIPPET: dict[str, tuple[float, bool | None]] = {}
+
+
+async def _online_has_snippet(url: str | None, published_at: float = 0) -> bool | None:
+    """Whether the page live on the app's URL loads Tably Analytics (None when it could not be read). Cached a minute,
+    and read again as soon as the app is republished."""
+    if not url:
+        return None
+    hit = _ONLINE_SNIPPET.get(f"{url}@{published_at}")
+    if hit and time.time() - hit[0] < 60:
+        return hit[1]
+    try:
+        async with httpx.AsyncClient(timeout=6, follow_redirects=True) as cx:
+            r = await cx.get(url)
+        val: bool | None = bool(re.search(r"/a\.js[^>]*data-site|data-site[^>]*/a\.js", r.text[:400_000])) if r.status_code < 400 else None
+    except Exception:  # noqa: BLE001
+        val = None
+    _ONLINE_SNIPPET[f"{url}@{published_at}"] = (time.time(), val)
+    return val
+
+
 @app.get("/api/analytics")
-def analytics_overview(user: User = CurrentUser):
+async def analytics_overview(user: User = CurrentUser):
     """Tably Analytics for every app the user published: visits, events and errors of each, whether the project has the
     snippet and whether the version online already carries it (if not, the page offers to publish again)."""
     folder = auth.user_dir(user.id)
@@ -2621,12 +2643,12 @@ def analytics_overview(user: User = CurrentUser):
                 pass
             break
         st = levelsmod.stats(app_["slug"])
-        installed = installed or st["pageviews"] > 0 or st["live"] > 0
+        online = await _online_has_snippet(app_.get("url"), app_.get("updated") or 0) if app_.get("status") == "live" else None
+        installed = installed or st["pageviews"] > 0 or st["live"] > 0 or online is True
         out.append({"slug": app_["slug"], "title": title, "url": app_.get("url"), "status": app_.get("status"), "provider": app_.get("provider"),
                     "build_id": app_["build_id"], "session_id": session_id, "installed": installed,
-                    # the snippet is in the project but nothing ever arrived: most likely the version online is older (the
-                    # builder can add it without a new version number); publishing again is safe, it reuses the same app
-                    "needs_republish": installed and st["pageviews"] == 0 and st["live"] == 0 and ((app_.get("version") or 0) < versions or app_.get("status") == "live"),
+                    # the project has the snippet but the page online does not load it (read from the live URL): publish again
+                    "needs_republish": installed and online is False,
                     "stats": st, "visits_7d": levelsmod.hits_for(app_["slug"], time.time() - 7 * 86400)})
     return {"apps": out, "collector": cloudmod.public_url(), "collector_public": not re.match(r"https?://(localhost|127\.0\.0\.1)", cloudmod.public_url())}
 
@@ -2821,6 +2843,13 @@ async def build_cloud_publish(session_id: str, build_id: str, user: User = Curre
     if b.status in ("running", "reviewing"):
         raise HTTPException(409, "Esperá a que el constructor termine")
     _check_capacity(user.id)
+    _start_publish(user, b)
+    return {"ok": True}
+
+
+def _start_publish(user: User, b) -> None:
+    """Publish the build's current files on Tably Cloud in the background (the panel follows the cloud.* events)."""
+    build_id = b.id
     root = _cloud_root(user, b)
     b.publishing = True
     b.emit("cloud.started", build=build_id)
@@ -2839,7 +2868,22 @@ async def build_cloud_publish(session_id: str, build_id: str, user: User = Curre
         b.emit("cloud.status", app=cloudmod.public(app_) if app_.get("slug") else app_)
 
     spawn(run())
-    return {"ok": True}
+
+
+def auto_publish(b) -> bool:
+    """An app that is already online gets the new work by itself: when the builder finishes or the council approves and the
+    approval holds (see levels «approved»), the current version is published again on the same app. Returns whether it started."""
+    app_ = cloudmod.get_app(b.user.id, b.id)
+    if not app_ or not (app_.get("status") in ("live", "deploying") or (app_.get("status") == "error" and app_.get("url"))):
+        return False  # never published (the first publish is the user's decision)
+    if getattr(b, "publishing", False) or b.status in ("running", "reviewing", "design_review"):
+        return False
+    checks = {c["id"]: c["ok"] for lv in b.levels_eval().get("levels") or [] for c in lv["checks"]}
+    if not checks.get("approved"):
+        return False  # new work the council has not approved stays unpublished until it is
+    b.chat.append({"role": "system", "text": b.tx(f"Publicando automáticamente la versión aprobada en {app_.get('url')}…", f"Publishing the approved version automatically at {app_.get('url')}…"), "ts": time.time()})
+    _start_publish(b.user, b)
+    return True
 
 
 @app.delete("/api/sessions/{session_id}/builds/{build_id}/cloud/publish")

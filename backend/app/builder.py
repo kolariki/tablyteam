@@ -680,6 +680,8 @@ class Build:
                     break
                 reqs = "\n".join(f"- [{r['role_label']} · {r['name']}] {r['requests']}" for r in rnd["results"] if r["verdict"] == "changes")
                 await self.run(f"REVISIÓN PRE-PRODUCCIÓN — ronda {rnd['round']}. El consejo del equipo pidió estos cambios:\n{reqs}\n\nAplicalos TODOS (archivos completos afectados), actualizá README/NOTES si corresponde y, cuando el proyecto vuelva a estar completo, emití <done>.")
+            if self.status in ("completed", "approved") and not self._stop.is_set():
+                self._auto_publish()  # already online + the approval holds → the new version goes out by itself
         except asyncio.CancelledError:
             self.status = "stopped"
         except Exception as e:  # pragma: no cover - a crash must leave the build resumable, never "running" forever
@@ -1422,6 +1424,7 @@ class Build:
         if council.get("approved"):
             self.status = "approved"
             self.emit("build.approved", round=len(self.council_sessions))
+            self._auto_publish_after_save = True
         self.emit("build.readiness", n=v["n"], readiness=v["readiness"], approved=bool(council.get("approved")), resolved=resolved)
         self._save()
         try:  # a build resolving a Notion ticket: approval opens the PR and moves the ticket (see main.ticket_on_verdict)
@@ -1430,6 +1433,18 @@ class Build:
             ticket_on_verdict(self, session_id, bool(council.get("approved")), len(council.get("changes") or []))
         except Exception as e:  # noqa: BLE001
             log.warning("ticket hook failed: %s", e)
+        if getattr(self, "_auto_publish_after_save", False):
+            self._auto_publish_after_save = False
+            self._auto_publish()
+
+    def _auto_publish(self) -> None:
+        """An app already online is republished when new approved work lands (main.auto_publish decides; never blocks)."""
+        try:
+            from .main import auto_publish
+
+            auto_publish(self)
+        except Exception as e:  # noqa: BLE001
+            log.warning("auto publish failed: %s", e)
 
     def pending_council(self) -> str | None:
         """Council session whose verdict is waiting for the user's decision (build with its changes or not)."""
