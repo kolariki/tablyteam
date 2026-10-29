@@ -2641,7 +2641,8 @@ async def _online_has_snippet(url: str | None, published_at: float = 0) -> bool 
     try:
         async with httpx.AsyncClient(timeout=6, follow_redirects=True) as cx:
             r = await cx.get(url)
-        val: bool | None = bool(re.search(r"/a\.js[^>]*data-site|data-site[^>]*/a\.js", r.text[:400_000])) if r.status_code < 400 else None
+        base = re.escape(cloudmod.public_url())  # it has to report here, not to another Tably (e.g. a local one)
+        val: bool | None = bool(re.search(rf"{base}/a\.js[^>]*data-site|data-site[^>]*{base}/a\.js", r.text[:400_000])) if r.status_code < 400 else None
     except Exception:  # noqa: BLE001
         val = None
     _ONLINE_SNIPPET[f"{url}@{published_at}"] = (time.time(), val)
@@ -2710,8 +2711,8 @@ def build_levels(session_id: str, build_id: str, user: User = CurrentUser):
 def _level_change(b, check: dict, level: int, site: str) -> dict:
     """A pending level check as a request for the builder; the analytics ones carry the exact snippet (any level)."""
     if check["id"] == "analytics":
-        text = b.tx(f"Instalá Tably Analytics: en cada página HTML (o en el layout raíz que las envuelve) agregá exactamente <script defer src=\"{cloudmod.public_url()}/a.js\" data-site=\"{site}\"></script>. Registra visitas, gente en vivo y errores solo; no uses cookies ni otro analytics.",
-                    f"Install Tably Analytics: on every HTML page (or the root layout that wraps them) add exactly <script defer src=\"{cloudmod.public_url()}/a.js\" data-site=\"{site}\"></script>. It records visits, live visitors and errors by itself; use no cookies or other analytics.")
+        text = b.tx(f"Instalá Tably Analytics: en cada página HTML (o en el layout raíz que las envuelve) agregá exactamente <script defer src=\"{cloudmod.public_url()}/a.js\" data-site=\"{site}\"></script>. Si ya hay un snippet de /a.js apuntando a otra dirección (por ejemplo localhost), reemplazalo por este en TODOS los archivos, incluidos los scripts que generan páginas. Registra visitas, gente en vivo y errores solo; no uses cookies ni otro analytics.",
+                    f"Install Tably Analytics: on every HTML page (or the root layout that wraps them) add exactly <script defer src=\"{cloudmod.public_url()}/a.js\" data-site=\"{site}\"></script>. If there is already an /a.js snippet pointing elsewhere (e.g. localhost), replace it with this one in EVERY file, including scripts that generate pages. It records visits, live visitors and errors by itself; use no cookies or other analytics.")
     elif check["id"] == "events":
         text = b.tx("Marcá al menos 3 acciones clave del producto (registro, crear, pagar, etc.) con data-track=\"nombre\" en el botón o tably.track('nombre') en el código.",
                     "Mark at least 3 key product actions (sign up, create, pay, etc.) with data-track=\"name\" on the button or tably.track('name') in code.")

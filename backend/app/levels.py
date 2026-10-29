@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from .auth import _db, user_dir
-from .config import DATA_DIR
+from .config import DATA_DIR, env
 
 log = logging.getLogger("arena.levels")
 
@@ -170,7 +170,12 @@ def _check(level: int, cid: str, b, files: dict[str, str], app: dict | None, hit
             return live, (app or {}).get("url") if live else None
     if level == 2:
         if cid == "analytics":
-            ok = _all_pages(pages, r"<script[^>]+src=[\"'][^\"']*/a\.js[\"'][^>]*data-site=|data-site=[\"'][^\"']+[\"'][^>]*src=[\"'][^\"']*/a\.js") or _any(code, r"/a\.js[\"'][^>]*data-site=")
+            # the snippet only counts when it reports to THIS installation (one built on another Tably, e.g. a local one
+            # pointing at localhost, sends its visits somewhere this dashboard never sees)
+            base = re.escape(collector_url())
+            ok = _all_pages(pages, rf"<script[^>]+src=[\"']{base}/a\.js[\"'][^>]*data-site=|data-site=[\"'][^\"']+[\"'][^>]*src=[\"']{base}/a\.js") or _any(code, rf"{base}/a\.js[\"'][^>]*data-site=")
+            if not ok and _any(code, r"/a\.js[\"'][^>]*data-site="):
+                return False, "el snippet apunta a otro Tably: hay que actualizarlo"
             return ok, "snippet /a.js" if ok else None
         if cid == "events":
             n = sum(len(re.findall(r"tably\.track\(\s*[\"'][^\"']+[\"']|data-track=[\"'][^\"']+[\"']", c)) for c in code.values())
@@ -212,6 +217,11 @@ def _check(level: int, cid: str, b, files: dict[str, str], app: dict | None, hit
             ok = _republished(versions, published_version)
             return ok, (f"v{published_version} publicada" if ok else f"publicada v{published_version}, la actual es v{len(versions)}" if published_version else None)
     return False, None
+
+
+def collector_url() -> str:
+    """Where this installation receives analytics (the same base Tably Cloud uses)."""
+    return (env("TABLY_CLOUD_URL") or "http://localhost:8000").rstrip("/")
 
 
 def _republished(versions: list[dict], published_version: int) -> bool:
