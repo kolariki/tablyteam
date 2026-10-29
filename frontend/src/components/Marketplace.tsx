@@ -1,10 +1,11 @@
-import { motion } from 'framer-motion'
-import { ExternalLink, Eye, Loader2, Mail, Store, Trophy } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { ExternalLink, Eye, Mail, Store, Trophy } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api, type MarketListing } from '../lib/api'
 import { useT } from '../lib/i18n'
 import { useArena } from '../store'
 import { LEVEL_COLORS } from './LevelsPanel'
+import HomeLoader from './HomeLoader'
 import PageHeader from './PageHeader'
 
 /** Every app for sale on Tably: level, public URL, real visits, pitch and price. Buyers write to the owner; the owner transfers from the builder. */
@@ -36,7 +37,7 @@ export default function Marketplace({ onBack }: { onBack: () => void }) {
           </div>
         )}
         {err && <div className="mt-6 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{err}</div>}
-        {!data && !err && <div className="mt-10 flex justify-center text-ink-3"><Loader2 size={18} className="animate-spin" /></div>}
+        <AnimatePresence>{!data && !err && <HomeLoader key="loader" caption={T('Abriendo el marketplace…', 'Opening the marketplace…')} />}</AnimatePresence>
         {data && data.listings.length === 0 && (
           <div className="mt-10 rounded-2xl border border-dashed border-line bg-surface px-6 py-10 text-center text-sm text-ink-2">
             {T('Todavía no hay apps en venta. La primera que llegue al nivel 1 aparece acá.', 'No apps for sale yet. The first one to reach level 1 shows up here.')}

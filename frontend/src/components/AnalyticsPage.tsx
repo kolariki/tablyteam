@@ -8,6 +8,8 @@ import { useArena } from '../store'
 import AnalyticsDetail from './AnalyticsDetail'
 import { LiveNow } from './LevelsPanel'
 import PageHeader from './PageHeader'
+import HomeLoader from './HomeLoader'
+import { AnimatePresence } from 'framer-motion'
 
 /** Tably Analytics for every published app: visits, events and errors, read from the `/a.js` snippet each app carries. */
 export default function AnalyticsPage({ onBack }: { onBack: () => void }) {
@@ -37,7 +39,7 @@ export default function AnalyticsPage({ onBack }: { onBack: () => void }) {
           </div>
         )}
         {error && <div className="mt-6 rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-[13px] text-danger">{error}</div>}
-        {!data && !error && <div className="mt-10 flex items-center gap-2 text-sm text-ink-3"><Loader2 size={15} className="animate-spin" /> {T('Cargando…', 'Loading…')}</div>}
+        <AnimatePresence>{!data && !error && <HomeLoader key="loader" caption={T('Midiendo tus apps…', 'Measuring your apps…')} />}</AnimatePresence>
         {data && !data.apps.length && <div className="mt-8 rounded-2xl border border-dashed border-line px-6 py-12 text-center text-[14px] text-ink-3">{T('Todavía no publicaste ninguna app. Cuando publiques una con Tably Cloud, sus visitas aparecen acá.', 'You have not published any app yet. Once you publish one with Tably Cloud, its visits show up here.')}</div>}
         {openApp ? <div className="mt-8"><AnalyticsDetail app={openApp} onBack={() => setOpen(null)} /></div>
           : <div className="mt-8 space-y-5">{data?.apps.map((a) => <AppCard key={a.slug} a={a} onDetail={() => setOpen(a.slug)} />)}</div>}

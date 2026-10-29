@@ -5,6 +5,7 @@ import { api, type AnalyticsApp, type AnalyticsDetail as Detail, type AnalyticsR
 import { getLang, tr, useT } from '../lib/i18n'
 import { useArena } from '../store'
 import { toast } from './Toast'
+import { PanelLoader } from './HomeLoader'
 
 /** One published app, in depth: who visits, from where, on what device, what they tap and who the signed-in users are. */
 export default function AnalyticsDetail({ app, onBack }: { app: AnalyticsApp; onBack: () => void }) {
@@ -50,7 +51,7 @@ export default function AnalyticsDetail({ app, onBack }: { app: AnalyticsApp; on
         </div>
       </div>
 
-      {!d ? <div className="mt-10 flex items-center gap-2 text-sm text-ink-3"><Loader2 size={15} className="animate-spin" /> {T('Cargando…', 'Loading…')}</div> : (
+      {!d ? <div className="mt-10 min-h-[420px]"><PanelLoader caption={T('Leyendo las visitas…', 'Reading the visits…')} /></div> : (
         <>
           {k && k.identified === 0 && d.people.length > 0 && app.session_id && (
             <div className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border border-accent/30 bg-accent-soft/40 px-4 py-3 text-[13px] text-ink-2">

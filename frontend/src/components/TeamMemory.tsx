@@ -7,6 +7,7 @@ import { getLang, tr, useT } from '../lib/i18n'
 import { useArena } from '../store'
 import AgentAvatar from './AgentAvatar'
 import PageHeader from './PageHeader'
+import { PanelLoader } from './HomeLoader'
 import { Employees, loadEmployees, useEmployees } from './MyTeam'
 import { toast } from './Toast'
 
@@ -104,7 +105,7 @@ function TeamContent() {
   const byRole = memory.reduce<Record<string, RoleInsight[]>>((acc, i) => ((acc[i.role] ??= []).push(i), acc), {})
   return (
     <>
-      {!data && (tab === 'review' || tab === 'memory') && <div className="flex items-center gap-2 py-10 text-sm text-ink-3"><Loader2 size={15} className="animate-spin" /> {T('Cargando…', 'Loading…')}</div>}
+      {!data && (tab === 'review' || tab === 'memory') && <div className="min-h-[300px]"><PanelLoader caption={T('Leyendo lo que aprendió tu equipo…', 'Reading what your team learned…')} /></div>}
       {data && tab === 'review' && (pending.length ? (
         <div className="space-y-3">{pending.map((i) => <InsightCard key={i.id} item={i} />)}</div>
       ) : (
@@ -178,7 +179,7 @@ const pct = (x: number | null) => (x === null ? '—' : `${Math.round(x * 100)}%
 /** What each role is worth to this user, from what happened: changes kept, blockers that held, rounds to approval. */
 function Scores({ roles }: { roles: RoleScore[] | null }) {
   const T = useT()
-  if (!roles) return <div className="flex items-center gap-2 py-10 text-sm text-ink-3"><Loader2 size={15} className="animate-spin" /> {T('Calculando…', 'Calculating…')}</div>
+  if (!roles) return <div className="min-h-[300px]"><PanelLoader caption={T('Calculando el puntaje de cada rol…', 'Scoring each role…')} /></div>
   if (!roles.length) return <Empty text={T('Todavía no hay datos. El puntaje sale de las rondas del consejo que aplicaste y de cuántas rondas tardó en aprobarse cada construcción.', 'No data yet. The score comes from the council rounds you applied and how many rounds each build took to be approved.')} />
   return (
     <div className="space-y-3">

@@ -7,6 +7,7 @@ import type { AgentConfig, Role } from '../types'
 import { useAvatars, type AvatarConfig } from '../lib/avatar'
 import AgentAvatar from './AgentAvatar'
 import AvatarEditor from './AvatarEditor'
+import { PanelLoader } from './HomeLoader'
 import { toast } from './Toast'
 
 /**
@@ -48,7 +49,7 @@ export function Employees() {
       setSel(d.employees.find((e) => (r && roleId !== 'custom' ? e.role === roleId : e.name === tr('Rol nuevo', 'New role')))?.id ?? null)
     } catch (e) { toast.error(tr('No se pudo sumar', 'Could not add'), (e as Error).message) }
   }
-  if (!list) return <div className="flex items-center gap-2 py-10 text-sm text-ink-3"><Loader2 size={15} className="animate-spin" /> {T('Cargando…', 'Loading…')}</div>
+  if (!list) return <div className="min-h-[360px]"><PanelLoader caption={T('Reuniendo a tu equipo…', 'Gathering your team…')} /></div>
   return (
     <div className="grid gap-4 sm:grid-cols-[210px_1fr] lg:grid-cols-[260px_1fr] lg:gap-6">
       <div className="space-y-1.5">

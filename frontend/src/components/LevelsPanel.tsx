@@ -6,6 +6,7 @@ import { api, type LevelsInfo, type LevelsPayload, type MarketListing } from '..
 import { tr, useT } from '../lib/i18n'
 import { toast } from './Toast'
 import { useArena } from '../store'
+import { PanelLoader } from './HomeLoader'
 
 const CARD = 'rounded-2xl border border-line bg-surface p-5 shadow-[0_1px_2px_rgba(30,38,34,.04),0_8px_24px_-16px_rgba(30,38,34,.18)]'
 const PILL = 'flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-[13px] text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent disabled:opacity-40'
@@ -69,7 +70,7 @@ export default function LevelsPanel() {
   }, [b.sessionId, b.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const lv: LevelsInfo | null = data?.levels ?? b.levels
-  if (!lv) return <div className="flex flex-1 items-center justify-center text-ink-3"><Loader2 size={18} className="animate-spin" /></div>
+  if (!lv) return <PanelLoader caption={T('Midiendo el nivel del proyecto…', 'Measuring the project level…')} />
   const next = lv.levels.find((l) => l.n === lv.next) ?? null
   const teamPending = (lv.pending ?? []).filter((c) => c.who === 'team' && c.id !== 'approved')  // approval is the council's verdict, not something to build
   const userPending = (lv.pending ?? []).filter((c) => c.who === 'user')
