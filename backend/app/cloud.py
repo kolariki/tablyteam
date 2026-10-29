@@ -14,6 +14,7 @@ pipeline at the user's own accounts (Vercel/Railway via deploy.py) plus a pg_dum
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -376,7 +377,8 @@ async def _publish_railway(root: Path, cls: dict, slug: str, values: dict[str, s
         (d / ".dockerignore").write_text("node_modules\n.git\n.venv\n.env\ndist-preview\ncoverage\n")
     renv = _railway_env(user_id)
     meta = dict((prev.get("db") or {}).get("railway") or {})
-    name = f"tably-{slug}"[:40].rstrip("-")
+    # Railway: project names are 1-32 characters; a short hash of the full slug keeps two long, similar names apart
+    name = f"tably-{slug[:20].rstrip('-')}-{hashlib.sha1(slug.encode()).hexdigest()[:5]}"
     linked = False
     if meta.get("project"):  # republish: link this folder to the project created the first time
         code, _ = await deploymod._stream([rw, "link", "--project", meta["project"], "--service", RAILWAY_SERVICE], d, renv, logf, timeout=120)
