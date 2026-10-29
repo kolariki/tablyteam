@@ -2655,6 +2655,44 @@ def build_levels(session_id: str, build_id: str, user: User = CurrentUser):
     return _levels_payload(user, _build_any(user, session_id, build_id))
 
 
+def _level_change(b, check: dict, level: int, site: str) -> dict:
+    """A pending level check as a request for the builder; the analytics ones carry the exact snippet (any level)."""
+    if check["id"] == "analytics":
+        text = b.tx(f"Instalá Tably Analytics: en cada página HTML (o en el layout raíz que las envuelve) agregá exactamente <script defer src=\"{cloudmod.public_url()}/a.js\" data-site=\"{site}\"></script>. Registra visitas, gente en vivo y errores solo; no uses cookies ni otro analytics.",
+                    f"Install Tably Analytics: on every HTML page (or the root layout that wraps them) add exactly <script defer src=\"{cloudmod.public_url()}/a.js\" data-site=\"{site}\"></script>. It records visits, live visitors and errors by itself; use no cookies or other analytics.")
+    elif check["id"] == "events":
+        text = b.tx("Marcá al menos 3 acciones clave del producto (registro, crear, pagar, etc.) con data-track=\"nombre\" en el botón o tably.track('nombre') en el código.",
+                    "Mark at least 3 key product actions (sign up, create, pay, etc.) with data-track=\"name\" on the button or tably.track('name') in code.")
+    else:
+        text = b.tx(check.get("label") or "", check.get("label_en") or check.get("label") or "")
+    word = b.tx("nivel", "level")
+    return {"severity": "bloqueante", "role": f"{word.title()} {level}", "text": f"({word} {level}) {text}"}
+
+
+@app.post("/api/sessions/{session_id}/builds/{build_id}/levels/build-pending")
+async def build_levels_pending(session_id: str, build_id: str, body: dict | None = None, user: User = CurrentUser):
+    """One click from anywhere (Levels, Analytics): the builder resolves pending level items. Body: {"ids": [...]} for specific
+    checks (any level), {"focus": "analytics"} for the snippet + key events, nothing for everything the team owes the next level."""
+    b = _build(user, build_id, session_id)
+    if b.status in ("running", "reviewing", "design_review"):
+        raise HTTPException(409, "El constructor ya está trabajando en este proyecto: cuando termine, probá de nuevo")
+    ev = b.levels_eval()
+    site = (cloudmod.get_app(user.id, b.id) or {}).get("slug") or "<slug-de-la-app>"
+    body = body or {}
+    ids = set(body.get("ids") or []) | ({"analytics", "events"} if body.get("focus") == "analytics" else set())
+    changes = []
+    for lv in ev.get("levels") or []:
+        for c in lv["checks"]:
+            if c["ok"] or c.get("who") != "team" or c["id"] == "approved":
+                continue
+            if (ids and c["id"] in ids) or (not ids and lv["n"] == ev.get("next")):
+                changes.append(_level_change(b, c, lv["n"], site))
+    if not changes:
+        raise HTTPException(400, "No hay nada pendiente que el constructor pueda resolver acá" if ids else "No hay nada pendiente que construir para el próximo nivel")
+    b.apply_council(changes, "")
+    return {"ok": True, "items": len(changes)}
+
+
 @app.put("/api/sessions/{session_id}/builds/{build_id}/market")
 def market_list(session_id: str, build_id: str, body: dict, user: User = CurrentUser):
     """List the project on the marketplace (level 1 or more). Pitch and price are the owner's words."""

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ArrowRight, BarChart3, Check, CloudUpload, Copy, ExternalLink, Gavel, Globe, HardHat, Loader2, Lock, Send, Store, Trophy, User, X } from 'lucide-react'
+import { ArrowRight, BarChart3, Check, CloudUpload, Wand2, Copy, ExternalLink, Gavel, Globe, HardHat, Loader2, Lock, Send, Store, Trophy, User, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { reconnectBuild, useBuild } from '../buildStore'
 import { api, type LevelsInfo, type LevelsPayload, type MarketListing } from '../lib/api'
@@ -74,6 +74,21 @@ export default function LevelsPanel() {
   const teamPending = (lv.pending ?? []).filter((c) => c.who === 'team' && c.id !== 'approved')  // approval is the council's verdict, not something to build
   const userPending = (lv.pending ?? []).filter((c) => c.who === 'user')
   const running = b.status === 'running' || b.status === 'reviewing' || b.status === 'design_review'
+
+  // one item at a time: the builder resolves just this check (works for any team item, not only the whole level)
+  const resolveOne = async (id: string, label: string) => {
+    if (!b.id || !b.sessionId) return
+    setBusy(`one:${id}`)
+    try {
+      await api.buildLevelPending(b.sessionId, b.id, { ids: [id] })
+      reconnectBuild(b.id)
+      toast.ok(T('El constructor lo está resolviendo', 'The builder is on it'), label)
+    } catch (e) {
+      toast.error(T('No se pudo arrancar', 'Could not start'), (e as Error).message)
+    } finally {
+      setBusy(null)
+    }
+  }
 
   const buildPending = async () => {
     if (!b.id || !next || teamPending.length === 0) return
@@ -193,6 +208,11 @@ export default function LevelsPanel() {
                   <div className="min-w-0 flex-1">
                     <div className={`text-[13px] ${c.ok ? 'text-ink-3 line-through decoration-ink-3/40' : 'text-ink'}`}>{en ? c.label_en : c.label}</div>
                     {c.evidence && <div className={`mt-0.5 font-mono text-[11px] ${c.ok ? 'text-ok' : 'text-ink-3'}`}>{c.ok ? '✓ ' : ''}{c.evidence}</div>}
+                    {!c.ok && c.who === 'team' && c.id !== 'approved' && (
+                      <button onClick={() => resolveOne(c.id, en ? c.label_en : c.label)} disabled={running || !!busy} className="mt-1.5 inline-flex h-8 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40" title={T('El constructor resuelve este punto ahora', 'The builder resolves this item now')}>
+                        {busy === `one:${c.id}` ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />} {T('Resolver', 'Resolve')}
+                      </button>
+                    )}
                     {!c.ok && c.id === 'approved' && (
                       <button onClick={council} disabled={running || !!busy || Object.keys(b.files).length === 0} className="mt-1.5 inline-flex h-8 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40">
                         {busy === 'council' ? <Loader2 size={13} className="animate-spin" /> : <Gavel size={13} />} {T('Enviar a revisión', 'Send for review')}
@@ -206,7 +226,14 @@ export default function LevelsPanel() {
                         </button>
                       </>
                     )}
-                    {!c.ok && c.id === 'visits' && data?.app?.url && <div className="mt-0.5 text-[11px] text-ink-3">{T('Compartí la URL: cada visita cuenta.', 'Share the URL: every visit counts.')} <a href={data.app.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">{data.app.url}</a></div>}
+                    {!c.ok && c.id === 'visits' && data?.app?.url && (
+                      <>
+                        <div className="mt-0.5 text-[11px] text-ink-3">{T('Compartí la URL: cada visita cuenta.', 'Share the URL: every visit counts.')} <a href={data.app.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">{data.app.url}</a></div>
+                        <button onClick={async () => { try { await navigator.clipboard.writeText(data.app!.url!); toast.ok(T('Link copiado', 'Link copied'), T('Pegalo donde quieras compartirlo.', 'Paste it wherever you want to share it.')) } catch { /* ignore */ } }} className="mt-1.5 inline-flex h-8 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110">
+                          <Copy size={13} /> {T('Copiar el link', 'Copy the link')}
+                        </button>
+                      </>
+                    )}
                   </div>
                   <Who who={c.who} />
                 </li>

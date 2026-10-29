@@ -1,7 +1,9 @@
-import { AlertTriangle, BarChart3, ExternalLink, Hammer, Loader2 } from 'lucide-react'
+import { AlertTriangle, BarChart3, ExternalLink, Hammer, Loader2, Wand2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api, type AnalyticsApp } from '../lib/api'
-import { useT } from '../lib/i18n'
+import { reconnectBuild } from '../buildStore'
+import { tr, useT } from '../lib/i18n'
+import { toast } from './Toast'
 import { useArena } from '../store'
 import { LiveNow } from './LevelsPanel'
 import PageHeader from './PageHeader'
@@ -53,6 +55,21 @@ function AppCard({ a }: { a: AnalyticsApp }) {
   const days = last14(a.stats.days)
   const max = Math.max(1, ...days.map((d) => d.n))
   const open = () => a.session_id && useArena.getState().set({ pendingBuild: { buildId: a.build_id, sessionId: a.session_id } })
+  const [installing, setInstalling] = useState(false)
+  // one click: the builder installs the snippet (and the rest of level 2), and the user lands in the builder to watch it
+  const install = async () => {
+    if (!a.session_id) return
+    setInstalling(true)
+    try {
+      await api.buildLevelPending(a.session_id, a.build_id, { focus: 'analytics' })
+      toast.ok(tr('El equipo está instalando las analíticas', 'The team is installing analytics'), tr('Cuando termine, tocá «Publicar» para que la versión con analíticas quede en línea.', 'When it is done, tap "Publish" so the version with analytics goes live.'))
+      open()
+      setTimeout(() => reconnectBuild(a.build_id), 1500)
+    } catch (e) {
+      toast.error(tr('No se pudo arrancar', 'Could not start'), (e as Error).message)
+      setInstalling(false)
+    }
+  }
   return (
     <div className="panel rounded-2xl p-5">
       <div className="flex flex-wrap items-start gap-3">
@@ -66,8 +83,13 @@ function AppCard({ a }: { a: AnalyticsApp }) {
         {a.session_id && <button onClick={open} className="flex h-8 items-center gap-1.5 rounded-full border border-line px-3 text-[12.5px] text-ink-2 transition hover:border-accent hover:text-accent"><Hammer size={13} /> {T('Abrir en el constructor', 'Open in the builder')}</button>}
       </div>
       {!a.installed && (
-        <div className="mt-3 rounded-xl border border-accent/30 bg-accent-soft/40 px-3.5 py-2.5 text-[12.5px] text-ink-2">
-          {T('Esta app todavía no tiene el snippet de analíticas, así que no registra visitas. En el constructor → Niveles → «Construir lo pendiente», el equipo lo instala (es el nivel 2); después volvé a publicar.', 'This app does not have the analytics snippet yet, so it records no visits. In the builder → Levels → "Build what is pending", the team installs it (it is level 2); then publish again.')}
+        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-accent/30 bg-accent-soft/40 px-3.5 py-2.5 text-[12.5px] text-ink-2">
+          <span className="min-w-0 flex-1">{T('Esta app todavía no tiene las analíticas instaladas, así que no registra visitas. Un clic y el equipo las instala; después la publicás de nuevo.', 'This app does not have analytics installed yet, so it records no visits. One click and the team installs them; then you publish it again.')}</span>
+          {a.session_id && (
+            <button onClick={install} disabled={installing} className="flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[12.5px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-50">
+              {installing ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />} {T('Instalar analíticas', 'Install analytics')}
+            </button>
+          )}
         </div>
       )}
       <LiveNow n={a.stats.live} pages={a.stats.live_pages} last30={a.stats.last_30m} />

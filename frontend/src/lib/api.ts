@@ -162,6 +162,7 @@ export const api = {
   addEmployeeUrl: (id: string, url: string) => j<{ docs: KnowledgeDoc[] }>(post(`/api/team/employees/${id}/docs`, { url })),
   addEmployeeFile: (id: string, file: File) => { const form = new FormData(); form.append('file', file, file.name); return j<{ docs: KnowledgeDoc[] }>(authed(`/api/team/employees/${id}/docs/file`, { method: 'POST', body: form })) },
   deleteEmployeeDoc: (id: string, did: string) => j<{ docs: KnowledgeDoc[] }>(authed(`/api/team/employees/${id}/docs/${did}`, { method: 'DELETE' })),
+  buildLevelPending: (sessionId: string, buildId: string, scope?: { focus?: 'analytics'; ids?: string[] }) => j<{ ok: boolean; items: number }>(post(`/api/sessions/${sessionId}/builds/${buildId}/levels/build-pending`, scope ?? {})),
   analytics: () => j<{ apps: AnalyticsApp[]; collector: string; collector_public: boolean }>(authed('/api/analytics')),
   teamScores: () => j<{ roles: RoleScore[] }>(authed('/api/team/scores')),
   teamMemoryDecide: (id: string, action: 'accept' | 'dismiss' | 'edit' | 'forget', text?: string) => j<TeamMemory>(post(`/api/team/memory/${id}`, { action, text })),
