@@ -42,13 +42,30 @@ export default function CouncilVerdict() {
     api.engines().then((es) => setEngines(visibleEngines(es))).catch(() => {})
     api.providers().then((all) => { const ps = visibleProviders(all); setProviders(ps.filter((p) => p.configured && p.id !== 'mock').concat(ps.filter((p) => p.id === 'mock' && p.configured))) }).catch(() => {})
   }, [])
+  // the builder of the reviewed build, read from the build itself (the store may hold another build, or none after F5)
+  const [reviewed, setReviewed] = useState<{ provider: string; model: string } | null>(null)
+  const [userPicked, setUserPicked] = useState(false)
+  const roBuild = config?.review_of?.build_id
+  const roSession = config?.review_of?.session_id
   useEffect(() => {
+    setReviewed(null)
+    setUserPicked(false)
+    if (!show || !roBuild || !roSession) return
+    api.build(roSession, roBuild).then((b) => { if (b?.provider) setReviewed({ provider: String(b.provider), model: String(b.model || 'default') }) }).catch(() => {})
+  }, [show, roBuild, roSession])
+  // keeps the builder the user had; it only changes when the user picks another one here
+  useEffect(() => {
+    if (userPicked) return
     const visible = (id: string) => engines.some((e) => e.id === id) || providers.some((p) => p.id === id)
+    const want = reviewed ?? (buildProvider ? { provider: buildProvider, model: buildModel || 'default' } : null)
+    if (want && visible(want.provider)) {
+      if (want.provider !== bProvider || want.model !== bModel) { setBProvider(want.provider); setBModel(want.model) }
+      return
+    }
     if (bProvider && visible(bProvider)) return
-    if (buildProvider && visible(buildProvider)) { setBProvider(buildProvider); setBModel(buildModel || 'default'); return }
     const ok = engines.find((e) => e.ok)
     if (ok) { setBProvider(ok.id); setBModel('default') } else if (providers[0]) { setBProvider(providers[0].id); setBModel(providers[0].default_model) }
-  }, [engines, providers, buildProvider, buildModel, bProvider])
+  }, [engines, providers, reviewed, buildProvider, buildModel, bProvider, bModel, userPicked])
   const isEngineSel = engines.some((e) => e.id === bProvider)
   if (!show || !config || config.mode !== 'review') return null
   const map = agentMap(config)
@@ -235,6 +252,7 @@ export default function CouncilVerdict() {
                     onChange={(e) => {
                       const id = e.target.value
                       const eng = engines.find((x) => x.id === id)
+                      setUserPicked(true)
                       setBProvider(id)
                       setBModel(eng ? 'default' : providers.find((p) => p.id === id)?.default_model ?? '')
                     }}
@@ -251,7 +269,7 @@ export default function CouncilVerdict() {
                     </optgroup>
                   </select>
                   </label>
-                  {!isEngineSel && bProvider && <span className="min-w-0 flex-1"><ModelSelect provider={bProvider} value={bModel} onChange={setBModel} /></span>}
+                  {!isEngineSel && bProvider && <span className="min-w-0 flex-1"><ModelSelect provider={bProvider} value={bModel} onChange={(m) => { setUserPicked(true); setBModel(m) }} /></span>}
                 </div>
               )}
               {chosen.length > 0 && (

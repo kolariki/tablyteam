@@ -65,7 +65,7 @@ function useEnglish(v: unknown, depth = 0): unknown {
   for (const k of Object.keys(o)) {
     if (k.endsWith('_en')) {
       const base = k.slice(0, -3)
-      if (base in o && typeof o[k] === 'string' && o[k]) o[base] = o[k]
+      if (base in o && ((typeof o[k] === 'string' && o[k]) || (Array.isArray(o[k]) && (o[k] as unknown[]).length))) o[base] = o[k]
     } else if (o[k] && typeof o[k] === 'object') useEnglish(o[k], depth + 1)
   }
   return v

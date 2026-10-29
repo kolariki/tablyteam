@@ -36,6 +36,7 @@ PACKAGES: list[dict] = [
         "includes": ["Dominio y HTTPS", "Deploy en Vercel / Railway (o tu nube)", "Variables y secretos por entorno", "Base de datos gestionada + migraciones", "CI con tests en cada push", "Monitoreo y alertas básicas", "Acta de entrega con accesos y cómo operar"],
         "excludes": ["Cambios de funcionalidad", "Integraciones nuevas (ver «Integración»)"],
         "needs": ["Invitación como colaborador a tu cuenta de Vercel/Railway y GitHub", "Dominio (si ya lo tenés)"],
+        "name_en": "Production launch", "eta_en": "48 business hours", "badge_en": "most requested", "tagline_en": "From «works on my machine» to a real URL, with everything configured.", "includes_en": ["Domain and HTTPS", "Deploy on Vercel / Railway (or your cloud)", "Variables and secrets per environment", "Managed database + migrations", "CI with tests on every push", "Basic monitoring and alerts", "Handover report with access and how to operate it"], "excludes_en": ["Functionality changes", "New integrations (see «Integration»)"], "needs_en": ["Collaborator invite to your Vercel/Railway and GitHub accounts", "Domain (if you already have one)"],
     },
     {
         "id": "integration", "name": "Integración de un servicio", "price_usd": 149, "eta": "24–48 h hábiles", "badge": None,
@@ -43,6 +44,7 @@ PACKAGES: list[dict] = [
         "includes": ["Cuenta y keys configuradas (modo test y producción)", "Código de integración revisado y probado", "Webhooks / reintentos / errores manejados", "Documentación corta de cómo cambiarlo"],
         "excludes": ["Más de un servicio por paquete", "Contratos o costos del proveedor"],
         "needs": ["Acceso al servicio (Stripe, Resend, Google Cloud…) por invitación"],
+        "name_en": "One service integration", "eta_en": "24–48 business hours", "tagline_en": "Payments, email, social login, a real external API (data, maps, SMS…), analytics.", "includes_en": ["Account and keys configured (test and production mode)", "Integration code reviewed and tested", "Webhooks / retries / errors handled", "Short doc on how to change it"], "excludes_en": ["More than one service per package", "Provider contracts or costs"], "needs_en": ["Access to the service (Stripe, Resend, Google Cloud…) by invite"],
     },
     {
         "id": "review", "name": "Revisión humana pre-lanzamiento", "price_usd": 99, "eta": "24 h hábiles", "badge": None,
@@ -50,6 +52,7 @@ PACKAGES: list[dict] = [
         "includes": ["Lectura del código y de los bloqueantes del consejo", "Llamada de 45 min", "Informe con prioridades y estimaciones", "Checklist de salida firmado"],
         "excludes": ["Implementar los cambios (se cotizan aparte o con «Horas»)"],
         "needs": ["Nada: trabaja sobre el proyecto tal como está en la plataforma"],
+        "name_en": "Human pre-launch review", "eta_en": "24 business hours", "tagline_en": "A senior engineer goes over what the council flagged: security, costs, what breaks first.", "includes_en": ["Read-through of the code and the council blockers", "45-minute call", "Report with priorities and estimates", "Signed launch checklist"], "excludes_en": ["Implementing the changes (quoted separately or with «Hours»)"], "needs_en": ["Nothing: works on the project as it is on the platform"],
     },
     {
         "id": "hours", "name": "Horas de developer", "price_usd": 75, "eta": "a coordinar", "badge": "por hora",
@@ -57,6 +60,7 @@ PACKAGES: list[dict] = [
         "includes": ["Mínimo 4 h", "Reporte por hora con lo hecho", "Trabajo sobre el repo del proyecto, versionado"],
         "excludes": [],
         "needs": ["Alcance acordado por escrito antes de empezar"],
+        "name_en": "Developer hours", "eta_en": "to be arranged", "badge_en": "hourly", "tagline_en": "For what does not fit a package: data migrations, one-off features, launch support.", "includes_en": ["4 h minimum", "Hourly report of the work done", "Work on the project repo, versioned"], "needs_en": ["Scope agreed in writing before starting"],
     },
 ]
 
