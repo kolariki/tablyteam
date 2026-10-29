@@ -592,8 +592,20 @@ async def council_redo(session_id: str, user: User = CurrentUser):
 
     data = _saved(user, session_id)
     cfg = SessionConfig(**data["config"])
-    if cfg.mode != "review":
-        raise HTTPException(400, "Esta sesión no es un consejo de revisión")
+    if cfg.mode != "review":  # the project's session (the arena moved to it after applying a list): its latest council round
+        latest = None
+        for p in sorted(auth.user_dir(user.id).glob(f"{session_id}.build.*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+            try:
+                latest = (json.loads(p.read_text()).get("council_sessions") or [None])[-1]
+            except Exception:
+                latest = None
+            if latest:
+                break
+        if not latest:
+            raise HTTPException(400, "Esta sesión no es un consejo de revisión")
+        session_id = latest
+        data = _saved(user, session_id)
+        cfg = SessionConfig(**data["config"])
     s = SESSIONS.get(session_id)
     if s and s.status == "running":
         raise HTTPException(409, "El consejo todavía está debatiendo")
@@ -610,7 +622,7 @@ async def council_redo(session_id: str, user: User = CurrentUser):
             pass
     await s._council()
     s._save()
-    return s.verdict.get("council") or {}
+    return (s.verdict.get("council") or {}) | {"session_id": session_id}
 
 
 @app.post("/api/sessions/{session_id}/resume")

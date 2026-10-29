@@ -34,6 +34,7 @@ export interface Verdict {
 }
 
 export interface CouncilVerdictData {
+  session_id?: string | null  // the council session it came from (the arena's sessionId can move to the project's afterwards)
   approved: boolean
   headline: string
   why: string
@@ -229,7 +230,7 @@ export const useArena = create<ArenaState>((set, get) => ({
         set({ explanation: d as Explanation })
         break
       case 'council.verdict':
-        set({ council: { approved: !!d.approved, headline: d.headline ?? '', why: d.why ?? '', changes: d.changes ?? [], priorities: d.priorities ?? [], level: d.level ?? null, judge_id: d.judge_id, model: d.model }, verdict: { winner: null, tally: {} }, showVerdict: true, live: null })
+        set({ council: { session_id: get().sessionId, approved: !!d.approved, headline: d.headline ?? '', why: d.why ?? '', changes: d.changes ?? [], priorities: d.priorities ?? [], level: d.level ?? null, judge_id: d.judge_id, model: d.model }, verdict: { winner: null, tally: {} }, showVerdict: true, live: null })
         break
       case 'session.completed':
         set({ status: (d.status as Status) ?? 'completed', stats: d.stats, endedAt: ev.ts, live: null })

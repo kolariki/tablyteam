@@ -81,7 +81,7 @@ export default function CouncilVerdict() {
     if (!ro) return
     setBusy(true)
     try {
-      const r = await api.councilApply(ro.build_id, ro.session_id, chosen, rounds, useArena.getState().sessionId, rounds > 0 ? priorities.trim() : '', refs, deep, bProvider ? { provider: bProvider, model: bModel } : undefined)
+      const r = await api.councilApply(ro.build_id, ro.session_id, chosen, rounds, council?.session_id ?? useArena.getState().sessionId, rounds > 0 ? priorities.trim() : '', refs, deep, bProvider ? { provider: bProvider, model: bModel } : undefined)
       if (r.researching) useBuild.getState().set({ researching: { refs, hidden: refs.length === 0, started: Date.now(), visited: [], finished: false } })
       set({ showVerdict: false, pendingBuild: { buildId: ro.build_id, sessionId: ro.session_id } })
     } catch (e) {
@@ -93,12 +93,12 @@ export default function CouncilVerdict() {
   const openBuild = () => ro && set({ showVerdict: false, pendingBuild: { buildId: ro.build_id, sessionId: ro.session_id } })
   // the chairman's consolidation can come back short (cut output): redo just that step over the saved debate
   const redo = async () => {
-    const sid = useArena.getState().sessionId
+    const sid = council?.session_id ?? useArena.getState().sessionId
     if (!sid) return
     setRedoing(true)
     try {
       const d = (await api.councilRedo(sid)) as unknown as { approved: boolean; headline: string; why: string; changes: typeof changes; priorities?: NonNullable<typeof council>['priorities']; judge_id: string; model: string }
-      set({ council: { approved: !!d.approved, headline: d.headline ?? '', why: d.why ?? '', changes: d.changes ?? [], priorities: d.priorities ?? [], judge_id: d.judge_id, model: d.model } })
+      set({ council: { session_id: (d as { session_id?: string }).session_id ?? sid, approved: !!d.approved, headline: d.headline ?? '', why: d.why ?? '', changes: d.changes ?? [], priorities: d.priorities ?? [], judge_id: d.judge_id, model: d.model } })
       setPicked({})
       toast.ok(tr('Veredicto reconsolidado', 'Verdict re-consolidated'), `${(d.changes ?? []).length} ${tr('cambios en la lista.', 'changes on the list.')}`)
     } catch (e) {
