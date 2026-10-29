@@ -346,6 +346,18 @@ def _uses_postgres(d: Path) -> bool:
     return False
 
 
+_RW_HELP: dict[str, str] = {}
+
+
+def _rw_has(rw: str, sub: str, flag: str) -> bool:
+    """Whether this CLI version knows a flag (or, with sub == "", a command): the CLI changed between 4.x releases
+    (`init --json`, `variable set`, `delete` are newer), and the server and a local install can be on different ones."""
+    if sub not in _RW_HELP:
+        code, text = deploymod._run_sync([rw, *([sub] if sub else []), "--help"], env=_railway_env(), timeout=20)
+        _RW_HELP[sub] = text if code == 0 else ""
+    return bool(re.search(rf"(^|\s){re.escape(flag)}\b", _RW_HELP[sub], re.M))
+
+
 def _last_line(text: str) -> str:
     return (text.strip().splitlines() or ["?"])[-1][:300]
 
@@ -372,10 +384,18 @@ async def _publish_railway(root: Path, cls: dict, slug: str, values: dict[str, s
     if not linked:
         ws = env("TABLY_CLOUD_RAILWAY_WORKSPACE")
         await _call(logf, f"$ railway init --name {name}")
-        code, text = await deploymod._stream([rw, "init", "--name", name, *(["--workspace", ws] if ws else []), "--json"], d, renv, logf, timeout=120)
+        args = [rw, "init", "--name", name]
+        if ws and _rw_has(rw, "init", "--workspace"):
+            args += ["--workspace", ws]
+        if _rw_has(rw, "init", "--json"):
+            args += ["--json"]
+        code, text = await deploymod._stream(args, d, renv, logf, timeout=120)
         if code != 0:
             return {"ok": False, "url": None, "error": "railway init falló: " + _last_line(text)}
         m = re.search(r'"(?:id|projectId)"\s*:\s*"([0-9a-f-]{20,})"', text)
+        if not m:  # older CLIs print no JSON on init: the linked project's id comes from status
+            _, st_text = await deploymod._stream([rw, "status", "--json"], d, renv, lambda _l: None, timeout=60)
+            m = re.search(r'"id"\s*:\s*"([0-9a-f-]{20,})"', st_text)
         meta = {"project": m.group(1) if m else name, "db": False}
         code, text = await deploymod._stream([rw, "add", "--service", RAILWAY_SERVICE], d, renv, logf, timeout=120)
         if code != 0:
@@ -392,7 +412,13 @@ async def _publish_railway(root: Path, cls: dict, slug: str, values: dict[str, s
     if meta.get("db") and "DATABASE_URL" not in values:
         sets["DATABASE_URL"] = "${{Postgres.DATABASE_URL}}"  # Railway resolves the reference to the app's own database
     await _call(logf, f"$ railway variable set ({len(sets)} variables)")
-    code, text = await deploymod._stream([rw, "variable", "set", "--service", RAILWAY_SERVICE, "--skip-deploys", *[f"{k}={v}" for k, v in sets.items()]], d, renv, logf, timeout=120)
+    if _rw_has(rw, "", "variable"):  # newer CLI: `variable set`; older: `variables --set` (still accepted, deprecated)
+        vargs = [rw, "variable", "set", "--service", RAILWAY_SERVICE, "--skip-deploys", *[f"{k}={v}" for k, v in sets.items()]]
+    else:
+        vargs = [rw, "variables", "--service", RAILWAY_SERVICE, *sum((["--set", f"{k}={v}"] for k, v in sets.items()), [])]
+        if _rw_has(rw, "variables", "--skip-deploys"):
+            vargs.append("--skip-deploys")
+    code, text = await deploymod._stream(vargs, d, renv, logf, timeout=120)
     if code != 0:
         await _call(logf, "⚠ no se pudieron cargar las variables: " + _last_line(text))
     await _call(logf, "$ railway up --ci")
@@ -473,8 +499,10 @@ async def unpublish(user_id: str, build_id: str, logf: Log | None = None) -> dic
                 await cx.delete(f"https://api.cloudflare.com/client/v4/accounts/{env('CF_ACCOUNT_ID')}/pages/projects/{app['slug']}", headers={"Authorization": f"Bearer {env('CF_API_TOKEN')}"})
         elif app["provider"] == "railway":
             rw, project = shutil.which("railway"), ((app.get("db") or {}).get("railway") or {}).get("project")
-            if rw and project:
+            if rw and project and _rw_has(rw, "", "delete"):
                 await deploymod._stream([rw, "delete", "--project", project, "--yes"], APPS_ROOT, _railway_env(user_id), lf, timeout=120)
+            elif project:
+                await _call(lf, f"⚠ esta versión de la CLI de Railway no borra proyectos: borralo a mano en Railway ({project})")
             (app.get("db") or {}).pop("railway", None)
         elif app["provider"] == "fly":
             fly = shutil.which("flyctl") or shutil.which("fly")
