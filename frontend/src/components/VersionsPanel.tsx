@@ -11,6 +11,7 @@ const TRIGGER = (): Record<string, string> => ({
   council: tr('Cambios pedidos por el consejo', 'Changes requested by the council'),
   audit: tr('Mejoras de la auditoría', 'Audit improvements'),
   user: tr('Pedido del usuario', 'User request'),
+  deploy: tr('Ajuste para publicar', 'Publishing fix'),
 })
 
 export function readinessColor(p: number | null) {
