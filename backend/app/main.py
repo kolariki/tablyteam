@@ -37,6 +37,7 @@ from pydantic import BaseModel
 
 from . import auth, keystore, trial
 from . import memory as memorymod
+from . import scores as scoresmod
 from . import observability as obs
 from .tasks import spawn
 from . import research
@@ -1416,6 +1417,12 @@ def _learn_from_council(user: User, council_session: str, chosen: list[dict]) ->
 @app.get("/api/team/memory")
 def team_memory(user: User = CurrentUser):
     return memorymod.listing(user.id)
+
+
+@app.get("/api/team/scores")
+def team_scores(user: User = CurrentUser):
+    """Each role's score from what actually happened: changes the user kept, blockers that held, rounds to approval."""
+    return {"roles": scoresmod.compute(user.id)}
 
 
 @app.post("/api/team/memory/{iid}")

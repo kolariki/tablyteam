@@ -86,6 +86,25 @@ export interface TeamMemory {
   insights: RoleInsight[]
   memory: RoleInsight[]
 }
+export interface RoleScore {
+  role: string
+  role_label: string
+  role_label_en: string
+  score: number | null
+  provisional: boolean
+  asked: number
+  kept: number
+  acceptance: number | null
+  blocking: number
+  blocking_precision: number | null
+  rounds_reviewed: number
+  approvals: number
+  open_builds: number
+  convergence: number | null
+  avg_rounds_to_approval: number | null
+  trend: 'up' | 'down' | 'flat' | null
+  lessons: number
+}
 
 export interface User {
   id: string
@@ -108,6 +127,7 @@ export const api = {
   models: (p: string) => j<{ models: string[]; error?: string }>(authed(`/api/providers/${p}/models`)),
   roles: () => j<{ groups: string[]; roles: Role[] }>(authed('/api/roles')),
   teamMemory: () => j<TeamMemory>(authed('/api/team/memory')),
+  teamScores: () => j<{ roles: RoleScore[] }>(authed('/api/team/scores')),
   teamMemoryDecide: (id: string, action: 'accept' | 'dismiss' | 'edit' | 'forget', text?: string) => j<TeamMemory>(post(`/api/team/memory/${id}`, { action, text })),
   fdePackages: () => j<{ packages: FdePackage[]; booking_url: string | null; stripe: StripeStatus }>(authed('/api/fde/packages')),
   checkout: (body: { kind: 'fde' | 'fees'; ref?: string; build_id?: string; session_id?: string; hours?: number }) => j<Order & { url: string }>(post('/api/billing/checkout', body)),

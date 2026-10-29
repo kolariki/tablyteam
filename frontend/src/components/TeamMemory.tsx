@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Brain, Check, Loader2, Pencil, Trash2, X } from 'lucide-react'
+import { Brain, Check, Loader2, Minus, Pencil, Trash2, TrendingDown, TrendingUp, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { create } from 'zustand'
-import { api, type RoleInsight, type TeamMemory } from '../lib/api'
+import { api, type RoleInsight, type RoleScore, type TeamMemory } from '../lib/api'
 import { getLang, tr, useT } from '../lib/i18n'
 import { useArena } from '../store'
 import AgentAvatar from './AgentAvatar'
@@ -19,8 +19,8 @@ const useMemory = create<{ data: TeamMemory | null; open: boolean; set: (p: Part
 }))
 
 const load = () => api.teamMemory().then((data) => { useMemory.getState().set({ data }); return data }).catch(() => null)
-const label = (i: RoleInsight) => (getLang() === 'en' ? i.role_label_en : i.role_label) || i.role_label
-const agentOf = (i: RoleInsight) => ({ name: i.role_label, role: i.role.startsWith('custom:') ? null : i.role })
+const label = (i: { role_label: string; role_label_en: string }) => (getLang() === 'en' ? i.role_label_en : i.role_label) || i.role_label
+const agentOf = (i: { role: string; role_label: string }) => ({ name: i.role_label, role: i.role.startsWith('custom:') ? null : i.role })
 
 /** Polls for new insights while signed in and tells the user once when some arrive. */
 export function TeamMemoryWatcher() {
@@ -63,7 +63,9 @@ export function TeamMemoryButton({ className = '' }: { className?: string }) {
 function TeamMemoryModal() {
   const T = useT()
   const { data, open } = useMemory()
-  const [tab, setTab] = useState<'review' | 'memory'>('review')
+  const [tab, setTab] = useState<'review' | 'memory' | 'score'>('review')
+  const [scores, setScores] = useState<RoleScore[] | null>(null)
+  useEffect(() => { if (open) api.teamScores().then((d) => setScores(d.roles)).catch(() => setScores([])) }, [open])
   useEffect(() => { if (open) setTab((data?.insights.length ?? 0) > 0 ? 'review' : 'memory') }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
   const close = () => useMemory.getState().set({ open: false })
   const pending = data?.insights ?? []
@@ -83,9 +85,10 @@ function TeamMemoryModal() {
               <button onClick={close} className="rounded-full p-1.5 text-ink-3 hover:bg-surface-2 hover:text-ink" aria-label={T('Cerrar', 'Close')}><X size={18} /></button>
             </div>
             <div className="flex gap-1 px-6 pt-3">
-              {(['review', 'memory'] as const).map((k) => (
+              {(['review', 'memory', 'score'] as const).map((k) => (
                 <button key={k} onClick={() => setTab(k)} className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${tab === k ? 'bg-accent text-white' : 'text-ink-2 hover:bg-surface-2'}`}>
-                  {k === 'review' ? T('Para revisar', 'To review') : T('Memoria', 'Memory')} <span className="opacity-70">{k === 'review' ? pending.length : memory.length}</span>
+                  {k === 'review' ? T('Para revisar', 'To review') : k === 'memory' ? T('Memoria', 'Memory') : T('Puntaje', 'Score')}
+                  {k !== 'score' && <span className="opacity-70"> {k === 'review' ? pending.length : memory.length}</span>}
                 </button>
               ))}
             </div>
@@ -108,11 +111,65 @@ function TeamMemoryModal() {
               ) : (
                 <Empty text={T('Todavía no aceptaste ninguna lección. Las que aceptes aparecen acá, por rol.', 'You have not accepted any lesson yet. The ones you accept show up here, by role.')} />
               ))}
+              {tab === 'score' && <Scores roles={scores} />}
             </div>
           </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
+  )
+}
+
+const pct = (x: number | null) => (x === null ? '—' : `${Math.round(x * 100)}%`)
+
+/** What each role is worth to this user, from what happened: changes kept, blockers that held, rounds to approval. */
+function Scores({ roles }: { roles: RoleScore[] | null }) {
+  const T = useT()
+  if (!roles) return <div className="flex items-center gap-2 py-10 text-sm text-ink-3"><Loader2 size={15} className="animate-spin" /> {T('Calculando…', 'Calculating…')}</div>
+  if (!roles.length) return <Empty text={T('Todavía no hay datos. El puntaje sale de las rondas del consejo que aplicaste y de cuántas rondas tardó en aprobarse cada construcción.', 'No data yet. The score comes from the council rounds you applied and how many rounds each build took to be approved.')} />
+  return (
+    <div className="space-y-3">
+      <p className="text-[12.5px] text-ink-3">{T('Sale de lo que pasó de verdad: qué pedidos de cada rol te quedaste al aplicar un consejo (los bloqueantes pesan doble) y cuántas rondas tardó en aprobarse lo que revisó. Si una construcción sigue sin aprobarse tras varias rondas, cuenta en contra.', 'It comes from what actually happened: which requests of each role you kept when applying a council (blocking ones weigh double) and how many rounds it took to approve what it reviewed. A build still unapproved after several rounds counts against it.')}</p>
+      {roles.map((r) => (
+        <div key={r.role} className="rounded-2xl border border-line p-4">
+          <div className="flex items-center gap-3">
+            <AgentAvatar agent={agentOf(r)} size={36} />
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold">{label(r)}</div>
+              <div className="text-[12px] text-ink-4">
+                {T(`${r.rounds_reviewed} ronda${r.rounds_reviewed === 1 ? '' : 's'} de consejo`, `${r.rounds_reviewed} council round${r.rounds_reviewed === 1 ? '' : 's'}`)}
+                {r.lessons > 0 && ` · ${r.lessons} ${T(r.lessons === 1 ? 'lección en memoria' : 'lecciones en memoria', r.lessons === 1 ? 'lesson in memory' : 'lessons in memory')}`}
+              </div>
+            </div>
+            {r.trend && <span className="flex items-center gap-1 text-[12px] text-ink-3" title={T('Aceptación en sus rondas recientes contra las anteriores', 'Acceptance in its recent rounds vs. the earlier ones')}>
+              {r.trend === 'up' ? <TrendingUp size={15} className="text-accent" /> : r.trend === 'down' ? <TrendingDown size={15} className="text-danger" /> : <Minus size={15} />}
+              {r.trend === 'up' ? T('mejora', 'improving') : r.trend === 'down' ? T('empeora', 'worse') : T('estable', 'steady')}
+            </span>}
+            <div className="text-right">
+              <div className="serif text-[28px] leading-none">{r.score ?? '—'}</div>
+              {r.score !== null && r.provisional && <div className="mt-1 text-[10.5px] uppercase tracking-widest text-ink-4">{T('pocos datos', 'little data')}</div>}
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <Stat title={T('Pedidos que te quedaste', 'Requests you kept')} value={r.asked ? `${r.kept}/${r.asked}` : '—'} bar={r.acceptance} hint={r.asked ? pct(r.acceptance) : T('no pidió cambios', 'asked no changes')} />
+            <Stat title={T('Bloqueantes sostenidos', 'Blockers that held')} value={r.blocking ? `${Math.round((r.blocking_precision ?? 0) * r.blocking)}/${r.blocking}` : '—'} bar={r.blocking_precision} hint={r.blocking ? pct(r.blocking_precision) : T('sin bloqueantes', 'no blockers')} />
+            <Stat title={T('Rondas hasta aprobar', 'Rounds to approval')} value={r.avg_rounds_to_approval !== null ? String(r.avg_rounds_to_approval) : '—'} bar={r.convergence}
+              hint={r.open_builds ? T(`${r.open_builds} sin aprobar tras varias rondas`, `${r.open_builds} unapproved after several rounds`) : r.approvals ? T(`${r.approvals} aprobada${r.approvals === 1 ? '' : 's'}`, `${r.approvals} approved`) : T('ninguna aprobada aún', 'none approved yet')} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function Stat({ title, value, bar, hint }: { title: string; value: string; bar: number | null; hint: string }) {
+  return (
+    <div className="rounded-xl bg-surface-2/50 px-3 py-2.5">
+      <div className="text-[11.5px] text-ink-3">{title}</div>
+      <div className="mt-0.5 text-[16px] font-semibold tabular-nums">{value}</div>
+      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-line">{bar !== null && <div className="h-full rounded-full bg-accent" style={{ width: `${Math.round(bar * 100)}%` }} />}</div>
+      <div className="mt-1 text-[11px] text-ink-4">{hint}</div>
+    </div>
   )
 }
 
