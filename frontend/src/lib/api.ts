@@ -71,6 +71,22 @@ function useEnglish(v: unknown, depth = 0): unknown {
   return v
 }
 
+export interface RoleInsight {
+  id: string
+  role: string
+  role_label: string
+  role_label_en: string
+  text: string
+  evidence: string
+  status: 'pending' | 'accepted'
+  created: number
+  updated: number
+}
+export interface TeamMemory {
+  insights: RoleInsight[]
+  memory: RoleInsight[]
+}
+
 export interface User {
   id: string
   email: string
@@ -91,6 +107,8 @@ export const api = {
   providers: () => j<Provider[]>(authed('/api/providers')),
   models: (p: string) => j<{ models: string[]; error?: string }>(authed(`/api/providers/${p}/models`)),
   roles: () => j<{ groups: string[]; roles: Role[] }>(authed('/api/roles')),
+  teamMemory: () => j<TeamMemory>(authed('/api/team/memory')),
+  teamMemoryDecide: (id: string, action: 'accept' | 'dismiss' | 'edit' | 'forget', text?: string) => j<TeamMemory>(post(`/api/team/memory/${id}`, { action, text })),
   fdePackages: () => j<{ packages: FdePackage[]; booking_url: string | null; stripe: StripeStatus }>(authed('/api/fde/packages')),
   checkout: (body: { kind: 'fde' | 'fees'; ref?: string; build_id?: string; session_id?: string; hours?: number }) => j<Order & { url: string }>(post('/api/billing/checkout', body)),
   confirmCheckout: (checkout: string) => j<Order>(post('/api/billing/confirm', { checkout })),

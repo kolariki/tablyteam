@@ -1,4 +1,5 @@
 import { useArena } from '../store'
+import { TeamMemoryButton } from './TeamMemory'
 import { useBuild, type Activity } from '../buildStore'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeftRight, Bookmark, Check, Eye, FolderOpen, Gavel, Globe, Loader2, LogOut, MonitorSmartphone, Play, Plus, Puzzle, Settings2, Smartphone, Store, Trash2, Users, X, Zap } from 'lucide-react'
@@ -563,6 +564,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
             <button onClick={() => useArena.getState().set({ view: 'agents' })} title={T('Tus proyectos y conversaciones de Muse Code, tal como están en esta máquina', 'Your Muse Code projects and conversations, as they are on this machine')} className="flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white ring-1 ring-black/10"><ProviderLogo provider="meta" size={15} /></span> {T('Mis sesiones', 'My sessions')}
             </button>
+            <TeamMemoryButton className="h-10" />
             <button onClick={onSettings} title={T('Conectá tus IAs, elegí modelos por defecto, deploy y trazas', 'Connect your AIs, pick default models, deploy and tracing')} className="flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-medium text-ink-2 shadow-sm transition hover:bg-accent-soft hover:border-accent hover:text-accent hover:shadow-md">
               <Settings2 size={16} /> {T('Modelos y API keys', 'Models & API keys')}
             </button>

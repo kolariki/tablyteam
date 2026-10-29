@@ -1,4 +1,5 @@
 import { AnimatePresence } from 'framer-motion'
+import { TeamMemoryWatcher } from './components/TeamMemory'
 import { useEffect, useRef, useState } from 'react'
 import ArenaGraph from './components/ArenaGraph'
 import AgentDrawer from './components/AgentDrawer'
@@ -624,6 +625,7 @@ export default function App() {
   return (
     <ErrorBoundary onReset={() => { history.replaceState(null, '', location.pathname); location.reload() }}>
       <AppInner />
+      <TeamMemoryWatcher />
       <Toaster />
     </ErrorBoundary>
   )

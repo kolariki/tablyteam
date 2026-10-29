@@ -36,6 +36,7 @@ from fastapi.responses import FileResponse, PlainTextResponse, Response, Streami
 from pydantic import BaseModel
 
 from . import auth, keystore, trial
+from . import memory as memorymod
 from . import observability as obs
 from .tasks import spawn
 from . import research
@@ -1394,6 +1395,41 @@ async def build_council(build_id: str, body: dict, user: User = CurrentUser):
     return {"ok": True, "session_id": sid}
 
 
+def _learn_from_council(user: User, council_session: str, chosen: list[dict]) -> None:
+    """What the user kept and dropped from the council's list → insights for each role (in the background, never blocks the build)."""
+    if not council_session:
+        return
+    try:
+        data = _saved(user, council_session)
+    except HTTPException:
+        return
+    agents = (data.get("config") or {}).get("agents") or []
+    judge = next((a for a in agents if a.get("id") == (data.get("config") or {}).get("judge")), agents[0] if agents else None)
+    if not judge:
+        return
+    provider = judge.get("provider") or "mock"
+    cred = keystore.creds(user.id).get(provider)
+    spawn(memorymod.learn_from_council(user.id, data, chosen, provider, judge.get("model") or "", cred))
+
+
+# ---------------------------------------------------------------------------- team memory (each role learns)
+@app.get("/api/team/memory")
+def team_memory(user: User = CurrentUser):
+    return memorymod.listing(user.id)
+
+
+@app.post("/api/team/memory/{iid}")
+def team_memory_decide(iid: str, body: dict, user: User = CurrentUser):
+    """accept | dismiss a pending insight (optionally with edited text), edit or forget an accepted lesson."""
+    try:
+        row = memorymod.decide(user.id, iid, str(body.get("action") or ""), body.get("text"))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    if not row:
+        raise HTTPException(404)
+    return memorymod.listing(user.id)
+
+
 @app.post("/api/builds/{build_id}/council/apply")
 async def build_council_apply(build_id: str, body: dict, user: User = CurrentUser):
     """The user accepted (a subset of) the council's change list → the builder applies it."""
@@ -1408,6 +1444,7 @@ async def build_council_apply(build_id: str, body: dict, user: User = CurrentUse
             b.set_builder(str(body["provider"]), str(body.get("model") or "") or None)
         except ValueError as e:
             raise HTTPException(400, str(e))
+    _learn_from_council(user, body.get("council_session") or "", changes)
     rounds = int(body.get("max_rounds") or 0)
     b.review_plan = {"max_rounds": len(b.council_sessions) + rounds} if rounds > 0 else None
     b.council_priorities = str(body.get("priorities") or "")

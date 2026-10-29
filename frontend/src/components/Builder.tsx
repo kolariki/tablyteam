@@ -1,4 +1,5 @@
 import DOMPurify from 'dompurify'
+import { TeamMemoryButton } from './TeamMemory'
 import { srv } from '../lib/serverText'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, CheckCircle2, Trophy, FlaskConical, Gauge, Home, ListChecks, Search, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2, CloudUpload, Clock3 } from 'lucide-react'
@@ -240,6 +241,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
           <div className="mt-0.5 flex items-center gap-2 text-[11.5px] text-ink-3">
             <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} /> <span className="font-mono">{b.model}</span></span>
             {b.id && b.sessionId && <TeamLanguage />}
+        {b.id && <TeamMemoryButton className="h-9" />}
             {b.engineSession && b.workdir && (
               <>
                 <span className="h-3 w-px bg-line" />

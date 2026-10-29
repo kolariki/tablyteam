@@ -129,11 +129,12 @@ def parse_changes(text: str) -> list[dict]:
     """`- [bloqueante] [CTO] texto` lines → [{severity, role, text}] (role optional, severity defaults to mejora)."""
     out = []
     for line in (text or "").splitlines():
-        m = re.match(r"^\s*[-*•]\s*(?:\[(bloqueante|mejora|blocker|nice[- ]to[- ]have|cr[ií]tico)\]\s*)?(?:\[([^\]]{1,40})\]\s*)?(.+)$", line.strip(), re.I)
+        # the tags come in the debate language: [bloqueante|mejora] in Spanish, [blocking|improvement] in English; several roles fit one tag
+        m = re.match(r"^\s*[-*•]\s*(?:\[(bloqueante|mejora|blocking|blocker|improvement|nice[- ]to[- ]have|cr[ií]tico|critical)\]\s*)?(?:\[([^\]]{1,160})\]\s*)?(.+)$", line.strip(), re.I)
         if not m or len(m.group(3).strip()) < 6:
             continue
         sev = (m.group(1) or "mejora").lower()
-        sev = "bloqueante" if sev in ("bloqueante", "blocker", "crítico", "critico") else "mejora"
+        sev = "bloqueante" if sev in ("bloqueante", "blocking", "blocker", "crítico", "critico", "critical") else "mejora"
         out.append({"severity": sev, "role": (m.group(2) or "").strip(), "text": m.group(3).strip()})
     return out
 
@@ -309,6 +310,9 @@ class Session:
             role_txt += craft + "\n"
         if not review:
             role_txt += uikit.team_block(agent.role, getattr(self.config, "platform", "web"))
+        from . import memory as memorymod
+
+        role_txt += memorymod.prompt_block(self.owner.id, agent.role, agent.name)
         sk = skillmod.prompt_block(self.owner.id, agent.skills)
         if sk:
             role_txt += sk
