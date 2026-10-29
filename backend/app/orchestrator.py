@@ -125,6 +125,15 @@ def parse_tags(text: str) -> dict[str, str]:
     return out
 
 
+SELF_APPROVAL = re.compile(r"aprobad[ao] por el consejo|approved by the council", re.I)
+
+
+def drop_self_approval(items: list[dict]) -> list[dict]:
+    """«Approved by the council» is the council's own verdict, never a change to build or to carry to the next round: asked as
+    a change it can never be resolved, so the council could never approve (the loop users saw at round 8 and 11)."""
+    return [c for c in items if not SELF_APPROVAL.search(c.get("text") or "")]
+
+
 def parse_changes(text: str) -> list[dict]:
     """`- [bloqueante] [CTO] texto` lines → [{severity, role, text}] (role optional, severity defaults to mejora)."""
     out = []
@@ -711,7 +720,7 @@ class Session:
 
         transcript = "\n".join(f"[Turno {t['turn']}] {who(t)}: {t['message'][:700]}" for t in debate)
         verdicts = "\n\n".join(f"### {who(t)}\n{t['message'][:1500]}" for t in closing)
-        prior = (cfg.review_of or {}).get("prior_requests") or []
+        prior = drop_self_approval((cfg.review_of or {}).get("prior_requests") or [])
         prior_txt = ("\n\nÍTEMS PEDIDOS EN LA RONDA ANTERIOR (decidí para cada uno done/partial/pending según el debate y los veredictos):\n"
                      + "\n".join(f"- [{r['id']}] [{r.get('severity', 'mejora')}] {r.get('text', '')[:220]}" for r in prior)) if prior else ""
         prios = split_priorities((cfg.review_of or {}).get("priorities"))
@@ -763,9 +772,9 @@ class Session:
         for ls in level_status:
             if ls["status"] != "done" and who.get(ls["id"]) == "team" and not any(f"(nivel {lvl.get('next')})" in c["text"].lower() and ls["text"][:40].lower() in c["text"].lower() for c in changes):
                 changes.append({"severity": "bloqueante", "role": f"Nivel {lvl.get('next')}", "text": f"(nivel {lvl.get('next')}) {ls['text']}" + (f" — {ls['note']}" if ls.get("note") else "")})
-        approved = ("approve" in (p.get("verdict") or "").lower()) if p.get("verdict") else not any(c["severity"] == "bloqueante" for c in changes)
-        if changes and any(c["severity"] == "bloqueante" for c in changes):
-            approved = False  # a blocking item (incl. an unmet user priority) can never ship as "approved"
+        changes = drop_self_approval(changes)
+        # approved = no blocking item left (that is the level's own definition); improvements stay as suggestions to apply or not
+        approved = not any(c["severity"] == "bloqueante" for c in changes)
         resolved = parse_resolved(p.get("resolved", ""), prior) if prior else []
         self.verdict = {"winner": None, "tally": {}, "council": {"approved": approved, "headline": p.get("headline", ""), "why": p.get("why", ""), "changes": changes, "resolved": resolved, "priorities": prio_status, "level": {**lvl, "status": level_status} if lv_items else None, "judge_id": judge.id, "model": judge.model}}
         self.emit("council.verdict", **self.verdict["council"], review_of=cfg.review_of)

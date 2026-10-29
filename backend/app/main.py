@@ -67,7 +67,7 @@ from . import intake as intakemod
 from .user_presets import create_preset, delete_preset, list_presets, scene_path
 from .exporter import TARGETS, BriefRequest, session_path, stream_brief, transcript_markdown
 from .config import CORS_ORIGINS, env
-from .orchestrator import SESSIONS, start_session
+from .orchestrator import SESSIONS, drop_self_approval, start_session
 from .presets import PRESETS
 from .roles import ROLE_GROUPS, ROLES
 from .providers import PROVIDERS, Cred, available_models, list_models
@@ -1530,9 +1530,9 @@ def team_memory_decide(iid: str, body: dict, user: User = CurrentUser):
 async def build_council_apply(build_id: str, body: dict, user: User = CurrentUser):
     """The user accepted (a subset of) the council's change list → the builder applies it."""
     b = _build(user, build_id, body.get("session_id"))
-    changes = [c for c in (body.get("changes") or []) if isinstance(c, dict) and (c.get("text") or "").strip()]
+    changes = drop_self_approval([c for c in (body.get("changes") or []) if isinstance(c, dict) and (c.get("text") or "").strip()])
     if not changes:
-        raise HTTPException(400, "No hay cambios seleccionados")
+        raise HTTPException(400, "No hay cambios para construir: lo que falta es que el consejo lo apruebe (enviá a revisión)")
     if b.status in ("running", "reviewing"):
         raise HTTPException(409, "La construcción ya está en curso")
     if body.get("provider"):  # the user picked who builds this list (Claude Code / Codex / an API model)

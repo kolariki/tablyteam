@@ -66,7 +66,7 @@ export default function LevelsPanel() {
   const lv: LevelsInfo | null = data?.levels ?? b.levels
   if (!lv) return <div className="flex flex-1 items-center justify-center text-ink-3"><Loader2 size={18} className="animate-spin" /></div>
   const next = lv.levels.find((l) => l.n === lv.next) ?? null
-  const teamPending = (lv.pending ?? []).filter((c) => c.who === 'team')
+  const teamPending = (lv.pending ?? []).filter((c) => c.who === 'team' && c.id !== 'approved')  // approval is the council's verdict, not something to build
   const userPending = (lv.pending ?? []).filter((c) => c.who === 'user')
   const running = b.status === 'running' || b.status === 'reviewing' || b.status === 'design_review'
 
@@ -176,7 +176,7 @@ export default function LevelsPanel() {
                     {busy === 'build' ? <Loader2 size={14} className="animate-spin" /> : <HardHat size={14} />} {T('Construir lo pendiente', 'Build what is pending')}
                   </button>
                 )}
-                <button onClick={council} disabled={running || !!busy || Object.keys(b.files).length === 0} className={PILL} title={T('El consejo revisa el proyecto contra los requisitos del nivel', 'The council reviews the project against the level requirements')}>
+                <button onClick={council} disabled={running || !!busy || Object.keys(b.files).length === 0} className={teamPending.length ? PILL : PRIMARY} title={T('El consejo revisa el proyecto contra los requisitos del nivel', 'The council reviews the project against the level requirements')}>
                   {busy === 'council' ? <Loader2 size={14} className="animate-spin" /> : <Gavel size={14} />} {T('Que el consejo verifique', 'Have the council verify')}
                 </button>
               </div>
