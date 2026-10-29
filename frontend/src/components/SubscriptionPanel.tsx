@@ -51,6 +51,7 @@ export default function SubscriptionPanel() {
   const [watching, setWatching] = useState(false)
   const [tok, setTok] = useState('')
   const [savingTok, setSavingTok] = useState(false)
+  const [remoteOpen, setRemoteOpen] = useState(false)  // already connected locally: the server token is an extra, folded away
   const prev = useRef<EngineStatus[] | null>(null)
 
   const check = async (silent = false) => {
@@ -114,9 +115,14 @@ export default function SubscriptionPanel() {
                 </span>
               </div>
 
-              {e.id === 'claude-code' && (
+              {e.id === 'claude-code' && e.ok && !e.token_set && !remoteOpen && (
+                <button onClick={() => setRemoteOpen(true)} className="relative mt-4 flex w-full items-center gap-2 rounded-xl border border-dashed border-line px-3.5 py-2.5 text-left text-[12.5px] text-ink-3 transition hover:border-accent hover:text-accent">
+                  <Smartphone size={14} /> <span><b className="font-semibold">{T('Opcional', 'Optional')}:</b> {T('usala desde cualquier lado, con la PC apagada', 'use it from anywhere, with your PC off')}</span> <span className="ml-auto text-[12px] underline-offset-2 hover:underline">{T('Configurar', 'Set up')}</span>
+                </button>
+              )}
+              {e.id === 'claude-code' && (!e.ok || e.token_set || remoteOpen) && (
                 <div className={`relative mt-4 rounded-xl border px-3.5 py-3 ${e.token_set ? 'border-ok/30 bg-ok/5' : 'border-accent/30 bg-accent-soft/40'}`}>
-                  <div className="flex items-center gap-2 text-[13px] font-semibold"><Smartphone size={14} className="text-accent" /> {T('Usala desde cualquier lado, con la PC apagada', 'Use it from anywhere, PC off')}</div>
+                  <div className="flex items-center gap-2 text-[13px] font-semibold"><Smartphone size={14} className="text-accent" /> {T('Usala desde cualquier lado, con la PC apagada', 'Use it from anywhere, PC off')}{e.ok && !e.token_set && <span className="ml-auto text-[11px] font-normal text-ink-4">{T('opcional', 'optional')}</span>}</div>
                   <p className="mt-1 text-[12.5px] leading-snug text-ink-2">{T('Conectá tu suscripción con un token: así Tably corre Claude Code en su servidor como vos, y podés construir y chatear con tus sesiones desde el celular aunque tu computadora esté apagada.', 'Connect your subscription with a token: Tably then runs Claude Code on its server as you, so you can build and chat with your sessions from your phone even with your computer off.')}</p>
                   {e.token_set ? (
                     <div className="mt-2 flex items-center gap-2 text-[12.5px]"><CheckCircle2 size={15} className="text-ok" /> {T('Token guardado (cifrado). Las construcciones y «Mis sesiones» corren con tu suscripción.', 'Token saved (encrypted). Builds and "My sessions" run on your subscription.')}
