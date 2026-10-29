@@ -296,7 +296,9 @@ async def _publish_fly(root: Path, cls: dict, slug: str, values: dict[str, str],
     fly = shutil.which("flyctl") or shutil.which("fly")
     if not fly:
         return {"ok": False, "url": None, "error": "flyctl no está instalado en el servidor"}
-    d = root / cls["dir"]
+    # the project's own Dockerfile at the root wins: it is how the team packaged the whole app (API + web + pages);
+    # only a project without one gets a generated Dockerfile for the service we detected
+    d = root if (root / "Dockerfile").exists() else root / cls["dir"]
     if not (d / "Dockerfile").exists():
         (d / "Dockerfile").write_text(_dockerfile(cls, d))
         await _call(logf, "· Dockerfile generado (el proyecto no tenía uno)")
@@ -368,8 +370,14 @@ async def _wait_until_up(url: str, logf: Log, timeout: float = 900) -> bool:
             try:
                 r = await cx.get(url)
                 fallback = r.headers.get("x-railway-fallback") or "application not found" in r.text[:2000].lower()
-                if r.status_code < 500 and not fallback:
+                if r.status_code < 400 and not fallback:  # the home page loads (a 404 there means the app is not what was meant)
                     return True
+                if r.status_code < 500 and not fallback and time.time() - start > 300:
+                    for probe in ("/api/health", "/health", "/healthz"):  # an API-only app: up if its health check answers
+                        h = await cx.get(url.rstrip("/") + probe)
+                        if h.status_code == 200:
+                            await _call(logf, f"⚠ la app responde {r.status_code} en su URL principal pero {probe} está OK: revisá qué sirve en «/»")
+                            return True
             except httpx.HTTPError:
                 pass
             if time.time() - last_note > 60:
@@ -414,7 +422,9 @@ async def _publish_railway(root: Path, cls: dict, slug: str, values: dict[str, s
     rw = shutil.which("railway")
     if not rw:
         return {"ok": False, "url": None, "error": "La CLI de Railway no está instalada en el servidor"}
-    d = root / cls["dir"]
+    # the project's own Dockerfile at the root wins: it is how the team packaged the whole app (API + web + pages);
+    # only a project without one gets a generated Dockerfile for the service we detected
+    d = root if (root / "Dockerfile").exists() else root / cls["dir"]
     if not (d / "Dockerfile").exists():
         (d / "Dockerfile").write_text(_dockerfile(cls, d))
         await _call(logf, "· Dockerfile generado (el proyecto no tenía uno)")
