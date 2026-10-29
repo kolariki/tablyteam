@@ -226,7 +226,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
   return (
     <div className="h-full flex flex-col bg-paper">
       {/* top bar */}
-      <div className="flex h-16 shrink-0 items-center gap-3 border-b border-line bg-surface/90 px-4 backdrop-blur">
+      <div className="relative z-[60] flex h-16 shrink-0 items-center gap-3 border-b border-line bg-surface/90 px-4 backdrop-blur">
         <button onClick={onHome ?? onBack} className="flex shrink-0 items-center rounded-lg transition hover:opacity-80" title={T('Tably Team · ir al inicio', 'Tably Team · go home')}>
           <img src="/icon.svg" alt="Tably Team" className="h-9 w-9 rounded-xl shadow-sm" draggable={false} />
         </button>
