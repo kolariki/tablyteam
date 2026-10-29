@@ -127,6 +127,22 @@ def _all_pages(pages: dict[str, str], pattern: str) -> bool:
 
 # ------------------------------------------------------------------------------------------------ evaluation
 
+def _approved_then_improved(versions: list[dict]) -> tuple[bool, str | None]:
+    """The council approved a version and what came after only applied the improvements that same approving council suggested
+    (no blocking item, nothing else): the approval holds. Otherwise applying a suggestion would undo the approval."""
+    last = next((i for i in range(len(versions) - 1, -1, -1) if (versions[i].get("verdict") or {}).get("approved")), None)
+    if last is None:
+        return False, None
+    approving = {versions[last].get("council_session")}
+    for v in versions[last + 1:]:
+        if v.get("trigger") != "council" or v.get("from_council") not in approving:
+            return False, None
+        if any((r.get("severity") or "mejora") == "bloqueante" for r in v.get("requested") or []):
+            return False, None
+        if v.get("council_session"):  # a council looked at it again: its verdict decides (handled above when it approved)
+            return False, None
+    return True, f"v{versions[last]['n']} aprobada · después solo mejoras sugeridas"
+
 def _check(level: int, cid: str, b, files: dict[str, str], app: dict | None, hits: int) -> tuple[bool, str | None]:
     """→ (ok, evidence)."""
     code = _code(files)
@@ -145,8 +161,9 @@ def _check(level: int, cid: str, b, files: dict[str, str], app: dict | None, hit
             return ok, "README.md" if ok else None
         if cid == "approved":
             v = versions[-1] if versions else None
-            ok = bool(v and v.get("verdict") and v["verdict"].get("approved")) or status == "approved"
-            return ok, (f"v{v['n']} aprobada" if ok and v else None)
+            if bool(v and v.get("verdict") and v["verdict"].get("approved")) or status == "approved":
+                return True, (f"v{v['n']} aprobada" if v else None)
+            return _approved_then_improved(versions)
         if cid == "published":
             return live, (app or {}).get("url") if live else None
     if level == 2:
