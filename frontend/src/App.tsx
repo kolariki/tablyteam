@@ -1,5 +1,6 @@
 import { AnimatePresence } from 'framer-motion'
 import { TeamMemoryWatcher, TeamPage } from './components/TeamMemory'
+import AnalyticsPage from './components/AnalyticsPage'
 import { useEffect, useRef, useState } from 'react'
 import ArenaGraph from './components/ArenaGraph'
 import AgentDrawer from './components/AgentDrawer'
@@ -552,6 +553,7 @@ function AppInner() {
   if (view === 'settings') return <>{banner}{demoLayer}<Settings onBack={() => useArena.getState().set({ view: 'setup' })} /></>
   if (view === 'agents') return <>{banner}{demoLayer}<AgentSessions onBack={() => useArena.getState().set({ view: 'setup' })} /></>
   if (view === 'tickets' && TICKETS_ENABLED) return <>{banner}{demoLayer}<Tickets onBack={() => useArena.getState().set({ view: 'setup' })} /></>
+  if (view === 'analytics') return <>{banner}{demoLayer}<AnalyticsPage onBack={() => useArena.getState().set({ view: 'setup' })} /></>
   if (view === 'team') return <>{banner}{demoLayer}<TeamPage onBack={() => useArena.getState().set({ view: 'setup' })} /></>
   if (view === 'market') return <>{banner}{demoLayer}<Marketplace onBack={() => useArena.getState().set({ view: 'setup' })} /></>
   if (view === 'setup') return <>{banner}{demoLayer}<Setup key={user.id} user={user} onLogout={logout} onSettings={() => useArena.getState().set({ view: 'settings' })} onAudit={() => useArena.getState().set({ view: 'audit' })} onStart={start} onDirect={direct} onReplay={startReplay} onOpen={(id, mode) => (mode === 'run' ? runApp(id) : openSaved(id, mode !== 'arena', mode === 'builder')).catch((e) => toast.error(tr('No se pudo abrir', 'Could not open'), (e as Error).message))} />{runOverlayLayer}</>

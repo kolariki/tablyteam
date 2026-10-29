@@ -2602,6 +2602,28 @@ def analytics_snippet():
     return Response(levelsmod.SNIPPET_JS, media_type="application/javascript", headers={"Cache-Control": "public, max-age=3600"})
 
 
+@app.get("/api/analytics")
+def analytics_overview(user: User = CurrentUser):
+    """Tably Analytics for every app the user published: visits, events and errors of each, with the snippet to install."""
+    folder = auth.user_dir(user.id)
+    out = []
+    for app_ in cloudmod.list_apps(user.id):
+        title, session_id, installed = app_["slug"], None, False
+        for p in folder.glob(f"*.build.{app_['build_id']}.json"):
+            try:
+                d = json.loads(p.read_text())
+            except Exception:  # noqa: BLE001
+                continue
+            title, session_id = d.get("title") or title, p.name.split(".build.")[0]
+            lv = d.get("levels") or {}  # the saved file has no contents: the level check «analytics» says whether the snippet is in
+            installed = (lv.get("level") or 0) >= 2 or (bool(lv) and not any(c.get("id") == "analytics" for c in lv.get("pending") or []) and lv.get("next") == 2)
+            break
+        out.append({"slug": app_["slug"], "title": title, "url": app_.get("url"), "status": app_.get("status"), "provider": app_.get("provider"),
+                    "build_id": app_["build_id"], "session_id": session_id, "installed": installed, "stats": levelsmod.stats(app_["slug"]),
+                    "visits_7d": levelsmod.hits_for(app_["slug"], time.time() - 7 * 86400)})
+    return {"apps": out, "collector": cloudmod.public_url(), "collector_public": not re.match(r"https?://(localhost|127\.0\.0\.1)", cloudmod.public_url())}
+
+
 @app.post("/api/a/{site}")
 async def analytics_hit(site: str, request: Request):
     """Beacon from a published app (text/plain so there is no preflight). Unauthenticated by design; one row per hit."""

@@ -3,7 +3,7 @@ import { TeamMemoryButton } from './TeamMemory'
 import { EmployeePicker, employeeToAgent } from './MyTeam'
 import { useBuild, type Activity } from '../buildStore'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeftRight, Bookmark, Check, Eye, FolderOpen, Gavel, Globe, Loader2, LogOut, MonitorSmartphone, Play, Plus, Puzzle, Settings2, Smartphone, Store, Trash2, Users, X, Zap } from 'lucide-react'
+import { ArrowLeftRight, BarChart3, Bookmark, Check, Eye, FolderOpen, Gavel, Globe, Loader2, LogOut, MonitorSmartphone, Play, Plus, Puzzle, Settings2, Smartphone, Store, Trash2, Users, X, Zap } from 'lucide-react'
 import { toast, useConfirm, usePrompt } from './Toast'
 import SkillPicker from './SkillPicker'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
@@ -578,6 +578,9 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
             </button>}
             <button onClick={() => useArena.getState().set({ view: 'market' })} title={T('Apps construidas con Tably en venta, con su nivel y sus visitas reales', 'Apps built with Tably for sale, with their level and real visits')} className="flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent">
               <Store size={16} /> Marketplace
+            </button>
+            <button onClick={() => useArena.getState().set({ view: 'analytics' })} title={T('Visitas, eventos y errores reales de tus apps publicadas', 'Real visits, events and errors of your published apps')} className="flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent">
+              <BarChart3 size={16} /> {T('Analíticas', 'Analytics')}
             </button>
             <button onClick={() => useArena.getState().set({ view: 'agents' })} title={T('Tus proyectos y conversaciones de Muse Code, tal como están en esta máquina', 'Your Muse Code projects and conversations, as they are on this machine')} className="flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white ring-1 ring-black/10"><ProviderLogo provider="meta" size={15} /></span> {T('Mis sesiones', 'My sessions')}
