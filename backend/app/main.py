@@ -2705,7 +2705,7 @@ def market_transfer(listing_id: str, body: dict, user: User = CurrentUser):
 
 @app.get("/api/cloud/status")
 def cloud_status(user: User = CurrentUser):
-    return {**cloudmod.status(), "github": keystore.key_status(user.id, "github"), "apps": [cloudmod.public(a) for a in cloudmod.list_apps(user.id)]}
+    return {**cloudmod.status(user.id), "github": keystore.key_status(user.id, "github"), "apps": [cloudmod.public(a) for a in cloudmod.list_apps(user.id)]}
 
 
 @app.put("/api/settings/github")
@@ -2736,7 +2736,7 @@ def build_cloud(session_id: str, build_id: str, user: User = CurrentUser):
         "app": cloudmod.public(cloudmod.get_app(user.id, build_id)),
         "git": gitserver.info(user.id, build_id, cloudmod.public_url()),
         "migration": cloudmod.migration_kit(user.id, build_id),
-        "status": cloudmod.status(),
+        "status": cloudmod.status(user.id),
         "github": keystore.key_status(user.id, "github"),
         "publishing": bool(getattr(b, "publishing", False)),
         "version": len(b.versions),

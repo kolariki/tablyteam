@@ -48,18 +48,26 @@ with _db() as _c:
 
 # ------------------------------------------------------------------------------------------------ operator status
 
-def _railway_token() -> str:
-    return env("TABLY_CLOUD_RAILWAY_TOKEN") or ""
+def _railway_token(user_id: str | None = None) -> str:
+    """The operator's workspace token (every app on Tably's account) or, without one, the Railway token the user connected
+    in Settings → Deploy (their apps on their own Railway, billed to them)."""
+    if env("TABLY_CLOUD_RAILWAY_TOKEN"):
+        return env("TABLY_CLOUD_RAILWAY_TOKEN") or ""
+    if not user_id:
+        return ""
+    from .keystore import get_key
+
+    return get_key(user_id, "railway") or ""
 
 def public_url() -> str:
     return (env("TABLY_CLOUD_URL") or "http://localhost:8000").rstrip("/")
 
 
-def status() -> dict:
-    """Which capabilities this installation has (operator env vars + CLIs)."""
+def status(user_id: str | None = None) -> dict:
+    """Which capabilities this installation has (operator env vars + CLIs; Railway also with the user's own token)."""
     cf = bool(env("CF_API_TOKEN") and env("CF_ACCOUNT_ID"))
     fly = bool(env("FLY_API_TOKEN")) and bool(shutil.which("flyctl") or shutil.which("fly"))
-    rw = bool(_railway_token()) and bool(shutil.which("railway"))
+    rw = bool(_railway_token(user_id)) and bool(shutil.which("railway"))
     return {
         "static": "cloudflare" if cf else "local",
         "server": "railway" if rw else "fly" if fly else None,
@@ -68,7 +76,7 @@ def status() -> dict:
         "missing": {
             "cloudflare": None if cf else "CF_API_TOKEN y CF_ACCOUNT_ID en el .env del backend (token con permiso Pages: Edit)",
             "fly": None if fly else ("FLY_API_TOKEN en el .env del backend" if not env("FLY_API_TOKEN") else "flyctl no está instalado en el servidor"),
-            "railway": None if rw else ("TABLY_CLOUD_RAILWAY_TOKEN en las variables del backend (token de workspace de Railway)" if not _railway_token() else "la CLI de Railway no está instalada en el servidor"),
+            "railway": None if rw else ("un token de Railway (conectalo en Configuración → Deploy)" if not _railway_token(user_id) else "la CLI de Railway no está instalada en el servidor"),
             "neon": None if env("NEON_API_KEY") else "NEON_API_KEY en el .env del backend",
             "supabase": None if env("SUPABASE_ACCESS_TOKEN") else "SUPABASE_ACCESS_TOKEN y SUPABASE_ORG_ID en el .env del backend",
         },
@@ -320,12 +328,12 @@ RAILWAY_SERVICE = "web"
 RAILWAY_HOME = APPS_ROOT / ".railway-cli"  # the CLI's own config (which folder is linked to which project) lives apart
 
 
-def _railway_env() -> dict:
+def _railway_env(user_id: str | None = None) -> dict:
     """A clean environment for the CLI. Tably itself runs on Railway, which injects RAILWAY_* variables about OUR project:
     none of them may reach the CLI, or it could deploy into Tably's own project. Only the operator's workspace token goes."""
     RAILWAY_HOME.mkdir(parents=True, exist_ok=True)
     base = {k: v for k, v in os.environ.items() if not k.startswith("RAILWAY_")}
-    return {**base, "RAILWAY_API_TOKEN": _railway_token(), "HOME": str(RAILWAY_HOME), "NO_COLOR": "1", "CI": "1"}
+    return {**base, "RAILWAY_API_TOKEN": _railway_token(user_id), "HOME": str(RAILWAY_HOME), "NO_COLOR": "1", "CI": "1"}
 
 
 def _uses_postgres(d: Path) -> bool:
@@ -342,7 +350,7 @@ def _last_line(text: str) -> str:
     return (text.strip().splitlines() or ["?"])[-1][:300]
 
 
-async def _publish_railway(root: Path, cls: dict, slug: str, values: dict[str, str], prev: dict, logf: Log) -> dict:
+async def _publish_railway(root: Path, cls: dict, slug: str, values: dict[str, str], prev: dict, logf: Log, user_id: str | None = None) -> dict:
     """One Railway project per app on the operator's workspace: an empty «web» service with the code (Dockerfile), its own
     Postgres when the app uses one, the user's variables, and a public *.up.railway.app domain. Republishing reuses it."""
     rw = shutil.which("railway")
@@ -354,7 +362,7 @@ async def _publish_railway(root: Path, cls: dict, slug: str, values: dict[str, s
         await _call(logf, "· Dockerfile generado (el proyecto no tenía uno)")
     if not (d / ".dockerignore").exists():
         (d / ".dockerignore").write_text("node_modules\n.git\n.venv\n.env\ndist-preview\ncoverage\n")
-    renv = _railway_env()
+    renv = _railway_env(user_id)
     meta = dict((prev.get("db") or {}).get("railway") or {})
     name = f"tably-{slug}"[:40].rstrip("-")
     linked = False
@@ -405,7 +413,7 @@ async def _publish_railway(root: Path, cls: dict, slug: str, values: dict[str, s
 
 async def publish(user_id: str, build_id: str, title: str, root: Path, files: dict[str, str], version: int, logf: Log) -> dict:
     """Build + publish; returns the saved app record. Logs stream through `logf`."""
-    st = status()
+    st = status(user_id)
     slug = slug_for(user_id, build_id, title)
     prev = get_app(user_id, build_id) or {}
     app = {"user_id": user_id, "build_id": build_id, "slug": slug, "provider": "local", "kind": "unknown", "status": "building", "url": prev.get("url"),
@@ -435,7 +443,7 @@ async def publish(user_id: str, build_id: str, title: str, root: Path, files: di
             elif st["server"] == "railway":
                 app["provider"] = "railway"
                 await log_(f"▶ app con servidor ({cls.get('runtime')}) · Railway · «{slug}»")
-                res = await _publish_railway(root, cls, slug, values, prev, log_)
+                res = await _publish_railway(root, cls, slug, values, prev, log_, user_id)
                 if res.get("railway"):
                     app["db"] = {**(app.get("db") or {}), "railway": res["railway"]}
             else:
@@ -466,7 +474,7 @@ async def unpublish(user_id: str, build_id: str, logf: Log | None = None) -> dic
         elif app["provider"] == "railway":
             rw, project = shutil.which("railway"), ((app.get("db") or {}).get("railway") or {}).get("project")
             if rw and project:
-                await deploymod._stream([rw, "delete", "--project", project, "--yes"], APPS_ROOT, _railway_env(), lf, timeout=120)
+                await deploymod._stream([rw, "delete", "--project", project, "--yes"], APPS_ROOT, _railway_env(user_id), lf, timeout=120)
             (app.get("db") or {}).pop("railway", None)
         elif app["provider"] == "fly":
             fly = shutil.which("flyctl") or shutil.which("fly")
