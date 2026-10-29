@@ -1,8 +1,8 @@
 import DOMPurify from 'dompurify'
-import { TeamMemoryButton } from './TeamMemory'
+import { openTeam } from './TeamMemory'
 import { srv } from '../lib/serverText'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, CheckCircle2, Trophy, FlaskConical, Gauge, Home, ListChecks, Search, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2, CloudUpload, Clock3 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, Trophy, FlaskConical, Gauge, Home, ListChecks, Search, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2, CloudUpload, Clock3, Menu, Users, Languages } from 'lucide-react'
 import { marked } from 'marked'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { reconnectBuild, useBuild, type Activity, type ChatItem, type Todo } from '../buildStore'
@@ -197,8 +197,6 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
 
   const shownFile = b.liveFile && b.selected === b.liveFile.path ? b.liveFile.content : b.files[b.selected ?? '']?.content
   const tree = useMemo(() => buildTree(Object.keys(b.files).concat(b.liveFile ? [b.liveFile.path] : [])), [b.files, b.liveFile?.path])
-  const stageCount = b.stages.length
-  const isEngineBuild = b.provider === 'claude-code' || b.provider === 'codex' || b.provider === 'muse-code'
   const codeTheme = useEditorTheme((s) => s.theme)
   const [payingFees, setPayingFees] = useState(false)
   const [stopping, setStopping] = useState(false)
@@ -240,20 +238,6 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
           <div className="serif truncate text-[17px] leading-tight" title={b.title}>{b.title}</div>
           <div className="mt-0.5 flex items-center gap-2 text-[11.5px] text-ink-3">
             <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} /> <span className="font-mono">{b.model}</span></span>
-            {b.id && b.sessionId && <TeamLanguage />}
-        {b.id && <TeamMemoryButton className="h-9" />}
-            {b.engineSession && b.workdir && (
-              <>
-                <span className="h-3 w-px bg-line" />
-                <button
-                  onClick={() => { navigator.clipboard?.writeText(`cd "${b.workdir}" && claude --resume ${b.engineSession}`); toast.ok(tr('Comando copiado', 'Command copied'), tr('Pegalo en tu terminal para abrir esta misma sesión en tu Claude Code.', 'Paste it in your terminal to open this same session in your Claude Code.')) }}
-                  className="flex items-center gap-1 whitespace-nowrap text-[11.5px] text-ink-3 transition hover:text-accent"
-                  title={`${T('Copia el comando para seguir esta misma sesión en tu terminal', 'Copies the command to continue this same session in your terminal')}: cd "${b.workdir}" && claude --resume ${b.engineSession}`}
-                >
-                  <TerminalSquare size={12} /> {T('Abrir en mi Claude Code', 'Open in my Claude Code')} <Copy size={10} className="opacity-60" />
-                </button>
-              </>
-            )}
           </div>
         </div>
         <div className="ml-2 flex shrink-0 items-center gap-2 whitespace-nowrap">
@@ -268,19 +252,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
           ) : (
             <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${b.status === 'completed' ? 'border-ok/30 bg-ok/10 text-ok' : 'border-line bg-surface-2 text-ink-3'}`}>{b.status === 'completed' ? (b.reviews.length ? T('CAMBIOS LISTOS · pendiente de consejo', 'CHANGES READY · pending council') : <><span className="h-2 w-2 rounded-full bg-ok shadow-[0_0_0_3px_rgba(23,137,106,.18)]" /> {T('LISTO', 'DONE')}</>) : b.status.toUpperCase()}</span>
           )}
-          {b.versions.length > 0 && <ReadinessBadge versions={b.versions} />}
           {b.levels && <button onClick={() => useBuild.getState().set({ pane: 'levels', paneOpen: true })} className="transition hover:brightness-95" title={T('Niveles de crecimiento', 'Growth levels')}><LevelBadge level={b.levels.level} pct={b.levels.pct} next={b.levels.next} /></button>}
-          {b.reviews.length > 0 && !reviewing && <span className="hidden text-[11px] text-ink-3 2xl:inline">{b.reviews.length} {b.reviews.length === 1 ? T('ronda', 'round') : T('rondas', 'rounds')} {T('de revisión', 'of review')}</span>}
-          {stageCount > 0 && <span className="hidden text-[11px] text-ink-3 2xl:inline">{stageCount} {stageCount === 1 ? T('etapa', 'stage') : T('etapas', 'stages')}</span>}
-          {/* what it really costs: an engine build runs on the user's subscription, so only the per-use fees count there */}
-          <span className="hidden rounded-full border border-line bg-surface px-2.5 py-1 font-mono text-[11px] text-ink-3 xl:inline-flex" title={isEngineBuild ? T('Construido con tu suscripción: los tokens no se cobran por API', 'Built on your subscription: tokens are not billed through the API') : T('Tokens por API más cargos por uso', 'API tokens plus per-use charges')}>
-            {Object.keys(b.files).length} {T('archivos', 'files')} · {isEngineBuild && !b.fees ? T('suscripción', 'subscription') : `$${((isEngineBuild ? 0 : b.cost) + b.fees).toFixed(2)}`}
-          </span>
-          {b.buildSeconds > 0 && (
-            <span className="hidden items-center gap-1 rounded-full border border-line bg-surface px-2.5 py-1 font-mono text-[11px] text-ink-3 xl:inline-flex" title={T('Tiempo total de construcción (suma de todos los turnos)', 'Total build time (all turns added up)')}>
-              <Clock3 size={11} /> {fmtDur(b.buildSeconds)}
-            </span>
-          )}
           {b.feesDue > 0 && (
             <button
               disabled={payingFees}
@@ -296,21 +268,8 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
         </div>
         {/* actions: labels only when there is room; below 2xl the secondary ones are icon buttons with a tooltip */}
         <div className="ml-auto flex shrink-0 items-center gap-2 whitespace-nowrap">
-          <button onClick={toggleRecording} className={`${b.recording ? `${HBTN} border-danger/60 bg-danger/10 text-danger hover:border-danger hover:text-danger` : HBTN} px-3 2xl:px-3.5`} title={b.recording ? T('Guardar el video', 'Save the video') : T('Graba esta pantalla (chat + código + vista previa) y descarga el video', 'Records this screen (chat + code + preview) and downloads the video')}>
-            <Circle size={13} className={b.recording ? 'fill-danger animate-pulse' : ''} /> <span className="hidden 2xl:inline">{b.recording ? T('Guardar video', 'Save video') : T('Grabar', 'Record')}</span>
-          </button>
-          {running && b.id && (
-            <button
-              disabled={stopping}
-              onClick={async () => { setStopping(true); try { await api.buildStop(b.id!) } catch (e) { toast.error(tr('No se pudo detener', 'Could not stop'), (e as Error).message); setStopping(false) } }}
-              className={`${HBTN} border-danger/40 px-3 text-danger hover:border-danger hover:text-danger disabled:opacity-80 2xl:px-3.5`}
-              title={stopping ? T('Deteniendo la construcción…', 'Stopping the build…') : T('Detener la construcción', 'Stop the build')}
-            >
-              {stopping ? <Loader2 size={14} className="animate-spin" /> : <Square size={14} />} <span className={stopping ? 'inline' : 'hidden 2xl:inline'}>{stopping ? T('Deteniendo…', 'Stopping…') : T('Detener', 'Stop')}</span>
-            </button>
-          )}
-          <button onClick={downloadZip} disabled={!Object.keys(b.files).length} className={`${HBTN} px-3 2xl:px-3.5`} title={T('Descargar el proyecto como .zip', 'Download the project as .zip')}><Download size={14} /> <span className="hidden 2xl:inline">{T('Descargar .zip', 'Download .zip')}</span></button>
           <button onClick={() => setRunOpen(true)} disabled={!Object.keys(b.files).length || running} className={HBTN_PRIMARY} title={T('Levanta la app en esta máquina y la muestra acá', 'Starts the app on this machine and shows it here')}><MonitorPlay size={14} /> {T('Correr la app', 'Run the app')}{b.appRun.status === 'running' ? <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> : null}</button>
+          <BuilderMenu onDownload={downloadZip} onRecord={toggleRecording} />
         </div>
       </div>
       {runOpen && <RunModal onClose={() => setRunOpen(false)} onDownload={downloadZip} />}
@@ -516,6 +475,14 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
                 className="flex-1 resize-none bg-transparent text-sm outline-none"
                 disabled={!b.id}
               />
+              {running && b.id && (
+                <button
+                  disabled={stopping}
+                  onClick={async () => { setStopping(true); try { await api.buildStop(b.id!) } catch (e) { toast.error(tr('No se pudo detener', 'Could not stop'), (e as Error).message); setStopping(false) } }}
+                  className="shrink-0 rounded-xl border border-danger/40 p-2 text-danger transition hover:border-danger hover:bg-danger/10 disabled:opacity-60"
+                  title={stopping ? T('Deteniendo la construcción…', 'Stopping the build…') : T('Detener la construcción', 'Stop the build')}
+                >{stopping ? <Loader2 size={16} className="animate-spin" /> : <Square size={16} />}</button>
+              )}
               <button onClick={() => send()} disabled={!input.trim() || !b.id} className="shrink-0 rounded-xl bg-accent text-white p-2 disabled:opacity-40"><Send size={16} /></button>
             </div>
             {/* what the agent is doing right now, under the box: last action, counters of the turn, elapsed */}
@@ -657,6 +624,57 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
 /** The live strip under the chat box: the agent's current action with its path, this turn's counters and the clock. */
 /** The language the team speaks on this project: a build started in Spanish can switch to English (and back). It applies
  *  from the next builder turn and the next council round; what was already written stays as it is. */
+/** The secondary actions of the builder, folded in one menu so the header stays clean. */
+function BuilderMenu({ onDownload, onRecord }: { onDownload: () => void; onRecord: () => void }) {
+  const T = useT()
+  const b = useBuild()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as globalThis.Node)) setOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('mousedown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey) }
+  }, [open])
+  const item = 'flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[13px] text-ink-2 transition hover:bg-surface-2 hover:text-ink disabled:opacity-40'
+  const act = (fn: () => void) => () => { setOpen(false); fn() }
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => setOpen(!open)} className={`${HBTN} px-2.5 ${open ? 'border-accent text-accent' : ''}`} title={T('Más opciones', 'More options')} aria-label={T('Más opciones', 'More options')} aria-expanded={open}>
+        {b.recording ? <Circle size={14} className="fill-danger text-danger animate-pulse" /> : <Menu size={16} />}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-2 w-[290px] rounded-2xl border border-line bg-surface p-2 shadow-[0_20px_50px_-20px_rgba(30,38,34,.45)]">
+          {b.id && <button className={item} onClick={act(() => openTeam())}><Users size={15} /> {T('Mi equipo', 'My team')}</button>}
+          {b.id && b.sessionId && (
+            <div className="flex items-center justify-between gap-2 px-3 py-2 text-[13px] text-ink-2"><span className="flex items-center gap-2.5"><Languages size={15} /> {T('Idioma del equipo', 'Team language')}</span><TeamLanguage /></div>
+          )}
+          <div className="my-1 h-px bg-line" />
+          <button className={item} onClick={act(onDownload)} disabled={!Object.keys(b.files).length}><Download size={15} /> {T('Descargar .zip', 'Download .zip')}</button>
+          <button className={`${item} ${b.recording ? 'text-danger hover:text-danger' : ''}`} onClick={act(onRecord)}><Circle size={15} className={b.recording ? 'fill-danger' : ''} /> {b.recording ? T('Guardar el video', 'Save the video') : T('Grabar la pantalla en video', 'Record the screen as video')}</button>
+          {b.engineSession && b.workdir && (
+            <button className={item} onClick={act(() => { navigator.clipboard?.writeText(`cd "${b.workdir}" && claude --resume ${b.engineSession}`); toast.ok(tr('Comando copiado', 'Command copied'), tr('Pegalo en tu terminal para abrir esta misma sesión en tu Claude Code.', 'Paste it in your terminal to open this same session in your Claude Code.')) })}>
+              <TerminalSquare size={15} /> {T('Abrir en mi Claude Code', 'Open in my Claude Code')} <Copy size={11} className="ml-auto opacity-60" />
+            </button>
+          )}
+          {(b.versions.length > 0 || b.buildSeconds > 0 || b.reviews.length > 0) && (
+            <>
+              <div className="my-1 h-px bg-line" />
+              <div className="flex flex-wrap items-center gap-2 px-3 py-2 text-[11.5px] text-ink-3">
+                {b.versions.length > 0 && <ReadinessBadge versions={b.versions} />}
+                {b.buildSeconds > 0 && <span className="flex items-center gap-1 font-mono"><Clock3 size={11} /> {fmtDur(b.buildSeconds)}</span>}
+                {b.reviews.length > 0 && <span>{b.reviews.length} {b.reviews.length === 1 ? T('ronda de revisión', 'review round') : T('rondas de revisión', 'review rounds')}</span>}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function TeamLanguage() {
   const T = useT()
   const b = useBuild()
@@ -677,9 +695,7 @@ function TeamLanguage() {
   }
   return (
     <>
-      <span className="h-3 w-px bg-line" />
       <span className="flex items-center gap-1 whitespace-nowrap" title={T('Idioma en el que habla el equipo (constructor y consejo)', 'Language the team speaks (builder and council)')}>
-        <span>{T('Equipo', 'Team')}</span>
         <span role="group" aria-label={T('Idioma del equipo', 'Team language')} className={`flex overflow-hidden rounded-full border border-line ${busy ? 'opacity-50' : ''}`}>
           {(['es', 'en'] as const).map((l) => (
             <button key={l} type="button" onClick={() => void pick(l)} aria-pressed={code === l} className={`px-1.5 py-px font-mono text-[10.5px] uppercase transition ${code === l ? 'bg-accent text-white' : 'text-ink-3 hover:text-accent'}`}>{l}</button>
