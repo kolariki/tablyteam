@@ -1,8 +1,9 @@
-import { Loader2, RotateCcw, Sparkles, X } from 'lucide-react'
-import { useState } from 'react'
+import { Camera, Loader2, RotateCcw, Sparkles, Upload, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import { PRESET_FACES, avatarSrc, type AvatarConfig } from '../lib/avatar'
 import { useT } from '../lib/i18n'
+import { useArena } from '../store'
 
 type Traits = { gender: string; age: string; skin: string; hair: string; hair_color: string; beard: string; glasses: string; clothes: string; expression: string; extra: string }
 const opt = (es: string, en: string, v: string) => ({ es, en, v })
@@ -22,11 +23,26 @@ const LABELS: Record<keyof Traits, [string, string]> = {
   beard: ['Barba', 'Beard'], glasses: ['Anteojos', 'Glasses'], clothes: ['Ropa', 'Clothes'], expression: ['Expresión', 'Expression'], extra: ['Algo más (opcional)', 'Anything else (optional)'],
 }
 
-/** Pick one of 24 realistic faces, or create a new one with AI from the traits you choose (same style as the role portraits). */
+/** The error, with a button to the keys page when the problem is a missing Muse/OpenAI key. */
+function FaceError({ error, onClose }: { error: string; onClose: () => void }) {
+  const T = useT()
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-[12.5px] text-danger">
+      <span className="flex-1">{error}</span>
+      {/API keys/.test(error) && <button onClick={() => { onClose(); useArena.getState().set({ view: 'settings' }) }} className="shrink-0 rounded-full bg-accent px-3 py-1 text-[12px] font-semibold text-white hover:brightness-110">{T('Conectar Muse', 'Connect Muse')}</button>}
+    </div>
+  )
+}
+
+/** Pick one of 24 realistic faces, turn your own photo into one, or create a new one with AI from the traits you choose (same style as the role portraits). */
 export default function AvatarEditor({ employeeId, value, onSave, onReset, onClose }: { employeeId: string; value: AvatarConfig | null; onSave: (c: AvatarConfig) => void; onReset: () => void; onClose: () => void }) {
   const T = useT()
   const [cur, setCur] = useState<AvatarConfig | null>(value)
-  const [tab, setTab] = useState<'gallery' | 'create'>('gallery')
+  const [tab, setTab] = useState<'gallery' | 'photo' | 'create'>('gallery')
+  const [photo, setPhoto] = useState<File | null>(null)
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  const [photoExtra, setPhotoExtra] = useState('')
+  useEffect(() => { if (!photo) return setPhotoUrl(null); const u = URL.createObjectURL(photo); setPhotoUrl(u); return () => URL.revokeObjectURL(u) }, [photo])
   const [t, setT] = useState<Traits>({ gender: 'woman', age: '30s', skin: 'medium tan', hair: 'medium-length wavy', hair_color: 'dark brown', beard: 'none', glasses: 'none', clothes: 'a navy blazer and a white shirt', expression: CHOICES.expression[0].v, extra: '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +50,13 @@ export default function AvatarEditor({ employeeId, value, onSave, onReset, onClo
     setBusy(true)
     setError(null)
     try { setCur(await api.generateFace(employeeId, t)) } catch (e) { setError((e as Error).message) }
+    setBusy(false)
+  }
+  const fromPhoto = async () => {
+    if (!photo) return
+    setBusy(true)
+    setError(null)
+    try { setCur(await api.faceFromPhoto(employeeId, photo, photoExtra)) } catch (e) { setError((e as Error).message) }
     setBusy(false)
   }
   return (
@@ -53,7 +76,7 @@ export default function AvatarEditor({ employeeId, value, onSave, onReset, onClo
           </div>
           <div>
             <div className="flex gap-1">
-              {(['gallery', 'create'] as const).map((k) => <button key={k} onClick={() => setTab(k)} className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${tab === k ? 'bg-accent text-white' : 'text-ink-2 hover:bg-surface-2'}`}>{k === 'create' && <Sparkles size={13} />}{k === 'gallery' ? T('24 personas', '24 people') : T('Crear con IA', 'Create with AI')}</button>)}
+              {(['gallery', 'photo', 'create'] as const).map((k) => <button key={k} onClick={() => { setTab(k); setError(null) }} className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${tab === k ? 'bg-accent text-white' : 'text-ink-2 hover:bg-surface-2'}`}>{k === 'create' && <Sparkles size={13} />}{k === 'photo' && <Camera size={13} />}{k === 'gallery' ? T('24 personas', '24 people') : k === 'photo' ? T('Desde tu foto', 'From your photo') : T('Crear con IA', 'Create with AI')}</button>)}
             </div>
             {tab === 'gallery' ? (
               <div className="mt-4 grid grid-cols-4 gap-2.5 sm:grid-cols-6">
@@ -62,6 +85,26 @@ export default function AvatarEditor({ employeeId, value, onSave, onReset, onClo
                     <img src={avatarSrc(p)} alt="" loading="lazy" className="aspect-square w-full object-cover" />
                   </button>
                 ))}
+              </div>
+            ) : tab === 'photo' ? (
+              <div className="mt-4 space-y-3">
+                <p className="text-[12.5px] text-ink-3">{T('Subí una foto tuya (o de quien quieras) y la IA la convierte en un retrato con el mismo estilo que el resto del equipo, manteniendo el parecido. Lo hace Muse con tu key de Meta (o OpenAI si no tenés Muse); se cobra por imagen. La foto original no se guarda.', 'Upload a photo of yourself (or anyone) and AI turns it into a portrait in the same style as the rest of the team, keeping the likeness. Muse does it with your Meta key (or OpenAI if you have no Muse); billed per image. The original photo is not stored.')}</p>
+                <label onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f?.type.startsWith('image/')) setPhoto(f) }} className="flex cursor-pointer items-center gap-4 rounded-2xl border border-dashed border-line p-4 transition hover:border-accent">
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) setPhoto(f); e.target.value = '' }} />
+                  <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-surface-2">
+                    {photoUrl ? <img src={photoUrl} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-ink-4"><Upload size={22} /></div>}
+                  </div>
+                  <div className="text-[13px]">
+                    <div className="font-semibold text-ink">{photo ? T('Cambiar foto', 'Change photo') : T('Elegí o arrastrá una foto', 'Choose or drop a photo')}</div>
+                    <div className="mt-0.5 text-[12px] text-ink-3">{T('Mejor si se ve bien la cara, de frente y con buena luz. JPG, PNG o WEBP.', 'Best with the face clearly visible, facing the camera, in good light. JPG, PNG or WEBP.')}</div>
+                  </div>
+                </label>
+                <div>
+                  <div className="mb-1 text-[11.5px] uppercase tracking-widest text-ink-3">{T(...LABELS.extra)}</div>
+                  <input value={photoExtra} onChange={(e) => setPhotoExtra(e.target.value)} placeholder={T('Ej.: con saco azul, sonriendo', 'e.g. in a navy blazer, smiling')} className="w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] outline-none focus:border-accent" />
+                </div>
+                <button onClick={fromPhoto} disabled={busy || !photo} className="flex h-10 items-center gap-1.5 rounded-full bg-accent px-5 text-[13.5px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-50">{busy ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />} {busy ? T('Transformando… (puede tardar un minuto)', 'Transforming… (can take a minute)') : T('Convertir en retrato', 'Turn into portrait')}</button>
+                {error && <FaceError error={error} onClose={onClose} />}
               </div>
             ) : (
               <div className="mt-4 space-y-3">
@@ -79,7 +122,7 @@ export default function AvatarEditor({ employeeId, value, onSave, onReset, onClo
                   <input value={t.extra} onChange={(e) => setT({ ...t, extra: e.target.value })} placeholder={T('Ej.: pecas, aros chicos, mirada cálida', 'e.g. freckles, small earrings, warm look')} className="w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] outline-none focus:border-accent" />
                 </div>
                 <button onClick={create} disabled={busy} className="flex h-10 items-center gap-1.5 rounded-full bg-accent px-5 text-[13.5px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-50">{busy ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />} {busy ? T('Generando… (puede tardar un minuto)', 'Generating… (can take a minute)') : T('Generar cara', 'Generate face')}</button>
-                {error && <div className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-[12.5px] text-danger">{error}</div>}
+                {error && <FaceError error={error} onClose={onClose} />}
               </div>
             )}
           </div>

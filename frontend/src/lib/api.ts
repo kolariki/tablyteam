@@ -159,6 +159,7 @@ export const api = {
   updateEmployee: (id: string, body: Partial<Pick<Employee, 'name' | 'persona' | 'provider' | 'model' | 'skills' | 'avatar'>>) => j<{ employees: Employee[] }>(authed(`/api/team/employees/${id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })),
   deleteEmployee: (id: string) => j<{ employees: Employee[] }>(authed(`/api/team/employees/${id}`, { method: 'DELETE' })),
   generateFace: (id: string, traits: Record<string, string>) => j<{ src: string }>(post(`/api/team/employees/${id}/generate-face`, traits)),
+  faceFromPhoto: (id: string, file: File, extra: string) => { const form = new FormData(); form.append('file', file, file.name); form.append('extra', extra); return j<{ src: string }>(authed(`/api/team/employees/${id}/face-from-photo`, { method: 'POST', body: form })) },
   suggestRolePrompt: (id: string, hint: string, lang: string) => j<{ prompt: string; model: string }>(post(`/api/team/employees/${id}/suggest-prompt`, { hint, lang })),
   employeeDocs: (id: string) => j<{ docs: KnowledgeDoc[] }>(authed(`/api/team/employees/${id}/docs`)),
   addEmployeeNote: (id: string, title: string, text: string) => j<{ docs: KnowledgeDoc[] }>(post(`/api/team/employees/${id}/docs`, { title, text })),

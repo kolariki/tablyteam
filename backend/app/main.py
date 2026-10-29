@@ -1551,38 +1551,19 @@ FACE_STYLE = ("Editorial corporate portrait photograph, head and shoulders frame
               "subtle film grain, refined muted color grade, square composition, no text, no logos. Person: ")
 
 
-@app.post("/api/team/employees/{eid}/generate-face")
-async def team_employee_generate_face(eid: str, body: dict, user: User = CurrentUser):
-    """A realistic portrait for an employee, in the same editorial style as the role portraits, from the traits the user picked.
-    Muse first (muse-image-1.0 on the Meta key), OpenAI (gpt-image-2) when there is no Meta key; billed per image."""
-    if not teammod.get(user.id, eid):
-        raise HTTPException(404)
-    eff = keystore.creds(user.id)
+def _image_provider(user_id: str, op: str) -> tuple[str, str, str]:
+    """(url, key, model) for an image call: Muse (muse-image-1.0 on the Meta key) first, OpenAI (gpt-image-2) when there is no Meta key."""
+    eff = keystore.creds(user_id)
     meta, openai = eff.get("meta"), eff.get("openai")
     if meta and meta.source != "none" and meta.api_key:
-        url, key, model = (meta.base_url or PROVIDERS["meta"].base_url).rstrip("/") + "/images/generations", meta.api_key, "muse-image-1.0"
-    elif openai and openai.source != "none" and openai.api_key:
-        url, key, model = "https://api.openai.com/v1/images/generations", openai.api_key, "gpt-image-2"
-    else:
-        raise HTTPException(400, "Para crear caras con IA conectá Muse (o OpenAI) en Modelos y API keys; mientras tanto elegí una de las prediseñadas")
-    pick = lambda k, n=60: re.sub(r"[^\w\s,.'/-]", "", str(body.get(k) or ""))[:n].strip()  # noqa: E731
-    parts = [f"a {pick('gender') or 'person'} in their {pick('age') or '30s'}", f"{pick('skin') or 'medium'} skin"]
-    hair = pick("hair")
-    parts.append("completely bald head" if hair in ("bald", "pelado") else f"{pick('hair_color')} {hair} hair".strip())
-    if pick("beard") and pick("beard") != "none":
-        parts.append(pick("beard"))
-    if pick("glasses") and pick("glasses") != "none":
-        parts.append(f"wearing {pick('glasses')} glasses")
-    parts.append(f"wearing {pick('clothes') or 'a smart casual blazer'}")
-    parts.append(f"{pick('expression') or 'calm confident expression with a slight natural smile'}")
-    if pick("extra", 160):
-        parts.append(pick("extra", 160))
-    try:
-        async with httpx.AsyncClient(timeout=240) as cx:
-            req = {"model": model, "prompt": FACE_STYLE + ", ".join(parts), "size": "1024x1024", "n": 1} | ({"quality": "medium"} if model.startswith("gpt-image") else {})
-            r = await cx.post(url, headers={"Authorization": f"Bearer {key}"}, json=req)
-    except httpx.HTTPError as e:
-        raise HTTPException(502, f"No se pudo generar la cara: {e}")
+        return (meta.base_url or PROVIDERS["meta"].base_url).rstrip("/") + f"/images/{op}", meta.api_key, "muse-image-1.0"
+    if openai and openai.source != "none" and openai.api_key:
+        return f"https://api.openai.com/v1/images/{op}", openai.api_key, "gpt-image-2"
+    raise HTTPException(400, "Para crear caras con IA conectá Muse (o OpenAI) en Modelos y API keys; mientras tanto elegí una de las prediseñadas")
+
+
+async def _save_face(r: httpx.Response, model: str) -> dict:
+    """Store the model's image as a 384px webp under an unguessable name."""
     if r.status_code != 200:
         msg = (r.json().get("error") or {}).get("message", r.text[:200]) if r.headers.get("content-type", "").startswith("application/json") else r.text[:200]
         raise HTTPException(400 if r.status_code < 500 else 502, f"{'Muse' if model.startswith('muse') else 'OpenAI'} no generó la cara: {msg}")
@@ -1603,6 +1584,68 @@ async def team_employee_generate_face(eid: str, body: dict, user: User = Current
     img = Image.open(io.BytesIO(raw)).convert("RGB").resize((384, 384), Image.LANCZOS)
     img.save(FACES_DIR / f"{name}.webp", "WEBP", quality=82, method=6)
     return {"src": f"/api/faces/{name}.webp"}
+
+
+@app.post("/api/team/employees/{eid}/generate-face")
+async def team_employee_generate_face(eid: str, body: dict, user: User = CurrentUser):
+    """A realistic portrait for an employee, in the same editorial style as the role portraits, from the traits the user picked; billed per image."""
+    if not teammod.get(user.id, eid):
+        raise HTTPException(404)
+    url, key, model = _image_provider(user.id, "generations")
+    pick = lambda k, n=60: re.sub(r"[^\w\s,.'/-]", "", str(body.get(k) or ""))[:n].strip()  # noqa: E731
+    parts = [f"a {pick('gender') or 'person'} in their {pick('age') or '30s'}", f"{pick('skin') or 'medium'} skin"]
+    hair = pick("hair")
+    parts.append("completely bald head" if hair in ("bald", "pelado") else f"{pick('hair_color')} {hair} hair".strip())
+    if pick("beard") and pick("beard") != "none":
+        parts.append(pick("beard"))
+    if pick("glasses") and pick("glasses") != "none":
+        parts.append(f"wearing {pick('glasses')} glasses")
+    parts.append(f"wearing {pick('clothes') or 'a smart casual blazer'}")
+    parts.append(f"{pick('expression') or 'calm confident expression with a slight natural smile'}")
+    if pick("extra", 160):
+        parts.append(pick("extra", 160))
+    try:
+        async with httpx.AsyncClient(timeout=240) as cx:
+            req = {"model": model, "prompt": FACE_STYLE + ", ".join(parts), "size": "1024x1024", "n": 1} | ({"quality": "medium"} if model.startswith("gpt-image") else {})
+            r = await cx.post(url, headers={"Authorization": f"Bearer {key}"}, json=req)
+    except httpx.HTTPError as e:
+        raise HTTPException(502, f"No se pudo generar la cara: {e}")
+    return await _save_face(r, model)
+
+
+FACE_FROM_PHOTO = ("Turn the person in this photo into an " + FACE_STYLE.split(". Person: ")[0][0].lower() + FACE_STYLE.split(". Person: ")[0][1:] + ". "
+                   "Keep their real likeness: same face shape, features, skin tone, hair, beard and glasses as in the photo, so they are clearly recognizable. "
+                   "Replace the original background, lighting and framing with the style described.")
+
+
+@app.post("/api/team/employees/{eid}/face-from-photo")
+async def team_employee_face_from_photo(eid: str, file: UploadFile = File(...), extra: str = Form(""), user: User = CurrentUser):
+    """The user's own photo turned into the role portrait style (image edit on Muse, or OpenAI). The uploaded photo is never stored."""
+    if not teammod.get(user.id, eid):
+        raise HTTPException(404)
+    data = await file.read()
+    if len(data) > 15_000_000:
+        raise HTTPException(413, "La foto supera 15 MB")
+    import io
+
+    from PIL import Image, ImageOps
+
+    try:
+        img = ImageOps.exif_transpose(Image.open(io.BytesIO(data))).convert("RGB")
+    except Exception:  # noqa: BLE001
+        raise HTTPException(400, "No pude leer la imagen; subí una foto JPG, PNG o WEBP")
+    img.thumbnail((1024, 1024))
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    url, key, model = _image_provider(user.id, "edits")
+    prompt = FACE_FROM_PHOTO + (" " + re.sub(r"[^\w\s,.'/-]", "", extra)[:200].strip() if extra.strip() else "")
+    form = {"model": model, "prompt": prompt, "size": "1024x1024", "n": "1"} | ({"quality": "medium", "input_fidelity": "high"} if model.startswith("gpt-image") else {})
+    try:
+        async with httpx.AsyncClient(timeout=240) as cx:
+            r = await cx.post(url, headers={"Authorization": f"Bearer {key}"}, data=form, files={"image": ("photo.png", buf.getvalue(), "image/png")})
+    except httpx.HTTPError as e:
+        raise HTTPException(502, f"No se pudo generar la cara: {e}")
+    return await _save_face(r, model)
 
 
 @app.get("/api/faces/{name}")
