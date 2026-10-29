@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { api, type AnalyticsApp } from '../lib/api'
 import { useT } from '../lib/i18n'
 import { useArena } from '../store'
+import { LiveNow } from './LevelsPanel'
 import PageHeader from './PageHeader'
 
 /** Tably Analytics for every published app: visits, events and errors, read from the `/a.js` snippet each app carries. */
@@ -11,18 +12,19 @@ export default function AnalyticsPage({ onBack }: { onBack: () => void }) {
   const [data, setData] = useState<{ apps: AnalyticsApp[]; collector: string; collector_public: boolean } | null>(null)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
-    const load = () => api.analytics().then(setData).catch((e) => setError((e as Error).message))
+    const load = () => { if (document.visibilityState === 'visible') api.analytics().then(setData).catch((e) => setError((e as Error).message)) }
     load()
     const t = window.setInterval(load, 30000)
     return () => window.clearInterval(t)
   }, [])
   const total = (data?.apps ?? []).reduce((n, a) => n + a.stats.pageviews, 0)
+  const live = (data?.apps ?? []).reduce((n, a) => n + a.stats.live, 0)
   return (
     <div className="h-full overflow-y-auto scroll-thin arena-bg">
       <div className="w-full px-8 py-8 2xl:px-12">
         <PageHeader onBack={onBack} kicker="Tably Analytics" title={T('Analíticas', 'Analytics')}
           subtitle={T('Visitas, eventos y errores reales de cada app que publicaste. Sin cookies ni datos personales: cada app carga el snippet /a.js y las visitas llegan acá.', 'Real visits, events and errors of every app you published. No cookies or personal data: each app loads the /a.js snippet and the visits land here.')}
-          right={data && <span className="flex h-9 items-center gap-2 rounded-full border border-line bg-surface px-3.5 text-sm text-ink-2 shadow-sm"><BarChart3 size={15} /> {total} {T('visitas en total', 'visits in total')}</span>} />
+          right={data && <span className="flex h-9 items-center gap-3 rounded-full border border-line bg-surface px-3.5 text-sm text-ink-2 shadow-sm"><span className="flex items-center gap-1.5"><span className={`h-2 w-2 rounded-full ${live ? 'bg-ok animate-pulse' : 'bg-ink-4'}`} /> {live} {T('en vivo', 'live')}</span><span className="h-4 w-px bg-line" /><span className="flex items-center gap-1.5"><BarChart3 size={15} /> {total} {T('visitas en total', 'visits in total')}</span></span>} />
         {data && !data.collector_public && (
           <div className="mt-6 flex items-start gap-3 rounded-2xl border border-gold/40 bg-gold/10 px-4 py-3 text-[13px] text-ink-2">
             <AlertTriangle size={16} className="mt-0.5 shrink-0 text-gold" />
@@ -68,6 +70,7 @@ function AppCard({ a }: { a: AnalyticsApp }) {
           {T('Esta app todavía no tiene el snippet de analíticas, así que no registra visitas. En el constructor → Niveles → «Construir lo pendiente», el equipo lo instala (es el nivel 2); después volvé a publicar.', 'This app does not have the analytics snippet yet, so it records no visits. In the builder → Levels → "Build what is pending", the team installs it (it is level 2); then publish again.')}
         </div>
       )}
+      <LiveNow n={a.stats.live} pages={a.stats.live_pages} last30={a.stats.last_30m} />
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Tile label={T('Visitas', 'Page views')} value={a.stats.pageviews} />
         <Tile label={T('Últimos 7 días', 'Last 7 days')} value={a.visits_7d} />

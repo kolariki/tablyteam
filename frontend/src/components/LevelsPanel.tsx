@@ -62,6 +62,11 @@ export default function LevelsPanel() {
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [b.sessionId, b.id, b.status, b.cloudApp?.status, b.cloudApp?.version, b.versions.length])
+  // live visitors: refresh every 30 s while the panel is open (the snippet pings every 30 s from each open tab)
+  useEffect(() => {
+    const t = window.setInterval(() => { if (document.visibilityState === 'visible') load() }, 30000)
+    return () => window.clearInterval(t)
+  }, [b.sessionId, b.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const lv: LevelsInfo | null = data?.levels ?? b.levels
   if (!lv) return <div className="flex flex-1 items-center justify-center text-ink-3"><Loader2 size={18} className="animate-spin" /></div>
@@ -219,6 +224,7 @@ export default function LevelsPanel() {
           </div>
           {an?.site ? (
             <>
+              <LiveNow n={an.live} pages={an.live_pages} last30={an.last_30m} />
               <div className="mt-3 grid grid-cols-3 gap-2">
                 {[[T('Páginas vistas', 'Page views'), an.pageviews], [T('Eventos', 'Events'), an.events], [T('Errores', 'Errors'), an.errors]].map(([l, v]) => (
                   <div key={String(l)} className="rounded-xl border border-line bg-surface-2 px-3 py-2"><div className="text-[11px] text-ink-3">{l}</div><div className="font-mono text-xl font-semibold text-ink">{v}</div></div>
@@ -289,3 +295,22 @@ export default function LevelsPanel() {
 }
 
 export type { MarketListing }
+
+/** Amplitude-style «live now»: tabs that signalled in the last 2 minutes, the page each is on, and visits in the last 30 min. */
+export function LiveNow({ n, pages, last30 }: { n: number; pages: { path: string; n: number }[]; last30: number }) {
+  const T = useT()
+  return (
+    <div className={`mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border px-3 py-2.5 ${n ? 'border-ok/30 bg-ok/5' : 'border-line bg-surface-2'}`}>
+      <span className="flex items-center gap-2">
+        <span className="relative flex h-2.5 w-2.5">
+          {n > 0 && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-ok opacity-60" />}
+          <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${n ? 'bg-ok' : 'bg-ink-4'}`} />
+        </span>
+        <span className="font-mono text-[20px] font-semibold leading-none text-ink tabular-nums">{n}</span>
+        <span className="text-[12.5px] text-ink-2">{n === 1 ? T('persona en vivo ahora', 'person live now') : T('personas en vivo ahora', 'people live now')}</span>
+      </span>
+      {pages.length > 0 && <span className="flex min-w-0 flex-wrap gap-1.5">{pages.map((p) => <span key={p.path} className="rounded-full border border-line bg-surface px-2 py-0.5 font-mono text-[11px] text-ink-2">{p.path} · {p.n}</span>)}</span>}
+      <span className="ml-auto text-[11.5px] text-ink-3">{last30} {T('visitas en los últimos 30 min · se actualiza cada 30 s', 'visits in the last 30 min · refreshes every 30 s')}</span>
+    </div>
+  )
+}

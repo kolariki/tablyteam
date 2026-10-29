@@ -405,7 +405,7 @@ export interface LevelsInfo {
   market_ready: boolean
   visits: number
 }
-export interface AnalyticsStats { site: string | null; pageviews: number; events: number; errors: number; days: { day: string; n: number }[]; pages: { path: string; n: number }[]; top_events: { name: string; n: number }[]; last_errors: { name: string; ts: number }[] }
+export interface AnalyticsStats { site: string | null; pageviews: number; events: number; errors: number; live: number; live_pages: { path: string; n: number }[]; last_30m: number; days: { day: string; n: number }[]; pages: { path: string; n: number }[]; top_events: { name: string; n: number }[]; last_errors: { name: string; ts: number }[] }
 export interface MarketListing {
   id: string
   slug: string | null

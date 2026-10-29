@@ -33,6 +33,8 @@ with _db() as _c:
             site TEXT NOT NULL, ts REAL NOT NULL, kind TEXT NOT NULL, path TEXT, ref TEXT, ua TEXT, name TEXT)"""
     )
     _c.execute("CREATE INDEX IF NOT EXISTS analytics_hits_site ON analytics_hits (site, ts)")
+    if "sid" not in [r[1] for r in _c.execute("PRAGMA table_info(analytics_hits)")]:  # anonymous per-tab id: who is live right now
+        _c.execute("ALTER TABLE analytics_hits ADD COLUMN sid TEXT")
     _c.execute(
         """CREATE TABLE IF NOT EXISTS market_listings (
             id TEXT PRIMARY KEY, user_id TEXT NOT NULL, session_id TEXT NOT NULL, build_id TEXT NOT NULL, slug TEXT, title TEXT NOT NULL,
@@ -295,31 +297,39 @@ def team_block(ev: dict, slug: str | None, public_url: str) -> str:
 
 # ------------------------------------------------------------------------------------------------ analytics collector
 
+LIVE_WINDOW = 120  # a visitor is «live» if their tab pinged within the last 2 minutes (the snippet pings every 30 s while visible)
+
 SNIPPET_JS = r"""(function(){var s=document.currentScript;if(!s)return;var site=s.getAttribute('data-site');if(!site)return;
 var base=s.src.replace(/\/a\.js(\?.*)?$/,'');var q=[];var last='';
-function send(kind,name){try{var body=JSON.stringify({k:kind,n:name||null,p:location.pathname+location.search,r:document.referrer||null,t:Date.now()});
+var sid;try{sid=sessionStorage.getItem('_tbly');if(!sid){sid=Math.random().toString(36).slice(2,12);sessionStorage.setItem('_tbly',sid)}}catch(e){sid=Math.random().toString(36).slice(2,12)}
+function send(kind,name){try{var body=JSON.stringify({k:kind,n:name||null,p:location.pathname+location.search,r:document.referrer||null,t:Date.now(),s:sid});
 if(navigator.sendBeacon){navigator.sendBeacon(base+'/api/a/'+site,new Blob([body],{type:'text/plain'}))}else{fetch(base+'/api/a/'+site,{method:'POST',headers:{'content-type':'text/plain'},body:body,keepalive:true}).catch(function(){})}}catch(e){}}
 function page(){var k=location.pathname+location.search;if(k===last)return;last=k;send('pageview')}
 window.tably=window.tably||{};window.tably.track=function(name){send('event',String(name||'').slice(0,80))};
 document.addEventListener('click',function(e){var el=e.target&&e.target.closest?e.target.closest('[data-track]'):null;if(el)send('event',el.getAttribute('data-track'))},true);
 window.addEventListener('error',function(e){send('error',String(e&&e.message||'error').slice(0,120))});
 var ps=history.pushState;history.pushState=function(){ps.apply(this,arguments);setTimeout(page,0)};window.addEventListener('popstate',function(){setTimeout(page,0)});
+setInterval(function(){if(document.visibilityState==='visible')send('ping')},30000);
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')send('ping')});
 page();})();"""
 
 
 def record_hit(site: str, body: dict, ua: str | None) -> None:
     kind = str(body.get("k") or "pageview")[:16]
-    if kind not in ("pageview", "event", "error"):
+    if kind not in ("pageview", "event", "error", "ping"):
         return
+    sid = str(body.get("s") or "")[:16] or None
     with _db() as c:
-        c.execute("INSERT INTO analytics_hits (site, ts, kind, path, ref, ua, name) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                  (site[:80], time.time(), kind, str(body.get("p") or "/")[:300], (str(body.get("r"))[:300] if body.get("r") else None), (ua or "")[:200], (str(body.get("n"))[:80] if body.get("n") else None)))
+        if kind == "ping":  # presence only: one row per tab, refreshed (pings never count as visits)
+            c.execute("DELETE FROM analytics_hits WHERE site = ? AND kind = 'ping' AND sid = ?", (site[:80], sid))
+        c.execute("INSERT INTO analytics_hits (site, ts, kind, path, ref, ua, name, sid) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                  (site[:80], time.time(), kind, str(body.get("p") or "/")[:300], (str(body.get("r"))[:300] if body.get("r") else None), (ua or "")[:200], (str(body.get("n"))[:80] if body.get("n") else None), sid))
 
 
 def stats(site: str | None) -> dict:
     """What the owner sees: totals, last 14 days, top pages, events, errors."""
     if not site:
-        return {"site": None, "pageviews": 0, "events": 0, "errors": 0, "days": [], "pages": [], "top_events": [], "last_errors": []}
+        return {"site": None, "pageviews": 0, "events": 0, "errors": 0, "live": 0, "live_pages": [], "last_30m": 0, "days": [], "pages": [], "top_events": [], "last_errors": []}
     now = time.time()
     with _db() as c:
         tot = {k: n for k, n in c.execute("SELECT kind, COUNT(*) FROM analytics_hits WHERE site = ? GROUP BY kind", (site,))}
@@ -327,7 +337,16 @@ def stats(site: str | None) -> dict:
         pages = [{"path": p, "n": n} for p, n in c.execute("SELECT path, COUNT(*) n FROM analytics_hits WHERE site = ? AND kind = 'pageview' GROUP BY path ORDER BY n DESC LIMIT 8", (site,))]
         evs = [{"name": p, "n": n} for p, n in c.execute("SELECT name, COUNT(*) n FROM analytics_hits WHERE site = ? AND kind = 'event' GROUP BY name ORDER BY n DESC LIMIT 8", (site,))]
         errs = [{"name": p, "ts": t} for p, t in c.execute("SELECT name, ts FROM analytics_hits WHERE site = ? AND kind = 'error' ORDER BY ts DESC LIMIT 5", (site,))]
-    return {"site": site, "pageviews": tot.get("pageview", 0), "events": tot.get("event", 0), "errors": tot.get("error", 0), "days": days, "pages": pages, "top_events": evs, "last_errors": errs}
+        # live: distinct tabs with any signal in the window, and the page each one is on now
+        live_rows = c.execute("SELECT sid, path, MAX(ts) FROM analytics_hits WHERE site = ? AND sid IS NOT NULL AND ts >= ? GROUP BY sid", (site, now - LIVE_WINDOW)).fetchall()
+        last_30m = c.execute("SELECT COUNT(*) FROM analytics_hits WHERE site = ? AND kind = 'pageview' AND ts >= ?", (site, now - 1800)).fetchone()[0]
+        c.execute("DELETE FROM analytics_hits WHERE kind = 'ping' AND ts < ?", (now - 86400,))  # presence rows are only useful for a while
+    live_pages: dict[str, int] = {}
+    for _sid, path, _ts in live_rows:
+        live_pages[path or "/"] = live_pages.get(path or "/", 0) + 1
+    return {"site": site, "pageviews": tot.get("pageview", 0), "events": tot.get("event", 0), "errors": tot.get("error", 0),
+            "live": len(live_rows), "live_pages": [{"path": p, "n": n} for p, n in sorted(live_pages.items(), key=lambda x: -x[1])[:6]], "last_30m": last_30m,
+            "days": days, "pages": pages, "top_events": evs, "last_errors": errs}
 
 
 # ------------------------------------------------------------------------------------------------ marketplace
