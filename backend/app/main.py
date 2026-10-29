@@ -2604,24 +2604,30 @@ def analytics_snippet():
 
 @app.get("/api/analytics")
 def analytics_overview(user: User = CurrentUser):
-    """Tably Analytics for every app the user published: visits, events and errors of each, with the snippet to install."""
+    """Tably Analytics for every app the user published: visits, events and errors of each, whether the project has the
+    snippet and whether the version online already carries it (if not, the page offers to publish again)."""
     folder = auth.user_dir(user.id)
     out = []
     for app_ in cloudmod.list_apps(user.id):
-        title, session_id, installed = app_["slug"], None, False
+        title, session_id, installed, versions = app_["slug"], None, False, 0
         for p in folder.glob(f"*.build.{app_['build_id']}.json"):
-            try:
-                d = json.loads(p.read_text())
+            session_id = p.name.split(".build.")[0]
+            try:  # the live level checks of the project (the saved snapshot can be old)
+                b = _build_any(user, session_id, app_["build_id"])
+                title, versions = b.title or title, len(b.versions)
+                checks = {c["id"]: c["ok"] for lv in b.levels_eval().get("levels") or [] for c in lv["checks"]}
+                installed = bool(checks.get("analytics"))
             except Exception:  # noqa: BLE001
-                continue
-            title, session_id = d.get("title") or title, p.name.split(".build.")[0]
-            lv = d.get("levels") or {}  # the saved file has no contents: the level check «analytics» says whether the snippet is in
-            installed = (lv.get("level") or 0) >= 2 or (bool(lv) and not any(c.get("id") == "analytics" for c in lv.get("pending") or []) and lv.get("next") == 2)
+                pass
             break
         st = levelsmod.stats(app_["slug"])
+        installed = installed or st["pageviews"] > 0 or st["live"] > 0
         out.append({"slug": app_["slug"], "title": title, "url": app_.get("url"), "status": app_.get("status"), "provider": app_.get("provider"),
-                    "build_id": app_["build_id"], "session_id": session_id, "installed": installed or st["pageviews"] > 0 or st["live"] > 0, "stats": st,
-                    "visits_7d": levelsmod.hits_for(app_["slug"], time.time() - 7 * 86400)})
+                    "build_id": app_["build_id"], "session_id": session_id, "installed": installed,
+                    # the snippet is in the project but nothing ever arrived: most likely the version online is older (the
+                    # builder can add it without a new version number); publishing again is safe, it reuses the same app
+                    "needs_republish": installed and st["pageviews"] == 0 and st["live"] == 0 and ((app_.get("version") or 0) < versions or app_.get("status") == "live"),
+                    "stats": st, "visits_7d": levelsmod.hits_for(app_["slug"], time.time() - 7 * 86400)})
     return {"apps": out, "collector": cloudmod.public_url(), "collector_public": not re.match(r"https?://(localhost|127\.0\.0\.1)", cloudmod.public_url())}
 
 
@@ -2688,7 +2694,9 @@ async def build_levels_pending(session_id: str, build_id: str, body: dict | None
             if (ids and c["id"] in ids) or (not ids and lv["n"] == ev.get("next")):
                 changes.append(_level_change(b, c, lv["n"], site))
     if not changes:
-        raise HTTPException(400, "No hay nada pendiente que el constructor pueda resolver acá" if ids else "No hay nada pendiente que construir para el próximo nivel")
+        if body.get("focus") == "analytics":
+            raise HTTPException(400, "Las analíticas ya están instaladas en el proyecto: falta publicar de nuevo para que queden en línea")
+        raise HTTPException(400, "Eso ya está resuelto en el proyecto" if ids else "No hay nada pendiente que construir para el próximo nivel")
     b.apply_council(changes, "")
     return {"ok": True, "items": len(changes)}
 

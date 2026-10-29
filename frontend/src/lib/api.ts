@@ -435,6 +435,7 @@ export interface AnalyticsApp {
   build_id: string
   session_id: string | null
   installed: boolean
+  needs_republish: boolean  // the project has the snippet but the version online is older
   stats: AnalyticsStats
   visits_7d: number
 }

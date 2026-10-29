@@ -1,4 +1,4 @@
-import { AlertTriangle, BarChart3, ExternalLink, Hammer, Loader2, Wand2 } from 'lucide-react'
+import { AlertTriangle, BarChart3, CloudUpload, ExternalLink, Hammer, Loader2, Wand2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api, type AnalyticsApp } from '../lib/api'
 import { reconnectBuild } from '../buildStore'
@@ -56,6 +56,20 @@ function AppCard({ a }: { a: AnalyticsApp }) {
   const max = Math.max(1, ...days.map((d) => d.n))
   const open = () => a.session_id && useArena.getState().set({ pendingBuild: { buildId: a.build_id, sessionId: a.session_id } })
   const [installing, setInstalling] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  // the snippet is in the project but not online yet: publish the current version from here
+  const publish = async () => {
+    if (!a.session_id) return
+    setPublishing(true)
+    try {
+      await api.cloudPublish(a.session_id, a.build_id)
+      toast.ok(tr('Publicando la versión con analíticas', 'Publishing the version with analytics'), tr('En unos minutos está en línea y empiezan a llegar las visitas.', 'In a few minutes it is live and visits start coming in.'))
+    } catch (e) {
+      toast.error(tr('No se pudo publicar', 'Could not publish'), (e as Error).message)
+    } finally {
+      setPublishing(false)
+    }
+  }
   // one click: the builder installs the snippet (and the rest of level 2), and the user lands in the builder to watch it
   const install = async () => {
     if (!a.session_id) return
@@ -82,6 +96,16 @@ function AppCard({ a }: { a: AnalyticsApp }) {
         </div>
         {a.session_id && <button onClick={open} className="flex h-8 items-center gap-1.5 rounded-full border border-line px-3 text-[12.5px] text-ink-2 transition hover:border-accent hover:text-accent"><Hammer size={13} /> {T('Abrir en el constructor', 'Open in the builder')}</button>}
       </div>
+      {a.needs_republish && (
+        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-accent/30 bg-accent-soft/40 px-3.5 py-2.5 text-[12.5px] text-ink-2">
+          <span className="min-w-0 flex-1">{a.status === 'building' || a.status === 'deploying' ? T('Publicando la versión con analíticas… en unos minutos empiezan a llegar las visitas.', 'Publishing the version with analytics… visits start coming in within a few minutes.') : T('Las analíticas ya están instaladas en el proyecto, pero la versión en línea es anterior. Publicala para empezar a medir.', 'Analytics are already installed in the project, but the version online is older. Publish it to start measuring.')}</span>
+          {a.session_id && a.status !== 'building' && a.status !== 'deploying' && (
+            <button onClick={publish} disabled={publishing} className="flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[12.5px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-50">
+              {publishing ? <Loader2 size={13} className="animate-spin" /> : <CloudUpload size={13} />} {T('Publicar ahora', 'Publish now')}
+            </button>
+          )}
+        </div>
+      )}
       {!a.installed && (
         <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-accent/30 bg-accent-soft/40 px-3.5 py-2.5 text-[12.5px] text-ink-2">
           <span className="min-w-0 flex-1">{T('Esta app todavía no tiene las analíticas instaladas, así que no registra visitas. Un clic y el equipo las instala; después la publicás de nuevo.', 'This app does not have analytics installed yet, so it records no visits. One click and the team installs them; then you publish it again.')}</span>
