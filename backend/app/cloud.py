@@ -359,6 +359,25 @@ def _rw_has(rw: str, sub: str, flag: str) -> bool:
     return bool(re.search(rf"(^|\s){re.escape(flag)}\b", _RW_HELP[sub], re.M))
 
 
+async def _wait_until_up(url: str, logf: Log, timeout: float = 900) -> bool:
+    """The app answers on its URL (anything but Railway's own «not found / starting» responses)."""
+    start, last_note = time.time(), 0.0
+    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as cx:
+        while time.time() - start < timeout:
+            try:
+                r = await cx.get(url)
+                fallback = r.headers.get("x-railway-fallback") or "application not found" in r.text[:2000].lower()
+                if r.status_code < 500 and not fallback:
+                    return True
+            except httpx.HTTPError:
+                pass
+            if time.time() - last_note > 60:
+                last_note = time.time()
+                await _call(logf, f"· esperando a que la app responda ({int(time.time() - start) // 60} min)…")
+            await asyncio.sleep(10)
+    return False
+
+
 def _last_line(text: str) -> str:
     return (text.strip().splitlines() or ["?"])[-1][:300]
 
@@ -381,7 +400,7 @@ async def _publish_railway(root: Path, cls: dict, slug: str, values: dict[str, s
     name = f"tably-{slug[:20].rstrip('-')}-{hashlib.sha1(slug.encode()).hexdigest()[:5]}"
     linked = False
     if meta.get("project"):  # republish: link this folder to the project created the first time
-        code, _ = await deploymod._stream([rw, "link", "--project", meta["project"], "--service", RAILWAY_SERVICE], d, renv, logf, timeout=120)
+        code, _ = await deploymod._stream([rw, "link", "--project", meta["project"], "--environment", "production", "--service", RAILWAY_SERVICE], d, renv, logf, timeout=120)
         linked = code == 0
     if not linked:
         ws = env("TABLY_CLOUD_RAILWAY_WORKSPACE")
@@ -396,7 +415,7 @@ async def _publish_railway(root: Path, cls: dict, slug: str, values: dict[str, s
             if re.search(r"unauthori[sz]ed|not authori[sz]ed|railway login", text, re.I):
                 return {"ok": False, "url": None, "error": "Railway rechazó el token: para crear proyectos hace falta un token de CUENTA. En railway.com/account/tokens creá uno con Workspace «No workspace» y reemplazalo en Configuración → Deploy (los tokens de workspace o de proyecto no alcanzan)."}
             return {"ok": False, "url": None, "error": "railway init falló: " + _last_line(text)}
-        m = re.search(r'"(?:id|projectId)"\s*:\s*"([0-9a-f-]{20,})"', text)
+        m = re.search(r'"(?:id|projectId)"\s*:\s*"([0-9a-f-]{20,})"', text) or re.search(r"railway\.com/project/([0-9a-f-]{36})", text)
         if not m:  # older CLIs print no JSON on init: the linked project's id comes from status
             _, st_text = await deploymod._stream([rw, "status", "--json"], d, renv, lambda _l: None, timeout=60)
             m = re.search(r'"id"\s*:\s*"([0-9a-f-]{20,})"', st_text)
@@ -425,8 +444,9 @@ async def _publish_railway(root: Path, cls: dict, slug: str, values: dict[str, s
     code, text = await deploymod._stream(vargs, d, renv, logf, timeout=120)
     if code != 0:
         await _call(logf, "⚠ no se pudieron cargar las variables: " + _last_line(text))
-    await _call(logf, "$ railway up --ci")
-    code, text = await deploymod._stream([rw, "up", "--service", RAILWAY_SERVICE, "--ci"], d, renv, logf, timeout=1800)
+    await _call(logf, "$ railway up --detach")
+    code, text = await deploymod._stream([rw, "up", "--service", RAILWAY_SERVICE, "--detach"], d, renv, logf, timeout=900)
+    logs = (re.search(r"https://railway\.com/project/\S+", text) or [None])[0]
     if code != 0:
         return {"ok": False, "url": None, "error": "railway up falló: " + _last_line(text), "railway": meta}
     url = meta.get("url")
@@ -437,6 +457,10 @@ async def _publish_railway(root: Path, cls: dict, slug: str, values: dict[str, s
         meta["url"] = url
     if not url:
         return {"ok": False, "url": None, "error": "La app quedó desplegada pero Railway no devolvió la URL pública", "railway": meta}
+    # the build runs on Railway (minutes): wait until the app answers on its URL instead of following the log stream
+    await _call(logf, "· Railway está construyendo la imagen y arrancando la app (puede tardar varios minutos)…")
+    if not await _wait_until_up(url, logf):
+        return {"ok": False, "url": None, "error": "La app no respondió en su URL después de 15 minutos. Mirá el build en Railway" + (f": {logs}" if logs else ".") + " Cuando termine, tocá «Publicar» de nuevo (reusa el mismo proyecto).", "railway": meta}
     await _call(logf, f"✓ publicada en {url}")
     return {"ok": True, "url": url, "railway": meta}
 
