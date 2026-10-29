@@ -24,6 +24,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
+from . import analytics as _analytics  # noqa: F401  (creates analytics_people before an import)
 from .auth import _db
 from .config import DATA_DIR
 from .gitserver import GIT_ROOT
@@ -113,6 +114,11 @@ def export_bundle(user_id: str, code: str) -> tuple[bytes, dict]:
                 hits += [{k: _encode(v) for k, v in dict(r).items()} for r in c.execute("SELECT * FROM analytics_hits WHERE site = ?", (s,)).fetchall()]
             if hits:
                 rows["analytics_hits"] = hits
+            people = []
+            for s_ in slugs:
+                people += [{k: _encode(v) for k, v in dict(r).items()} for r in c.execute("SELECT * FROM analytics_people WHERE site = ?", (s_,)).fetchall()]
+            if people:
+                rows["analytics_people"] = people
         summary["rows"] = {k: len(v) for k, v in rows.items()}
         manifest = {"format": FORMAT, "user_id": user_id, "exported": time.time(),
                     "roots": {"sessions": str(DATA_DIR / user_id), "builds": str(BUILD_ROOT / user_id), "git": str(GIT_ROOT / user_id)}}
@@ -185,6 +191,14 @@ def import_bundle(user_id: str, blob: bytes, code: str) -> dict:
                     keys = [k for k in it if k in cols]
                     c.execute(f"INSERT INTO analytics_hits ({','.join(keys)}) VALUES ({','.join('?' * len(keys))})", [_decode(it[k]) for k in keys])
                     n += 1
+                summary["rows"][name] = n
+                continue
+            if name == "analytics_people":
+                cols = [r[1] for r in c.execute("PRAGMA table_info(analytics_people)")]
+                n = 0
+                for it in items:
+                    keys = [k for k in it if k in cols]
+                    n += c.execute(f"INSERT OR IGNORE INTO analytics_people ({','.join(keys)}) VALUES ({','.join('?' * len(keys))})", [_decode(it[k]) for k in keys]).rowcount
                 summary["rows"][name] = n
                 continue
             if name not in tables:

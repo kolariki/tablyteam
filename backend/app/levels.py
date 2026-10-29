@@ -310,30 +310,47 @@ def team_block(ev: dict, slug: str | None, public_url: str) -> str:
 LIVE_WINDOW = 120  # a visitor is «live» if their tab pinged within the last 2 minutes (the snippet pings every 30 s while visible)
 
 SNIPPET_JS = r"""(function(){var s=document.currentScript;if(!s)return;var site=s.getAttribute('data-site');if(!site)return;
-var base=s.src.replace(/\/a\.js(\?.*)?$/,'');var q=[];var last='';
-var sid;try{sid=sessionStorage.getItem('_tbly');if(!sid){sid=Math.random().toString(36).slice(2,12);sessionStorage.setItem('_tbly',sid)}}catch(e){sid=Math.random().toString(36).slice(2,12)}
-function send(kind,name){try{var body=JSON.stringify({k:kind,n:name||null,p:location.pathname+location.search,r:document.referrer||null,t:Date.now(),s:sid});
+if(!/^https?:$/.test(location.protocol))return;
+var base=s.src.replace(/\/a\.js(\?.*)?$/,'');var last='';
+function rid(){return Math.random().toString(36).slice(2,12)}
+var sid,vid;try{sid=sessionStorage.getItem('_tbly');if(!sid){sid=rid();sessionStorage.setItem('_tbly',sid)}}catch(e){sid=rid()}
+try{vid=localStorage.getItem('_tblyv');if(!vid){vid=rid();localStorage.setItem('_tblyv',vid)}}catch(e){vid=sid}
+var tz='';try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||''}catch(e){}
+function send(kind,name,props){try{var body=JSON.stringify({k:kind,n:name||null,p:location.pathname+location.search+(location.hash&&location.hash.length<60?location.hash:''),r:document.referrer||null,t:Date.now(),s:sid,v:vid,tz:tz,l:navigator.language||'',w:(screen&&screen.width?screen.width+'x'+screen.height:''),props:props||null});
 if(navigator.sendBeacon){navigator.sendBeacon(base+'/api/a/'+site,new Blob([body],{type:'text/plain'}))}else{fetch(base+'/api/a/'+site,{method:'POST',headers:{'content-type':'text/plain'},body:body,keepalive:true}).catch(function(){})}}catch(e){}}
-function page(){var k=location.pathname+location.search;if(k===last)return;last=k;send('pageview')}
-window.tably=window.tably||{};window.tably.track=function(name){send('event',String(name||'').slice(0,80))};
-document.addEventListener('click',function(e){var el=e.target&&e.target.closest?e.target.closest('[data-track]'):null;if(el)send('event',el.getAttribute('data-track'))},true);
+function page(){var k=location.pathname+location.search+location.hash;if(k===last)return;last=k;send('pageview')}
+window.tably=window.tably||{};window.tably.track=function(name,props){send('event',String(name||'').slice(0,80),props)};
+window.tably.identify=function(p){if(p&&typeof p==='object')send('identify',null,{email:p.email||'',name:p.name||'',id:p.id||''})};
+function label(el){var t=el.getAttribute('aria-label')||el.getAttribute('title')||(el.innerText||el.value||'').replace(/\s+/g,' ').trim()||el.id||el.tagName.toLowerCase();return String(t).slice(0,60)}
+document.addEventListener('click',function(e){var t=e.target;if(!t||!t.closest)return;var tr=t.closest('[data-track]');if(tr){send('event',tr.getAttribute('data-track'));return}
+var el=t.closest('a,button,[role=button],[role=tab],[role=menuitem],summary,input[type=submit],input[type=button],label');if(el&&!(el.tagName==='INPUT'&&/password|text|email/.test(el.type)))send('click',label(el))},true);
 window.addEventListener('error',function(e){send('error',String(e&&e.message||'error').slice(0,120))});
-var ps=history.pushState;history.pushState=function(){ps.apply(this,arguments);setTimeout(page,0)};window.addEventListener('popstate',function(){setTimeout(page,0)});
+var ps=history.pushState;history.pushState=function(){ps.apply(this,arguments);setTimeout(page,0)};window.addEventListener('popstate',function(){setTimeout(page,0)});window.addEventListener('hashchange',function(){setTimeout(page,0)});
 setInterval(function(){if(document.visibilityState==='visible')send('ping')},30000);
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')send('ping')});
 page();})();"""
 
 
 def record_hit(site: str, body: dict, ua: str | None) -> None:
+    from . import analytics as an
+
     kind = str(body.get("k") or "pageview")[:16]
-    if kind not in ("pageview", "event", "error", "ping"):
+    if kind not in ("pageview", "event", "error", "ping", "click", "identify"):
         return
     sid = str(body.get("s") or "")[:16] or None
+    x = an.enrich(body, ua)
+    if x["device"] == "bot":
+        return
+    if kind == "identify":
+        an.identify(site[:80], x["vid"] or sid, body.get("props") if isinstance(body.get("props"), dict) else None)
+        return
     with _db() as c:
         if kind == "ping":  # presence only: one row per tab, refreshed (pings never count as visits)
             c.execute("DELETE FROM analytics_hits WHERE site = ? AND kind = 'ping' AND sid = ?", (site[:80], sid))
-        c.execute("INSERT INTO analytics_hits (site, ts, kind, path, ref, ua, name, sid) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                  (site[:80], time.time(), kind, str(body.get("p") or "/")[:300], (str(body.get("r"))[:300] if body.get("r") else None), (ua or "")[:200], (str(body.get("n"))[:80] if body.get("n") else None), sid))
+        c.execute("""INSERT INTO analytics_hits (site, ts, kind, path, ref, ua, name, sid, vid, country, device, os, browser, lang, tz, screen, props)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                  (site[:80], time.time(), kind, str(body.get("p") or "/")[:300], (str(body.get("r"))[:300] if body.get("r") else None), (ua or "")[:200],
+                   (str(body.get("n"))[:80] if body.get("n") else None), sid, x["vid"], x["country"], x["device"], x["os"], x["browser"], x["lang"], x["tz"], x["screen"], x["props"]))
 
 
 def stats(site: str | None) -> dict:

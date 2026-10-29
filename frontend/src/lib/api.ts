@@ -162,7 +162,7 @@ export const api = {
   addEmployeeUrl: (id: string, url: string) => j<{ docs: KnowledgeDoc[] }>(post(`/api/team/employees/${id}/docs`, { url })),
   addEmployeeFile: (id: string, file: File) => { const form = new FormData(); form.append('file', file, file.name); return j<{ docs: KnowledgeDoc[] }>(authed(`/api/team/employees/${id}/docs/file`, { method: 'POST', body: form })) },
   deleteEmployeeDoc: (id: string, did: string) => j<{ docs: KnowledgeDoc[] }>(authed(`/api/team/employees/${id}/docs/${did}`, { method: 'DELETE' })),
-  buildLevelPending: (sessionId: string, buildId: string, scope?: { focus?: 'analytics'; ids?: string[] }) => j<{ ok: boolean; items: number }>(post(`/api/sessions/${sessionId}/builds/${buildId}/levels/build-pending`, scope ?? {})),
+  buildLevelPending: (sessionId: string, buildId: string, scope?: { focus?: 'analytics' | 'identify'; ids?: string[] }) => j<{ ok: boolean; items: number }>(post(`/api/sessions/${sessionId}/builds/${buildId}/levels/build-pending`, scope ?? {})),
   accountExport: async () => {
     const r = await authed('/api/account/export', { method: 'POST' })
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail ?? `HTTP ${r.status}`)
@@ -170,6 +170,7 @@ export const api = {
     return { blob: await r.blob(), code: r.headers.get('x-tably-code') ?? '', name, summary: JSON.parse(r.headers.get('x-tably-summary') ?? '{}') as { session_files: number; project_files: number; rows: Record<string, number> } }
   },
   accountImport: (file: File, code: string) => { const form = new FormData(); form.append('file', file, file.name); form.append('code', code); return j<{ ok: boolean; files: number; skipped_files: number; rows: Record<string, number> }>(authed('/api/account/import', { method: 'POST', body: form })) },
+  analyticsDetail: (slug: string, days: number) => j<AnalyticsDetail>(authed(`/api/analytics/${slug}?days=${days}`)),
   analytics: () => j<{ apps: AnalyticsApp[]; collector: string; collector_public: boolean }>(authed('/api/analytics')),
   teamScores: () => j<{ roles: RoleScore[] }>(authed('/api/team/scores')),
   teamMemoryDecide: (id: string, action: 'accept' | 'dismiss' | 'edit' | 'forget', text?: string) => j<TeamMemory>(post(`/api/team/memory/${id}`, { action, text })),
@@ -445,6 +446,18 @@ export interface AnalyticsApp {
   needs_republish: boolean  // the project has the snippet but the version online is older
   stats: AnalyticsStats
   visits_7d: number
+}
+export interface AnalyticsRow { key: string; n: number }
+export interface AnalyticsPerson { id: string; email: string | null; name: string | null; first_seen: number; last_seen: number; pageviews: number; actions: number; sessions: number; country: string | null; device: string | null; os: string | null; browser: string | null }
+export interface AnalyticsDetail {
+  site: string
+  days: number
+  kpis: { visitors: number; sessions: number; pageviews: number; pages_per_session: number; events: number; clicks: number; errors: number; identified: number; live: number }
+  series: { day: string; visitors: number; pageviews: number; sessions: number }[]
+  countries: AnalyticsRow[]; devices: AnalyticsRow[]; os: AnalyticsRow[]; browsers: AnalyticsRow[]; referrers: AnalyticsRow[]
+  pages: AnalyticsRow[]; clicks: AnalyticsRow[]; events: AnalyticsRow[]; errors: AnalyticsRow[]
+  people: AnalyticsPerson[]
+  live: { path: string; country: string | null; device: string | null; ts: number }[]
 }
 export interface LevelsPayload { levels: LevelsInfo; analytics: AnalyticsStats; app: CloudApp | null; listing: MarketListing | null; snippet: string }
 export interface CloudDb { provider: string; ok: boolean; vars: string[]; host: string | null; ts: number }

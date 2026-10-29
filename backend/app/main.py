@@ -28,6 +28,7 @@ import hashlib
 import logging
 import re
 import secrets
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
@@ -41,6 +42,7 @@ from . import memory as memorymod
 from . import scores as scoresmod
 from . import team as teammod
 from . import portability
+from . import analytics as analyticsmod
 from . import observability as obs
 from .tasks import spawn
 from . import research
@@ -2678,6 +2680,16 @@ async def analytics_overview(user: User = CurrentUser):
     return {"apps": out, "collector": cloudmod.public_url(), "collector_public": not re.match(r"https?://(localhost|127\.0\.0\.1)", cloudmod.public_url())}
 
 
+@app.get("/api/analytics/{slug}")
+def analytics_detail(slug: str, days: int = 30, user: User = CurrentUser):
+    """One app's detailed analytics: visitors, sessions, countries, devices, sources, pages, what people tap, who they are."""
+    app_ = next((a for a in cloudmod.list_apps(user.id) if a["slug"] == slug), None)
+    if not app_:
+        raise HTTPException(404)
+    own = urlparse(app_.get("url") or "").hostname
+    return analyticsmod.detail(slug, max(1, min(int(days), 365)), own)
+
+
 @app.post("/api/a/{site}")
 async def analytics_hit(site: str, request: Request):
     """Beacon from a published app (text/plain so there is no preflight). Unauthenticated by design; one row per hit."""
@@ -2711,8 +2723,8 @@ def build_levels(session_id: str, build_id: str, user: User = CurrentUser):
 def _level_change(b, check: dict, level: int, site: str) -> dict:
     """A pending level check as a request for the builder; the analytics ones carry the exact snippet (any level)."""
     if check["id"] == "analytics":
-        text = b.tx(f"Instalá Tably Analytics: en cada página HTML (o en el layout raíz que las envuelve) agregá exactamente <script defer src=\"{cloudmod.public_url()}/a.js\" data-site=\"{site}\"></script>. Si ya hay un snippet de /a.js apuntando a otra dirección (por ejemplo localhost), reemplazalo por este en TODOS los archivos, incluidos los scripts que generan páginas. Registra visitas, gente en vivo y errores solo; no uses cookies ni otro analytics.",
-                    f"Install Tably Analytics: on every HTML page (or the root layout that wraps them) add exactly <script defer src=\"{cloudmod.public_url()}/a.js\" data-site=\"{site}\"></script>. If there is already an /a.js snippet pointing elsewhere (e.g. localhost), replace it with this one in EVERY file, including scripts that generate pages. It records visits, live visitors and errors by itself; use no cookies or other analytics.")
+        text = b.tx(f"Instalá Tably Analytics: en cada página HTML (o en el layout raíz que las envuelve) agregá exactamente <script defer src=\"{cloudmod.public_url()}/a.js\" data-site=\"{site}\"></script>. Si ya hay un snippet de /a.js apuntando a otra dirección (por ejemplo localhost), reemplazalo por este en TODOS los archivos, incluidos los scripts que generan páginas. Registra visitas, clics, gente en vivo y errores solo; no uses cookies ni otro analytics. Si la app tiene usuarios, donde ya sabe quién es (registro, inicio de sesión, sesión abierta) llamá window.tably && window.tably.identify({ email, name, id }).",
+                    f"Install Tably Analytics: on every HTML page (or the root layout that wraps them) add exactly <script defer src=\"{cloudmod.public_url()}/a.js\" data-site=\"{site}\"></script>. If there is already an /a.js snippet pointing elsewhere (e.g. localhost), replace it with this one in EVERY file, including scripts that generate pages. It records visits, clicks, live visitors and errors by itself; use no cookies or other analytics. If the app has users, wherever it already knows who they are (sign up, log in, open session) call window.tably && window.tably.identify({ email, name, id }).")
     elif check["id"] == "events":
         text = b.tx("Marcá al menos 3 acciones clave del producto (registro, crear, pagar, etc.) con data-track=\"nombre\" en el botón o tably.track('nombre') en el código.",
                     "Mark at least 3 key product actions (sign up, create, pay, etc.) with data-track=\"name\" on the button or tably.track('name') in code.")
@@ -2733,6 +2745,11 @@ async def build_levels_pending(session_id: str, build_id: str, body: dict | None
     site = (cloudmod.get_app(user.id, b.id) or {}).get("slug") or "<slug-de-la-app>"
     body = body or {}
     ids = set(body.get("ids") or []) | ({"analytics", "events"} if body.get("focus") == "analytics" else set())
+    if body.get("focus") == "identify":  # not a level check: who the signed-in users are, for the analytics «people» list
+        b.apply_council([{"severity": "mejora", "role": "Tably Analytics", "text": b.tx(
+            "Identificá a los usuarios en Tably Analytics: donde la app ya sabe quién es el usuario (al registrarse, al iniciar sesión y al cargar la app con la sesión abierta) llamá window.tably && window.tably.identify({ email, name, id }) con los datos que la app ya tiene; nunca contraseñas ni datos sensibles. Si la app no tiene usuarios, no hagas nada. Agregá a la política de privacidad (si existe) que se miden visitas y, para usuarios registrados, su email y nombre.",
+            "Identify users in Tably Analytics: wherever the app already knows who the user is (sign up, log in and app load with an open session) call window.tably && window.tably.identify({ email, name, id }) with the data the app already has; never passwords or sensitive data. If the app has no users, do nothing. Add to the privacy policy (if there is one) that visits are measured and, for registered users, their email and name.")}], "")
+        return {"ok": True, "items": 1}
     changes = []
     for lv in ev.get("levels") or []:
         for c in lv["checks"]:

@@ -5,6 +5,7 @@ import { reconnectBuild } from '../buildStore'
 import { tr, useT } from '../lib/i18n'
 import { toast } from './Toast'
 import { useArena } from '../store'
+import AnalyticsDetail from './AnalyticsDetail'
 import { LiveNow } from './LevelsPanel'
 import PageHeader from './PageHeader'
 
@@ -19,6 +20,8 @@ export default function AnalyticsPage({ onBack }: { onBack: () => void }) {
     const t = window.setInterval(load, 30000)
     return () => window.clearInterval(t)
   }, [])
+  const [open, setOpen] = useState<string | null>(null)
+  const openApp = data?.apps.find((a) => a.slug === open) ?? null
   const total = (data?.apps ?? []).reduce((n, a) => n + a.stats.pageviews, 0)
   const live = (data?.apps ?? []).reduce((n, a) => n + a.stats.live, 0)
   return (
@@ -36,7 +39,8 @@ export default function AnalyticsPage({ onBack }: { onBack: () => void }) {
         {error && <div className="mt-6 rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-[13px] text-danger">{error}</div>}
         {!data && !error && <div className="mt-10 flex items-center gap-2 text-sm text-ink-3"><Loader2 size={15} className="animate-spin" /> {T('Cargando…', 'Loading…')}</div>}
         {data && !data.apps.length && <div className="mt-8 rounded-2xl border border-dashed border-line px-6 py-12 text-center text-[14px] text-ink-3">{T('Todavía no publicaste ninguna app. Cuando publiques una con Tably Cloud, sus visitas aparecen acá.', 'You have not published any app yet. Once you publish one with Tably Cloud, its visits show up here.')}</div>}
-        <div className="mt-8 space-y-5">{data?.apps.map((a) => <AppCard key={a.slug} a={a} />)}</div>
+        {openApp ? <div className="mt-8"><AnalyticsDetail app={openApp} onBack={() => setOpen(null)} /></div>
+          : <div className="mt-8 space-y-5">{data?.apps.map((a) => <AppCard key={a.slug} a={a} onDetail={() => setOpen(a.slug)} />)}</div>}
       </div>
     </div>
   )
@@ -50,7 +54,7 @@ function last14(days: { day: string; n: number }[]) {
   })
 }
 
-function AppCard({ a }: { a: AnalyticsApp }) {
+function AppCard({ a, onDetail }: { a: AnalyticsApp; onDetail: () => void }) {
   const T = useT()
   const days = last14(a.stats.days)
   const max = Math.max(1, ...days.map((d) => d.n))
@@ -94,6 +98,7 @@ function AppCard({ a }: { a: AnalyticsApp }) {
             <span>· {a.status === 'live' ? T('en línea', 'live') : a.status === 'deploying' ? T('desplegando', 'deploying') : a.status}</span>
           </div>
         </div>
+        <button onClick={onDetail} className="flex h-8 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[12.5px] font-semibold text-white shadow-sm transition hover:brightness-110"><BarChart3 size={13} /> {T('Ver detalle', 'See details')}</button>
         {a.session_id && <button onClick={open} className="flex h-8 items-center gap-1.5 rounded-full border border-line px-3 text-[12.5px] text-ink-2 transition hover:border-accent hover:text-accent"><Hammer size={13} /> {T('Abrir en el constructor', 'Open in the builder')}</button>}
       </div>
       {a.needs_republish && (
