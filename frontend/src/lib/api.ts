@@ -368,10 +368,10 @@ export interface ServiceVar {
 
 export interface CloudStatus {
   static: 'local' | 'cloudflare'
-  server: 'fly' | null
+  server: 'fly' | 'railway' | null
   database: 'neon' | null
   auth: 'supabase' | null
-  missing: Record<'cloudflare' | 'fly' | 'neon' | 'supabase', string | null>
+  missing: Record<'cloudflare' | 'fly' | 'neon' | 'supabase', string | null> & { railway?: string | null }
   public_url: string
 }
 /** Notion tickets resolved by the team. */

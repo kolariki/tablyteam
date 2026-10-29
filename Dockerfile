@@ -13,7 +13,7 @@ ENV DEBIAN_FRONTEND=noninteractive PYTHONUNBUFFERED=1
 # node (for the agents, builds and Expo/Vite projects), git (own repos), chromium (reference captures)
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates git chromium zip unzip \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y --no-install-recommends nodejs \
-    && npm install -g @anthropic-ai/claude-code @openai/codex pnpm \
+    && npm install -g @anthropic-ai/claude-code @openai/codex pnpm @railway/cli \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app/backend

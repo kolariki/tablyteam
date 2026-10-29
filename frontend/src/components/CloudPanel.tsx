@@ -17,6 +17,7 @@ const PROVIDER_LABEL: Record<string, [string, string]> = {
   local: ['Tably Cloud · servidor propio', 'Tably Cloud · own server'],
   cloudflare: ['Tably Cloud · Cloudflare', 'Tably Cloud · Cloudflare'],
   fly: ['Tably Cloud · Fly Machines', 'Tably Cloud · Fly Machines'],
+  railway: ['Tably Cloud · Railway', 'Tably Cloud · Railway'],
 }
 
 const infoCache = new Map<string, CloudInfo>()
@@ -153,8 +154,8 @@ export default function CloudPanel() {
         <Section
           icon={<Globe size={17} />}
           title={live ? T('Tu app está publicada', 'Your app is published') : T('Hosting', 'Hosting')}
-          hint={live ? undefined : st?.static === 'cloudflare' ? T('Estáticos en Cloudflare bajo nuestro dominio; apps con servidor en Fly Machines.', 'Static sites on Cloudflare under our domain; server apps on Fly Machines.') : T('Estáticos servidos por Tably Cloud al instante. Apps con servidor: según la instalación.', 'Static sites served by Tably Cloud instantly. Server apps: depends on the installation.')}
-          right={app?.provider && <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-2.5 py-0.5 text-[11.5px] text-ink-3">{app.provider === 'cloudflare' ? <ProviderLogo provider="cloudflare" size={12} /> : app.provider === 'fly' ? <Server size={12} /> : <Globe size={12} />} {T(...(PROVIDER_LABEL[app.provider] ?? [app.provider, app.provider]))}</span>}
+          hint={live ? undefined : st?.static === 'cloudflare' ? T('Estáticos en Cloudflare bajo nuestro dominio; apps con servidor en ' + (st?.server === 'railway' ? 'Railway' : 'Fly Machines') + '.', 'Static sites on Cloudflare under our domain; server apps on ' + (st?.server === 'railway' ? 'Railway' : 'Fly Machines') + '.') : st?.server === 'railway' ? T('Estáticos servidos por Tably Cloud al instante. Apps con servidor: en Railway, con su propia base de datos.', 'Static sites served by Tably Cloud instantly. Server apps: on Railway, with their own database.') : T('Estáticos servidos por Tably Cloud al instante. Apps con servidor: según la instalación.', 'Static sites served by Tably Cloud instantly. Server apps: depends on the installation.')}
+          right={app?.provider && <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-2.5 py-0.5 text-[11.5px] text-ink-3">{app.provider === 'cloudflare' ? <ProviderLogo provider="cloudflare" size={12} /> : app.provider === 'fly' || app.provider === 'railway' ? <Server size={12} /> : <Globe size={12} />} {T(...(PROVIDER_LABEL[app.provider] ?? [app.provider, app.provider]))}</span>}
         >
           {live && app?.url && (
             <a href={app.url} target="_blank" rel="noreferrer" className="group flex items-center gap-3 rounded-xl border border-accent/30 bg-accent-soft/50 px-4 py-3 transition hover:border-accent">
@@ -179,7 +180,7 @@ export default function CloudPanel() {
             )}
           </div>
           {live && info && app && info.version > (app.version ?? 0) && <p className="mt-2 text-[12px] text-gold">{T('Hay una versión más nueva que la publicada', 'There is a newer version than the published one')} (v{info.version} vs v{app.version}).</p>}
-          {!live && !publishing && st && !st.server && <p className="mt-2 text-[12px] leading-snug text-ink-4">{T('Las apps con servidor propio necesitan', 'Apps with their own server need')} {st.missing.fly}. {T('Mientras tanto corrélas en «App real» o llevalas a Railway.', 'Meanwhile run them in "Real app" or take them to Railway.')}</p>}
+          {!live && !publishing && st && !st.server && <p className="mt-2 text-[12px] leading-snug text-ink-4">{T('Las apps con servidor propio necesitan', 'Apps with their own server need')} {st.missing.railway ?? st.missing.fly}. {T('Mientras tanto corrélas en «App real» o llevalas a Railway.', 'Meanwhile run them in "Real app" or take them to Railway.')}</p>}
           <Terminal lines={b.cloudLogs.length ? b.cloudLogs : info?.app?.log ?? app?.log ?? []} open={logOpen} onToggle={() => setLogOpen((v) => !v)} live={publishing} />
         </Section>
 
