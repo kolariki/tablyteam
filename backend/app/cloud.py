@@ -391,6 +391,8 @@ async def _publish_railway(root: Path, cls: dict, slug: str, values: dict[str, s
             args += ["--json"]
         code, text = await deploymod._stream(args, d, renv, logf, timeout=120)
         if code != 0:
+            if re.search(r"unauthori[sz]ed|not authori[sz]ed|railway login", text, re.I):
+                return {"ok": False, "url": None, "error": "Railway rechazó el token: para crear proyectos hace falta un token de CUENTA. En railway.com/account/tokens creá uno con Workspace «No workspace» y reemplazalo en Configuración → Deploy (los tokens de workspace o de proyecto no alcanzan)."}
             return {"ok": False, "url": None, "error": "railway init falló: " + _last_line(text)}
         m = re.search(r'"(?:id|projectId)"\s*:\s*"([0-9a-f-]{20,})"', text)
         if not m:  # older CLIs print no JSON on init: the linked project's id comes from status
