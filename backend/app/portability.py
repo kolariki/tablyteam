@@ -119,6 +119,11 @@ def export_bundle(user_id: str, code: str) -> tuple[bytes, dict]:
                 people += [{k: _encode(v) for k, v in dict(r).items()} for r in c.execute("SELECT * FROM analytics_people WHERE site = ?", (s_,)).fetchall()]
             if people:
                 rows["analytics_people"] = people
+        faces = DATA_DIR.parent / "faces"  # the faces generated for this user's employees
+        for e in rows.get("employees", []):
+            m = re.search(r"/api/faces/([a-f0-9]{24}\.webp)", json.dumps(e.get("avatar") or ""))
+            if m and (faces / m.group(1)).exists():
+                z.write(faces / m.group(1), f"faces/{m.group(1)}")
         summary["rows"] = {k: len(v) for k, v in rows.items()}
         manifest = {"format": FORMAT, "user_id": user_id, "exported": time.time(),
                     "roots": {"sessions": str(DATA_DIR / user_id), "builds": str(BUILD_ROOT / user_id), "git": str(GIT_ROOT / user_id)}}
@@ -153,6 +158,11 @@ def import_bundle(user_id: str, blob: bytes, code: str) -> dict:
         for info in z.infolist():
             name = info.filename
             top, _, rel = name.partition("/")
+            if top == "faces" and re.fullmatch(r"[a-f0-9]{24}\.webp", rel):
+                (DATA_DIR.parent / "faces").mkdir(parents=True, exist_ok=True)
+                if not (DATA_DIR.parent / "faces" / rel).exists():
+                    (DATA_DIR.parent / "faces" / rel).write_bytes(z.read(info))
+                continue
             if top not in ("sessions", "builds", "git") or not rel or ".." in Path(rel).parts or info.is_dir():
                 continue
             dest = Path(new[top]) / rel

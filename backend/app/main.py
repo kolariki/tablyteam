@@ -70,7 +70,7 @@ from . import scenes as scenemod
 from . import intake as intakemod
 from .user_presets import create_preset, delete_preset, list_presets, scene_path
 from .exporter import TARGETS, BriefRequest, session_path, stream_brief, transcript_markdown
-from .config import CORS_ORIGINS, env
+from .config import CORS_ORIGINS, DATA_DIR, env
 from .orchestrator import SESSIONS, drop_self_approval, start_session
 from .presets import PRESETS
 from .roles import ROLE_GROUPS, ROLES
@@ -1543,6 +1543,62 @@ async def team_employee_suggest_prompt(eid: str, body: dict | None = None, user:
     if not text:
         raise HTTPException(502, "El modelo no devolvió un prompt; probá de nuevo")
     return {"prompt": text[:6000], "model": model}
+
+
+FACES_DIR = DATA_DIR.parent / "faces"
+FACE_STYLE = ("Editorial corporate portrait photograph, head and shoulders, centered, facing the camera, soft diffused window light, realistic skin texture, "
+              "shallow depth of field, painterly textured studio backdrop with a soft gradient from warm cream on the left to muted sage teal on the right, "
+              "subtle film grain, refined muted color grade, square composition, no text, no logos. Person: ")
+
+
+@app.post("/api/team/employees/{eid}/generate-face")
+async def team_employee_generate_face(eid: str, body: dict, user: User = CurrentUser):
+    """A realistic portrait for an employee, in the same editorial style as the role portraits, from the traits the user picked.
+    Runs on the user's own OpenAI key (image generation is billed per image)."""
+    if not teammod.get(user.id, eid):
+        raise HTTPException(404)
+    key = keystore.get_key(user.id, "openai") or env("OPENAI_API_KEY")
+    if not key:
+        raise HTTPException(400, "Para crear caras con IA cargá tu key de OpenAI en Modelos y API keys (mientras tanto elegí una de las prediseñadas)")
+    pick = lambda k, n=60: re.sub(r"[^\w\s,.'/-]", "", str(body.get(k) or ""))[:n].strip()  # noqa: E731
+    parts = [f"a {pick('gender') or 'person'} in their {pick('age') or '30s'}", f"{pick('skin') or 'medium'} skin"]
+    hair = pick("hair")
+    parts.append("completely bald head" if hair in ("bald", "pelado") else f"{pick('hair_color')} {hair} hair".strip())
+    if pick("beard") and pick("beard") != "none":
+        parts.append(pick("beard"))
+    if pick("glasses") and pick("glasses") != "none":
+        parts.append(f"wearing {pick('glasses')} glasses")
+    parts.append(f"wearing {pick('clothes') or 'a smart casual blazer'}")
+    parts.append(f"{pick('expression') or 'calm confident expression with a slight natural smile'}")
+    if pick("extra", 160):
+        parts.append(pick("extra", 160))
+    try:
+        async with httpx.AsyncClient(timeout=240) as cx:
+            r = await cx.post("https://api.openai.com/v1/images/generations", headers={"Authorization": f"Bearer {key}"},
+                              json={"model": "gpt-image-2", "prompt": FACE_STYLE + ", ".join(parts), "size": "1024x1024", "quality": "medium", "n": 1})
+    except httpx.HTTPError as e:
+        raise HTTPException(502, f"No se pudo generar la cara: {e}")
+    if r.status_code != 200:
+        msg = (r.json().get("error") or {}).get("message", r.text[:200]) if r.headers.get("content-type", "").startswith("application/json") else r.text[:200]
+        raise HTTPException(400 if r.status_code < 500 else 502, f"OpenAI no generó la cara: {msg}")
+    import base64
+    import io
+
+    from PIL import Image
+
+    FACES_DIR.mkdir(parents=True, exist_ok=True)
+    name = secrets.token_hex(12)
+    img = Image.open(io.BytesIO(base64.b64decode(r.json()["data"][0]["b64_json"]))).convert("RGB").resize((384, 384), Image.LANCZOS)
+    img.save(FACES_DIR / f"{name}.webp", "WEBP", quality=82, method=6)
+    return {"src": f"/api/faces/{name}.webp"}
+
+
+@app.get("/api/faces/{name}")
+def face_file(name: str):
+    """Generated faces: random, unguessable names (they are shown in <img>, so no auth header)."""
+    if not re.fullmatch(r"[a-f0-9]{24}\.webp", name) or not (FACES_DIR / name).exists():
+        raise HTTPException(404)
+    return FileResponse(FACES_DIR / name, media_type="image/webp", headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
 
 @app.get("/api/team/employees/{eid}/docs")

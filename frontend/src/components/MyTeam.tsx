@@ -129,7 +129,7 @@ function EmployeeDetail({ e, onDeleted }: { e: Employee; onDeleted: () => void }
   )
   return (
     <div className="min-w-0 space-y-4">
-      {editingFace && <AvatarEditor value={e.avatar} onSave={(c) => saveFace(c)} onReset={() => saveFace(null)} onClose={() => setEditingFace(false)} />}
+      {editingFace && <AvatarEditor employeeId={e.id} value={e.avatar} onSave={(c) => saveFace(c)} onReset={() => saveFace(null)} onClose={() => setEditingFace(false)} />}
       <div className="flex items-center gap-3">
         <button onClick={() => setEditingFace(true)} className="group relative shrink-0 rounded-full" title={T('Cambiar su cara', 'Change their face')}>
           <AgentAvatar agent={{ name: e.name, role: e.role, provider: e.provider }} size={56} />

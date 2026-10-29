@@ -55,7 +55,8 @@ with _db() as _c:  # the employee's avatar (an illustrated face the user designs
 def _row(r) -> dict:
     d = dict(r)
     d["skills"] = json.loads(d.get("skills") or "[]")
-    d["avatar"] = json.loads(d["avatar"]) if d.get("avatar") else None
+    av = json.loads(d["avatar"]) if d.get("avatar") else None
+    d["avatar"] = av if isinstance(av, dict) and av.get("src") else None  # older illustrated configs fall back to the portrait
     return d
 
 
@@ -140,7 +141,9 @@ def update(user_id: str, eid: str, body: dict) -> dict | None:
         fields["skills"] = json.dumps([str(s) for s in body["skills"]][:20])
     if "avatar" in body:  # a small dict of drawing options, or null to go back to the default portrait
         av = body.get("avatar")
-        fields["avatar"] = json.dumps({str(k)[:24]: str(v)[:32] for k, v in list(av.items())[:20]}) if isinstance(av, dict) else None
+        src = str(av.get("src") or "") if isinstance(av, dict) else ""
+        ok = re.fullmatch(r"(/avatars/people/p\d{2}\.webp|/api/faces/[a-f0-9]{24}\.webp)", src)  # a preset or a generated face
+        fields["avatar"] = json.dumps({"src": src}) if ok else None
     if "name" in fields:
         fields["name"] = fields["name"].strip()[:80] or e["name"]
         new_key = role_key(e["role"], fields["name"])
