@@ -44,7 +44,7 @@ export function Employees() {
   }
   if (!list) return <div className="flex items-center gap-2 py-10 text-sm text-ink-3"><Loader2 size={15} className="animate-spin" /> {T('Cargando…', 'Loading…')}</div>
   return (
-    <div className="grid gap-4 sm:grid-cols-[210px_1fr]">
+    <div className="grid gap-4 sm:grid-cols-[210px_1fr] lg:grid-cols-[260px_1fr] lg:gap-6">
       <div className="space-y-1.5">
         {list.map((e) => (
           <button key={e.id} onClick={() => setSel(e.id)} className={`flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition ${sel === e.id ? 'border-accent bg-accent-soft' : 'border-line hover:bg-surface-2'}`}>

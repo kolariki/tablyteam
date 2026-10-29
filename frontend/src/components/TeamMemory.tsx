@@ -6,6 +6,7 @@ import { api, type RoleInsight, type RoleScore, type TeamMemory } from '../lib/a
 import { getLang, tr, useT } from '../lib/i18n'
 import { useArena } from '../store'
 import AgentAvatar from './AgentAvatar'
+import PageHeader from './PageHeader'
 import { Employees, loadEmployees, useEmployees } from './MyTeam'
 import { toast } from './Toast'
 
@@ -13,9 +14,10 @@ import { toast } from './Toast'
  * Team memory: after each council round the roles learn from what the user kept and dropped. The lessons arrive as insights
  * the user accepts, edits or dismisses; the accepted ones are each role's memory and go into its prompt from then on.
  */
-const useMemory = create<{ data: TeamMemory | null; open: boolean; set: (p: Partial<{ data: TeamMemory | null; open: boolean }>) => void }>((set) => ({
+const useMemory = create<{ data: TeamMemory | null; open: boolean; tab: 'team' | 'review' | 'memory' | 'score'; set: (p: Partial<{ data: TeamMemory | null; open: boolean; tab: 'team' | 'review' | 'memory' | 'score' }>) => void }>((set) => ({
   data: null,
   open: false,
+  tab: 'team',
   set: (p) => set(p),
 }))
 
@@ -36,7 +38,7 @@ export function TeamMemoryWatcher() {
       if (seen.current !== null && n > seen.current) {
         toast.info(tr(`Tu equipo aprendió ${n - seen.current} cosa${n - seen.current === 1 ? '' : 's'}`, `Your team learned ${n - seen.current} thing${n - seen.current === 1 ? '' : 's'}`),
           tr('De lo que aceptaste y descartaste del consejo. Revisalas antes de que entren en su memoria.', 'From what you kept and dropped from the council. Review them before they go into its memory.'),
-          { label: tr('Revisar', 'Review'), onClick: () => useMemory.getState().set({ open: true }) })
+          { label: tr('Revisar', 'Review'), onClick: () => openTeam('review') })
       }
       seen.current = n
     }
@@ -56,24 +58,98 @@ export function TeamMemoryButton({ className = '' }: { className?: string }) {
   const n = useEmployees((s) => s.list?.length ?? 0)
   useEffect(() => { loadEmployees() }, [])
   return (
-    <button onClick={() => { useMemory.getState().set({ open: true }); load(); loadEmployees() }} title={T('Tus roles guardados: su conocimiento, lo que aprendieron y su puntaje', 'Your saved roles: their knowledge, what they learned and their score')} className={`relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-line bg-surface px-3.5 text-sm font-medium text-ink-2 shadow-sm transition hover:bg-accent-soft hover:border-accent hover:text-accent ${className}`}>
+    <button onClick={() => openTeam()} title={T('Tus roles guardados: su conocimiento, lo que aprendieron y su puntaje', 'Your saved roles: their knowledge, what they learned and their score')} className={`relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-line bg-surface px-3.5 text-sm font-medium text-ink-2 shadow-sm transition hover:bg-accent-soft hover:border-accent hover:text-accent ${className}`}>
       <Users size={16} /> {T('Mi equipo', 'My team')}{n > 0 && pending === 0 && <span className="text-ink-4">{n}</span>}
       {pending > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-semibold text-white">{pending}</span>}
     </button>
   )
 }
 
-function TeamMemoryModal() {
+type Tab = 'team' | 'review' | 'memory' | 'score'
+
+/** Opens «Mi equipo»: as its own page from the home (like «Modelos y API keys»), as a window over the builder. */
+export function openTeam(tab?: Tab) {
+  const view = useArena.getState().view
+  const t = tab ?? ((useMemory.getState().data?.insights.length ?? 0) > 0 ? 'review' : 'team')
+  useMemory.getState().set({ tab: t })
+  load()
+  loadEmployees()
+  if (view === 'setup' || view === 'team') useArena.getState().set({ view: 'team' })
+  else useMemory.getState().set({ open: true })
+}
+
+function TeamTabs() {
   const T = useT()
-  const { data, open } = useMemory()
-  const [tab, setTab] = useState<'team' | 'review' | 'memory' | 'score'>('team')
+  const { data, tab } = useMemory()
+  return (
+    <div className="flex flex-wrap gap-1">
+      {(['team', 'review', 'memory', 'score'] as const).map((k) => (
+        <button key={k} onClick={() => useMemory.getState().set({ tab: k })} className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${tab === k ? 'bg-accent text-white' : 'text-ink-2 hover:bg-surface-2'}`}>
+          {k === 'team' ? T('Empleados', 'Employees') : k === 'review' ? T('Para revisar', 'To review') : k === 'memory' ? T('Memoria', 'Memory') : T('Puntaje', 'Score')}
+          {(k === 'review' || k === 'memory') && <span className="opacity-70"> {k === 'review' ? data?.insights.length ?? 0 : data?.memory.length ?? 0}</span>}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function TeamContent() {
+  const T = useT()
+  const { data, tab } = useMemory()
   const [scores, setScores] = useState<RoleScore[] | null>(null)
-  useEffect(() => { if (open) api.teamScores().then((d) => setScores(d.roles)).catch(() => setScores([])) }, [open])
-  useEffect(() => { if (open) setTab((data?.insights.length ?? 0) > 0 ? 'review' : 'team') }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
-  const close = () => useMemory.getState().set({ open: false })
+  useEffect(() => { if (tab === 'score') api.teamScores().then((d) => setScores(d.roles)).catch(() => setScores([])) }, [tab])
   const pending = data?.insights ?? []
   const memory = data?.memory ?? []
   const byRole = memory.reduce<Record<string, RoleInsight[]>>((acc, i) => ((acc[i.role] ??= []).push(i), acc), {})
+  return (
+    <>
+      {!data && (tab === 'review' || tab === 'memory') && <div className="flex items-center gap-2 py-10 text-sm text-ink-3"><Loader2 size={15} className="animate-spin" /> {T('Cargando…', 'Loading…')}</div>}
+      {data && tab === 'review' && (pending.length ? (
+        <div className="space-y-3">{pending.map((i) => <InsightCard key={i.id} item={i} />)}</div>
+      ) : (
+        <Empty text={T('No hay nada para revisar. Cuando apliques los cambios de un consejo, tu equipo saca lecciones de lo que aceptaste y descartaste.', 'Nothing to review. When you apply a council’s changes, your team draws lessons from what you kept and dropped.')} />
+      ))}
+      {data && tab === 'memory' && (memory.length ? (
+        <div className="space-y-4">
+          {Object.entries(byRole).map(([role, items]) => (
+            <div key={role}>
+              <div className="mb-2 flex items-center gap-2"><AgentAvatar agent={agentOf(items[0])} size={28} /><span className="font-semibold">{label(items[0])}</span><span className="text-[12px] text-ink-4">{items.length} {T(items.length === 1 ? 'lección' : 'lecciones', items.length === 1 ? 'lesson' : 'lessons')}</span></div>
+              <div className="space-y-2">{items.map((i) => <MemoryRow key={i.id} item={i} />)}</div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <Empty text={T('Todavía no aceptaste ninguna lección. Las que aceptes aparecen acá, por rol.', 'You have not accepted any lesson yet. The ones you accept show up here, by role.')} />
+      ))}
+      {tab === 'score' && <Scores roles={scores} />}
+      {tab === 'team' && <Employees />}
+    </>
+  )
+}
+
+const INTRO: [string, string] = ['Tus roles quedan guardados con su prompt, su conocimiento y su memoria, y los usás en cada proyecto nuevo. Cada uno aprende de lo que aceptás y descartás del consejo; nada entra a su memoria sin tu OK.', 'Your roles are saved with their prompt, knowledge and memory, and you use them in every new project. Each one learns from what you keep and drop from the council; nothing enters its memory without your OK.']
+
+/** «Mi equipo» as a section of its own, next to «Modelos y API keys». */
+export function TeamPage({ onBack }: { onBack: () => void }) {
+  const T = useT()
+  const n = useEmployees((s) => s.list?.length ?? 0)
+  useEffect(() => { load(); loadEmployees() }, [])
+  return (
+    <div className="h-full overflow-y-auto scroll-thin arena-bg">
+      <div className="w-full px-8 py-8 2xl:px-12">
+        <PageHeader onBack={onBack} kicker={T('Tu equipo', 'Your team')} title={T('Mi equipo', 'My team')} subtitle={T(...INTRO)}
+          right={<span className="flex h-9 items-center gap-2 rounded-full border border-line bg-surface px-3.5 text-sm text-ink-2 shadow-sm"><Users size={15} /> {n} {T(n === 1 ? 'empleado' : 'empleados', n === 1 ? 'employee' : 'employees')}</span>} />
+        <div className="mt-8"><TeamTabs /></div>
+        <div className="panel mt-4 rounded-2xl p-6"><TeamContent /></div>
+      </div>
+    </div>
+  )
+}
+
+function TeamMemoryModal() {
+  const T = useT()
+  const open = useMemory((s) => s.open)
+  const close = () => useMemory.getState().set({ open: false })
   return (
     <AnimatePresence>
       {open && (
@@ -83,40 +159,12 @@ function TeamMemoryModal() {
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent text-white"><Users size={20} /></span>
               <div className="min-w-0 flex-1">
                 <div className="serif text-[22px] leading-tight">{T('Mi equipo', 'My team')}</div>
-                <p className="mt-1 text-[13px] text-ink-3">{T('Tus roles quedan guardados con su prompt, su conocimiento y su memoria, y los usás en cada proyecto nuevo. Cada uno aprende de lo que aceptás y descartás del consejo; nada entra a su memoria sin tu OK.', 'Your roles are saved with their prompt, knowledge and memory, and you use them in every new project. Each one learns from what you keep and drop from the council; nothing enters its memory without your OK.')}</p>
+                <p className="mt-1 text-[13px] text-ink-3">{T(...INTRO)}</p>
               </div>
               <button onClick={close} className="rounded-full p-1.5 text-ink-3 hover:bg-surface-2 hover:text-ink" aria-label={T('Cerrar', 'Close')}><X size={18} /></button>
             </div>
-            <div className="flex gap-1 px-6 pt-3">
-              {(['team', 'review', 'memory', 'score'] as const).map((k) => (
-                <button key={k} onClick={() => setTab(k)} className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${tab === k ? 'bg-accent text-white' : 'text-ink-2 hover:bg-surface-2'}`}>
-                  {k === 'team' ? T('Empleados', 'Employees') : k === 'review' ? T('Para revisar', 'To review') : k === 'memory' ? T('Memoria', 'Memory') : T('Puntaje', 'Score')}
-                  {(k === 'review' || k === 'memory') && <span className="opacity-70"> {k === 'review' ? pending.length : memory.length}</span>}
-                </button>
-              ))}
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-              {!data && (tab === 'review' || tab === 'memory') && <div className="flex items-center gap-2 py-10 text-sm text-ink-3"><Loader2 size={15} className="animate-spin" /> {T('Cargando…', 'Loading…')}</div>}
-              {data && tab === 'review' && (pending.length ? (
-                <div className="space-y-3">{pending.map((i) => <InsightCard key={i.id} item={i} />)}</div>
-              ) : (
-                <Empty text={T('No hay nada para revisar. Cuando apliques los cambios de un consejo, tu equipo saca lecciones de lo que aceptaste y descartaste.', 'Nothing to review. When you apply a council’s changes, your team draws lessons from what you kept and dropped.')} />
-              ))}
-              {data && tab === 'memory' && (memory.length ? (
-                <div className="space-y-4">
-                  {Object.entries(byRole).map(([role, items]) => (
-                    <div key={role}>
-                      <div className="mb-2 flex items-center gap-2"><AgentAvatar agent={agentOf(items[0])} size={28} /><span className="font-semibold">{label(items[0])}</span><span className="text-[12px] text-ink-4">{items.length} {T(items.length === 1 ? 'lección' : 'lecciones', items.length === 1 ? 'lesson' : 'lessons')}</span></div>
-                      <div className="space-y-2">{items.map((i) => <MemoryRow key={i.id} item={i} />)}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <Empty text={T('Todavía no aceptaste ninguna lección. Las que aceptes aparecen acá, por rol.', 'You have not accepted any lesson yet. The ones you accept show up here, by role.')} />
-              ))}
-              {tab === 'score' && <Scores roles={scores} />}
-              {tab === 'team' && <Employees />}
-            </div>
+            <div className="px-6 pt-3"><TeamTabs /></div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4"><TeamContent /></div>
           </motion.div>
         </motion.div>
       )}

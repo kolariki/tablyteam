@@ -54,7 +54,7 @@ export interface Explanation {
 }
 
 interface ArenaState {
-  view: 'setup' | 'arena' | 'settings' | 'builder' | 'audit' | 'agents' | 'market' | 'tickets'
+  view: 'setup' | 'arena' | 'settings' | 'builder' | 'audit' | 'agents' | 'market' | 'tickets' | 'team'
   sessionId: string | null
   source: 'live' | 'replay'
   status: Status
