@@ -105,9 +105,9 @@ function EmployeeDetail({ e, onDeleted }: { e: Employee; onDeleted: () => void }
   }
   useEffect(() => { api.employeeDocs(e.id).then((d) => setDocs(d.docs)).catch(() => setDocs([])) }, [e.id])
   const dirty = name !== e.name || persona !== e.persona
-  const save = async () => {
+  const save = async (text = persona) => {
     setSaving(true)
-    try { useEmployees.getState().set((await api.updateEmployee(e.id, { name, persona })).employees); toast.ok(tr('Guardado', 'Saved')) } catch (err) { toast.error(tr('No se pudo guardar', 'Could not save'), (err as Error).message) }
+    try { useEmployees.getState().set((await api.updateEmployee(e.id, { name, persona: text })).employees); setPersona(text); toast.ok(tr('Guardado', 'Saved')) } catch (err) { toast.error(tr('No se pudo guardar', 'Could not save'), (err as Error).message) }
     setSaving(false)
   }
   const fed = async (p: Promise<{ docs: KnowledgeDoc[] }>) => {
@@ -156,9 +156,10 @@ function EmployeeDetail({ e, onDeleted }: { e: Employee; onDeleted: () => void }
             <div className="mt-1.5 text-[11.5px] text-ink-3">{T('Usa el rol, su prompt actual y lo que le cargaste en Conocimiento sobre tu empresa.', 'Uses the role, its current prompt and what you loaded in Knowledge about your company.')}</div>
             {suggestion && (
               <div className="mt-2 rounded-lg border border-line bg-surface p-3">
-                <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink">{suggestion}</p>
+                <div className="mb-1 text-[11.5px] text-ink-3">{T('Podés editarlo antes de usarlo', 'You can edit it before using it')}</div>
+                <textarea value={suggestion} onChange={(ev) => setSuggestion(ev.target.value)} rows={Math.min(14, Math.max(5, Math.ceil(suggestion.length / 110)))} className="w-full resize-y rounded-lg border border-line bg-surface px-3 py-2 text-[13px] leading-relaxed text-ink outline-none focus:border-accent" />
                 <div className="mt-2 flex gap-2">
-                  <button onClick={() => { setPersona(suggestion); setSuggestion(null); setAsking(false) }} className="flex h-8 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[12.5px] font-semibold text-white"><Check size={13} /> {T('Usar este prompt', 'Use this prompt')}</button>
+                  <button disabled={!suggestion.trim()} onClick={() => { void save(suggestion.trim()); setSuggestion(null); setAsking(false) }} className="flex h-8 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[12.5px] font-semibold text-white"><Check size={13} /> {T('Usar y guardar', 'Use and save')}</button>
                   <button onClick={() => setSuggestion(null)} className="h-8 rounded-full px-3 text-[12.5px] text-ink-3 hover:text-ink">{T('Descartar', 'Dismiss')}</button>
                 </div>
               </div>
@@ -166,7 +167,7 @@ function EmployeeDetail({ e, onDeleted }: { e: Employee; onDeleted: () => void }
           </div>
         )}
         <textarea value={persona} onChange={(ev) => setPersona(ev.target.value)} rows={4} placeholder={T('Cómo trabaja, qué prioriza, cómo habla (se suma al rol del catálogo)', 'How it works, what it prioritises, how it speaks (added to the catalog role)')} className="mt-1.5 w-full resize-y rounded-xl border border-line bg-surface px-3 py-2 text-[13.5px] outline-none focus:border-accent" />
-        {dirty && <button onClick={save} disabled={saving} className="mt-1.5 flex h-8 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[13px] font-semibold text-white disabled:opacity-50">{saving && <Loader2 size={13} className="animate-spin" />} {T('Guardar', 'Save')}</button>}
+        {dirty && <button onClick={() => save()} disabled={saving} className="mt-1.5 flex h-8 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[13px] font-semibold text-white disabled:opacity-50">{saving && <Loader2 size={13} className="animate-spin" />} {T('Guardar', 'Save')}</button>}
       </div>
       <div>
         <div className="flex items-center gap-2">
