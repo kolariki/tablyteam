@@ -1,11 +1,12 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Brain, Check, Loader2, Minus, Pencil, Trash2, TrendingDown, TrendingUp, X } from 'lucide-react'
+import { Check, Loader2, Minus, Pencil, Trash2, TrendingDown, TrendingUp, Users, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { create } from 'zustand'
 import { api, type RoleInsight, type RoleScore, type TeamMemory } from '../lib/api'
 import { getLang, tr, useT } from '../lib/i18n'
 import { useArena } from '../store'
 import AgentAvatar from './AgentAvatar'
+import { Employees, loadEmployees, useEmployees } from './MyTeam'
 import { toast } from './Toast'
 
 /**
@@ -48,13 +49,15 @@ export function TeamMemoryWatcher() {
   return <TeamMemoryModal />
 }
 
-/** Header pill: opens the memory, with the count of insights waiting for review. */
+/** Header pill: opens the user's team (employees, knowledge, memory, score), with the count of insights waiting for review. */
 export function TeamMemoryButton({ className = '' }: { className?: string }) {
   const T = useT()
   const pending = useMemory((s) => s.data?.insights.length ?? 0)
+  const n = useEmployees((s) => s.list?.length ?? 0)
+  useEffect(() => { loadEmployees() }, [])
   return (
-    <button onClick={() => { useMemory.getState().set({ open: true }); load() }} title={T('Lo que tu equipo aprendió de tus decisiones', 'What your team learned from your decisions')} className={`relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-line bg-surface px-3.5 text-sm font-medium text-ink-2 shadow-sm transition hover:bg-accent-soft hover:border-accent hover:text-accent ${className}`}>
-      <Brain size={16} /> {T('Memoria del equipo', 'Team memory')}
+    <button onClick={() => { useMemory.getState().set({ open: true }); load(); loadEmployees() }} title={T('Tus roles guardados: su conocimiento, lo que aprendieron y su puntaje', 'Your saved roles: their knowledge, what they learned and their score')} className={`relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-line bg-surface px-3.5 text-sm font-medium text-ink-2 shadow-sm transition hover:bg-accent-soft hover:border-accent hover:text-accent ${className}`}>
+      <Users size={16} /> {T('Mi equipo', 'My team')}{n > 0 && pending === 0 && <span className="text-ink-4">{n}</span>}
       {pending > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-semibold text-white">{pending}</span>}
     </button>
   )
@@ -63,10 +66,10 @@ export function TeamMemoryButton({ className = '' }: { className?: string }) {
 function TeamMemoryModal() {
   const T = useT()
   const { data, open } = useMemory()
-  const [tab, setTab] = useState<'review' | 'memory' | 'score'>('review')
+  const [tab, setTab] = useState<'team' | 'review' | 'memory' | 'score'>('team')
   const [scores, setScores] = useState<RoleScore[] | null>(null)
   useEffect(() => { if (open) api.teamScores().then((d) => setScores(d.roles)).catch(() => setScores([])) }, [open])
-  useEffect(() => { if (open) setTab((data?.insights.length ?? 0) > 0 ? 'review' : 'memory') }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (open) setTab((data?.insights.length ?? 0) > 0 ? 'review' : 'team') }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
   const close = () => useMemory.getState().set({ open: false })
   const pending = data?.insights ?? []
   const memory = data?.memory ?? []
@@ -75,25 +78,25 @@ function TeamMemoryModal() {
     <AnimatePresence>
       {open && (
         <motion.div className="fixed inset-0 z-[300] flex items-center justify-center bg-paper/70 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={(e) => e.target === e.currentTarget && close()}>
-          <motion.div className="flex max-h-[86vh] min-h-[min(480px,86vh)] w-full max-w-[720px] flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-[0_30px_80px_-30px_rgba(30,38,34,.55)]" initial={{ y: 14, scale: 0.98 }} animate={{ y: 0, scale: 1 }} exit={{ y: 10, opacity: 0 }}>
+          <motion.div className="flex max-h-[86vh] min-h-[min(480px,86vh)] w-full max-w-[940px] flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-[0_30px_80px_-30px_rgba(30,38,34,.55)]" initial={{ y: 14, scale: 0.98 }} animate={{ y: 0, scale: 1 }} exit={{ y: 10, opacity: 0 }}>
             <div className="flex items-start gap-3 border-b border-line px-6 py-5">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent text-white"><Brain size={20} /></span>
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent text-white"><Users size={20} /></span>
               <div className="min-w-0 flex-1">
-                <div className="serif text-[22px] leading-tight">{T('Memoria del equipo', 'Team memory')}</div>
-                <p className="mt-1 text-[13px] text-ink-3">{T('Cada rol aprende de lo que aceptás y descartás del consejo. Nada entra a su memoria sin tu OK; lo aceptado se suma a su prompt en cada debate y revisión.', 'Each role learns from what you keep and drop from the council. Nothing enters its memory without your OK; what you accept is added to its prompt in every debate and review.')}</p>
+                <div className="serif text-[22px] leading-tight">{T('Mi equipo', 'My team')}</div>
+                <p className="mt-1 text-[13px] text-ink-3">{T('Tus roles quedan guardados con su prompt, su conocimiento y su memoria, y los usás en cada proyecto nuevo. Cada uno aprende de lo que aceptás y descartás del consejo; nada entra a su memoria sin tu OK.', 'Your roles are saved with their prompt, knowledge and memory, and you use them in every new project. Each one learns from what you keep and drop from the council; nothing enters its memory without your OK.')}</p>
               </div>
               <button onClick={close} className="rounded-full p-1.5 text-ink-3 hover:bg-surface-2 hover:text-ink" aria-label={T('Cerrar', 'Close')}><X size={18} /></button>
             </div>
             <div className="flex gap-1 px-6 pt-3">
-              {(['review', 'memory', 'score'] as const).map((k) => (
+              {(['team', 'review', 'memory', 'score'] as const).map((k) => (
                 <button key={k} onClick={() => setTab(k)} className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${tab === k ? 'bg-accent text-white' : 'text-ink-2 hover:bg-surface-2'}`}>
-                  {k === 'review' ? T('Para revisar', 'To review') : k === 'memory' ? T('Memoria', 'Memory') : T('Puntaje', 'Score')}
-                  {k !== 'score' && <span className="opacity-70"> {k === 'review' ? pending.length : memory.length}</span>}
+                  {k === 'team' ? T('Empleados', 'Employees') : k === 'review' ? T('Para revisar', 'To review') : k === 'memory' ? T('Memoria', 'Memory') : T('Puntaje', 'Score')}
+                  {(k === 'review' || k === 'memory') && <span className="opacity-70"> {k === 'review' ? pending.length : memory.length}</span>}
                 </button>
               ))}
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-              {!data && <div className="flex items-center gap-2 py-10 text-sm text-ink-3"><Loader2 size={15} className="animate-spin" /> {T('Cargando…', 'Loading…')}</div>}
+              {!data && (tab === 'review' || tab === 'memory') && <div className="flex items-center gap-2 py-10 text-sm text-ink-3"><Loader2 size={15} className="animate-spin" /> {T('Cargando…', 'Loading…')}</div>}
               {data && tab === 'review' && (pending.length ? (
                 <div className="space-y-3">{pending.map((i) => <InsightCard key={i.id} item={i} />)}</div>
               ) : (
@@ -112,6 +115,7 @@ function TeamMemoryModal() {
                 <Empty text={T('Todavía no aceptaste ninguna lección. Las que aceptes aparecen acá, por rol.', 'You have not accepted any lesson yet. The ones you accept show up here, by role.')} />
               ))}
               {tab === 'score' && <Scores roles={scores} />}
+              {tab === 'team' && <Employees />}
             </div>
           </motion.div>
         </motion.div>

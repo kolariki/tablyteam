@@ -1,12 +1,13 @@
 import { useArena } from '../store'
 import { TeamMemoryButton } from './TeamMemory'
+import { EmployeePicker, employeeToAgent } from './MyTeam'
 import { useBuild, type Activity } from '../buildStore'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeftRight, Bookmark, Check, Eye, FolderOpen, Gavel, Globe, Loader2, LogOut, MonitorSmartphone, Play, Plus, Puzzle, Settings2, Smartphone, Store, Trash2, Users, X, Zap } from 'lucide-react'
 import { toast, useConfirm, usePrompt } from './Toast'
 import SkillPicker from './SkillPicker'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { api, type EngineStatus, type User } from '../lib/api'
+import { api, type Employee, type EngineStatus, type User } from '../lib/api'
 import { fmtUsd } from '../lib/parse'
 import Dashboard from './Dashboard'
 import HomeLoader from './HomeLoader'
@@ -338,6 +339,23 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
             </button>
   )
   const input = 'w-full rounded-lg bg-surface border border-line px-3 py-2 text-sm outline-none focus:border-accent transition'
+
+  /** The saved employees become the team: each seat keeps its model when that provider is connected, otherwise the usual stand-in. */
+  const applyEmployees = (picked: Employee[]) => {
+    const metaOn = !!providers.find((x) => x.id === 'meta')?.configured
+    const ids = new Set<string>()
+    const agents = picked.map((e, i) => {
+      let a = employeeToAgent(e, 0)
+      if (ids.has(a.id)) a = employeeToAgent(e, i)
+      ids.add(a.id)
+      const p = providers.find((x) => x.id === a.provider)
+      if (p?.configured && p.id !== 'mock') return { ...a, model: a.model || (p.id === 'meta' ? museReco(a).model : p.default_model), color: null }
+      return MUSE_FIRST ? museTeamFor([a], metaOn, trialProvider?.default_model)[0] : { ...a, wanted_provider: a.provider, provider: 'mock', model: 'mock-1' }
+    })
+    baseline.current = null  // the user's own roles: the language switch leaves their names and prompts alone
+    setCfg((c) => ({ ...c, agents }))
+    toast.ok(tr(`Tu equipo: ${agents.length} roles`, `Your team: ${agents.length} roles`), tr('Con su prompt, su conocimiento y lo que aprendieron.', 'With their prompt, knowledge and what they learned.'))
+  }
 
   /** The catalog picks skills for one role from the task (same call as «Sugerir skills», applied to a single seat). */
   const suggestSkillsFor = async (i: number) => {
@@ -834,6 +852,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                 className="ml-auto flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft px-3 py-1.5 text-[13px] font-semibold text-accent shadow-sm transition hover:bg-accent hover:text-white disabled:opacity-40 disabled:hover:bg-accent-soft disabled:hover:text-accent"
                 title={T('Elegir del catálogo las skills que mejor encajan con la tarea, rol por rol', 'Pick from the catalog the skills that best fit the task, role by role')}
               >{suggesting ? <Loader2 size={14} className="animate-spin" /> : <Puzzle size={14} />} {T('Sugerir skills', 'Suggest skills')}</button>
+              <div className="ml-2"><EmployeePicker onUse={applyEmployees} /></div>
               <button type="button" onClick={() => setCfg((c) => ({ ...c, agents: museTeam(c.agents) }))} disabled={cfg.agents.every(isMuseReco)} className="ml-2 flex items-center gap-1.5 rounded-lg border border-[#BBD5FA] bg-[#EEF5FF] px-3 py-1.5 text-[13px] font-semibold text-[#0B2E66] shadow-sm transition hover:border-[#0082FB] disabled:opacity-40" title={T('Cada rol con el modelo de Muse que mejor hace su trabajo: Wonder para dirección e ingeniería, Spark para producto, diseño y QA', 'Every role on the Muse model that does its job best: Wonder for direction and engineering, Spark for product, design and QA')}><ProviderLogo provider="meta" size={14} /> {T('Equipo recomendado con Muse', 'Recommended Muse team')}</button>
               <button disabled={cfg.agents.length >= 8} onClick={addAgent} className="ml-2 flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40" title={T('Sumar un rol al equipo (hasta 8)', 'Add a role to the team (up to 8)')}><Plus size={15} />{T('Agregar rol', 'Add role')}</button>
             </div>

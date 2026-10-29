@@ -312,7 +312,10 @@ class Session:
             role_txt += uikit.team_block(agent.role, getattr(self.config, "platform", "web"))
         from . import memory as memorymod
 
+        from . import team as teammod
+
         role_txt += memorymod.prompt_block(self.owner.id, agent.role, agent.name)
+        role_txt += teammod.knowledge_block(self.owner.id, agent.role, agent.name, f"{self.config.title or ''} {self.config.topic}")
         sk = skillmod.prompt_block(self.owner.id, agent.skills)
         if sk:
             role_txt += sk

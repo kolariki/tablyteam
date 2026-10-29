@@ -38,6 +38,7 @@ from pydantic import BaseModel
 from . import auth, keystore, trial
 from . import memory as memorymod
 from . import scores as scoresmod
+from . import team as teammod
 from . import observability as obs
 from .tasks import spawn
 from . import research
@@ -577,6 +578,10 @@ async def create_session(config: SessionConfig, user: User = CurrentUser):
     if any(eff[a.provider].source == "trial" for a in config.agents):
         trial.spend(user.id, rounds=1)  # creds() already refused the trial when no round is left
     s = start_session(config, user, eff, auto_pick=False)
+    try:  # the roles of this project join (or stay in) the user's team, in the database
+        teammod.save_from_agents(user.id, config.agents)
+    except Exception as e:  # noqa: BLE001
+        log.warning("team: could not save the roles: %s", e)
     return {"id": s.id}
 
 
@@ -1417,6 +1422,90 @@ def _learn_from_council(user: User, council_session: str, chosen: list[dict]) ->
 @app.get("/api/team/memory")
 def team_memory(user: User = CurrentUser):
     return memorymod.listing(user.id)
+
+
+@app.get("/api/team/employees")
+def team_employees(user: User = CurrentUser):
+    """The user's saved roles (employees), with how much they know and how many lessons they carry."""
+    return {"employees": teammod.listing(user.id)}
+
+
+@app.post("/api/team/employees")
+def team_employee_create(body: dict, user: User = CurrentUser):
+    try:
+        teammod.create(user.id, body)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    return {"employees": teammod.listing(user.id)}
+
+
+@app.patch("/api/team/employees/{eid}")
+def team_employee_update(eid: str, body: dict, user: User = CurrentUser):
+    try:
+        if not teammod.update(user.id, eid, body):
+            raise HTTPException(404)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    return {"employees": teammod.listing(user.id)}
+
+
+@app.delete("/api/team/employees/{eid}")
+def team_employee_delete(eid: str, user: User = CurrentUser):
+    if not teammod.delete(user.id, eid):
+        raise HTTPException(404)
+    return {"employees": teammod.listing(user.id)}
+
+
+@app.get("/api/team/employees/{eid}/docs")
+def team_employee_docs(eid: str, user: User = CurrentUser):
+    d = teammod.docs(user.id, eid)
+    if d is None:
+        raise HTTPException(404)
+    return {"docs": d}
+
+
+@app.post("/api/team/employees/{eid}/docs")
+async def team_employee_add_doc(eid: str, body: dict, user: User = CurrentUser):
+    """Feed a role: a note ({title, text}) or a public web page ({url})."""
+    try:
+        if body.get("url"):
+            url = str(body["url"]).strip()
+            title, text = await teammod.page_text(url)
+            doc = teammod.add_doc(user.id, eid, str(body.get("title") or "") or title, text, "url", url)
+        else:
+            doc = teammod.add_doc(user.id, eid, str(body.get("title") or ""), str(body.get("text") or ""), "note")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:  # noqa: BLE001  (network errors reading the page)
+        raise HTTPException(400, f"No pude leer la página: {e}")
+    if doc is None:
+        raise HTTPException(404)
+    return {"docs": teammod.docs(user.id, eid)}
+
+
+@app.post("/api/team/employees/{eid}/docs/file")
+async def team_employee_add_file(eid: str, file: UploadFile = File(...), user: User = CurrentUser):
+    """Feed a role with a document (md, txt, pdf, docx, csv, code…)."""
+    data = await file.read()
+    if len(data) > 25_000_000:
+        raise HTTPException(413, "El documento supera 25 MB")
+    try:
+        text = skillmod.extract_text(file.filename or "documento", data).strip()
+        doc = teammod.add_doc(user.id, eid, re.sub(r"\.[A-Za-z0-9]+$", "", file.filename or "Documento"), text, "file", file.filename or "")
+    except ValueError as e:
+        raise HTTPException(400, str(e) if str(e) != "No hay texto para guardar" else "El documento no tiene texto legible (¿es un PDF escaneado?)")
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(400, f"No pude leer el documento: {e}")
+    if doc is None:
+        raise HTTPException(404)
+    return {"docs": teammod.docs(user.id, eid)}
+
+
+@app.delete("/api/team/employees/{eid}/docs/{did}")
+def team_employee_delete_doc(eid: str, did: str, user: User = CurrentUser):
+    if not teammod.delete_doc(user.id, eid, did):
+        raise HTTPException(404)
+    return {"docs": teammod.docs(user.id, eid)}
 
 
 @app.get("/api/team/scores")

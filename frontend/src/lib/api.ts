@@ -86,6 +86,32 @@ export interface TeamMemory {
   insights: RoleInsight[]
   memory: RoleInsight[]
 }
+export interface Employee {
+  id: string
+  key: string
+  role: string | null
+  name: string
+  persona: string
+  provider: string
+  model: string
+  skills: string[]
+  role_label: string
+  role_label_en: string
+  docs: number
+  knowledge_chars: number
+  lessons: number
+  projects: number
+  last_used: number
+}
+export interface KnowledgeDoc {
+  id: string
+  title: string
+  kind: 'note' | 'file' | 'url'
+  source: string
+  chars: number
+  preview: string
+  created: number
+}
 export interface RoleScore {
   role: string
   role_label: string
@@ -127,6 +153,15 @@ export const api = {
   models: (p: string) => j<{ models: string[]; error?: string }>(authed(`/api/providers/${p}/models`)),
   roles: () => j<{ groups: string[]; roles: Role[] }>(authed('/api/roles')),
   teamMemory: () => j<TeamMemory>(authed('/api/team/memory')),
+  employees: () => j<{ employees: Employee[] }>(authed('/api/team/employees')),
+  createEmployee: (body: { role?: string | null; name?: string; persona?: string; provider?: string; model?: string }) => j<{ employees: Employee[] }>(post('/api/team/employees', body)),
+  updateEmployee: (id: string, body: Partial<Pick<Employee, 'name' | 'persona' | 'provider' | 'model' | 'skills'>>) => j<{ employees: Employee[] }>(authed(`/api/team/employees/${id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })),
+  deleteEmployee: (id: string) => j<{ employees: Employee[] }>(authed(`/api/team/employees/${id}`, { method: 'DELETE' })),
+  employeeDocs: (id: string) => j<{ docs: KnowledgeDoc[] }>(authed(`/api/team/employees/${id}/docs`)),
+  addEmployeeNote: (id: string, title: string, text: string) => j<{ docs: KnowledgeDoc[] }>(post(`/api/team/employees/${id}/docs`, { title, text })),
+  addEmployeeUrl: (id: string, url: string) => j<{ docs: KnowledgeDoc[] }>(post(`/api/team/employees/${id}/docs`, { url })),
+  addEmployeeFile: (id: string, file: File) => { const form = new FormData(); form.append('file', file, file.name); return j<{ docs: KnowledgeDoc[] }>(authed(`/api/team/employees/${id}/docs/file`, { method: 'POST', body: form })) },
+  deleteEmployeeDoc: (id: string, did: string) => j<{ docs: KnowledgeDoc[] }>(authed(`/api/team/employees/${id}/docs/${did}`, { method: 'DELETE' })),
   teamScores: () => j<{ roles: RoleScore[] }>(authed('/api/team/scores')),
   teamMemoryDecide: (id: string, action: 'accept' | 'dismiss' | 'edit' | 'forget', text?: string) => j<TeamMemory>(post(`/api/team/memory/${id}`, { action, text })),
   fdePackages: () => j<{ packages: FdePackage[]; booking_url: string | null; stripe: StripeStatus }>(authed('/api/fde/packages')),
