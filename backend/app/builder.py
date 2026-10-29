@@ -511,7 +511,9 @@ class Build:
         from . import cloud as cloudmod
 
         app_ = self.cloud_app()
-        return levelsmod.team_block(self.levels_eval(), (app_ or {}).get("slug"), cloudmod.public_url())
+        from . import lessons as lessonsmod
+
+        return levelsmod.team_block(self.levels_eval(), (app_ or {}).get("slug"), cloudmod.public_url()) + lessonsmod.block()
 
     def snapshot_event(self) -> dict:
         return {"type": "build.snapshot", "seq": -1, "ts": time.time(), "build": self.snapshot()}

@@ -12,6 +12,7 @@ import { readCache, writeCache } from '../lib/cache'
 import { brandTheme } from '../lib/brand'
 import SubscriptionPanel from './SubscriptionPanel'
 import AccountTransfer from './AccountTransfer'
+import DeployLessons from './DeployLessons'
 
 const KEY_URL: Record<string, string> = {
   anthropic: 'https://console.anthropic.com/settings/keys',
@@ -104,6 +105,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
         <TablyCloudSettings />
         {TICKETS_ENABLED && <NotionAppSettings />}
         <DeploySettings />
+        <DeployLessons />
         <LangfuseSettings />
         <AccountTransfer />
       </div>

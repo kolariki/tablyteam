@@ -282,6 +282,7 @@ export const api = {
     j<{ set: boolean; last4: string | null }>(authed('/api/settings/github', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, clear }) })),
   cloud: (sessionId: string, id: string) => j<CloudInfo>(authed(`/api/sessions/${sessionId}/builds/${id}/cloud`)),
   notionStatus: () => j<{ set: boolean; last4: string | null; me: { name: string; workspace: string | null } | null; error: string | null; oauth?: boolean }>(authed('/api/notion/status')),
+  deployFailures: (days = 90) => j<DeployFailures>(authed(`/api/admin/deploy-failures?days=${days}`)),
   notionApp: () => j<{ admin: boolean; client_id: string | null; has_secret: boolean; configured: boolean; redirect_uri: string; from_env: boolean }>(authed('/api/settings/notion-app')),
   saveNotionApp: (body: { client_id?: string; client_secret?: string; clear?: boolean }) =>
     j<{ admin: boolean; client_id: string | null; has_secret: boolean; configured: boolean; redirect_uri: string; from_env: boolean }>(authed('/api/settings/notion-app', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })),
@@ -823,3 +824,6 @@ export function replay(events: ArenaEvent[], speed: () => number, onEvent: (e: A
     window.clearTimeout(timer)
   }
 }
+
+export type DeployFailureGroup = { signature: string; label: string; rule: string | null; prevented: boolean; count: number; fixed: number; unfixed: number; open: number; apps: number; last_ts: number; excerpt: string; fix_summary: string | null }
+export type DeployFailures = { groups: DeployFailureGroup[]; total: number; fixed: number; days: number }

@@ -59,6 +59,7 @@ from . import providers as provmod
 from . import runner as runmod
 from . import skills as skillmod
 from . import cloud as cloudmod
+from . import lessons as lessonsmod
 from . import levels as levelsmod
 from . import tickets as ticketsmod
 from . import gitserver
@@ -3129,6 +3130,10 @@ def on_deploy_failed(user_id: str, build_id: str, reason: str, logs: str) -> boo
                 await asyncio.sleep(10)
         finally:
             b._deploy_fix = False
+        v = b.versions[-1] if b.versions else {}
+        if v.get("trigger") == "deploy":  # what the builder changed: confirmed as the fix when the app goes live
+            st = v.get("stats") or {}
+            lessonsmod.note_fix(user_id, build_id, v.get("summary") or "", [*st.get("added", []), *st.get("modified", [])])
         if b.status != "error" and not getattr(b, "publishing", False):
             _start_publish(user, b)
             return
@@ -3143,6 +3148,14 @@ def on_deploy_failed(user_id: str, build_id: str, reason: str, logs: str) -> boo
 
 
 cloudmod.ON_DEPLOY_FAILED = on_deploy_failed
+
+
+@app.get("/api/admin/deploy-failures")
+def admin_deploy_failures(days: int = 90, user: User = CurrentUser):
+    """What Tably Cloud learned from failed deploys: which errors repeat, which the automatic fix solved (admin only)."""
+    if not _is_admin(user):
+        raise HTTPException(403)
+    return lessonsmod.report(max(1, min(days, 365)))
 
 
 @app.delete("/api/sessions/{session_id}/builds/{build_id}/cloud/publish")
