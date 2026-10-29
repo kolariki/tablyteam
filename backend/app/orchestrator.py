@@ -82,7 +82,7 @@ CLOSING_REVIEW_PROTOCOL = """RONDA DE CIERRE DE LA REVISIÓN. La discusión term
 Respondé SOLO con:
 <reflexion>qué pesó más en tu decisión, en 1-2 frases</reflexion>
 <message>Primera línea: `APRUEBO` o `CAMBIOS`. Después, la lista de cambios que pedís de tu área, uno por línea, con este formato exacto:
-- [bloqueante] qué cambiar y dónde (archivo, pantalla o endpoint concreto)
+- [bloqueante] qué cambiar y dónde (archivo, pantalla o endpoint concreto) — solo lo que se arregla en el código; publicar, desplegar o cargar secretos lo hace el usuario desde Tably y nunca es bloqueante
 - [mejora] qué cambiar y dónde
 Si aprobás sin cambios, dejá la lista vacía. Máximo 8 ítems, concretos y accionables para el constructor.</message>
 <stance>propose</stance>
@@ -101,7 +101,13 @@ está listo para producción o no. Mantené la atribución del rol que lo pidió
 <level>SOLO si hay REQUISITOS DEL NIVEL: una línea por requisito, formato exacto `- [N1] cumplido|parcial|pendiente — evidencia concreta (archivo, pantalla)`</level>
 IMPORTANTE: las prioridades del usuario que no estén cumplidas DEBEN aparecer también en <changes> como [bloqueante] [Usuario]. Los requisitos del nivel marcados [team] que no estén
 cumplidos DEBEN aparecer en <changes> como [bloqueante] [Nivel N]: el equipo sigue los niveles a rajatabla y no se aprueba un producto que no cumple el nivel que está escalando.
-Nunca devuelvas <changes> vacío si algún rol pidió cambios."""
+Nunca devuelvas <changes> vacío si algún rol pidió cambios.
+QUÉ PUEDE SER [bloqueante]: solo lo que el constructor puede resolver escribiendo código en el repo (un bug, un flujo roto, un hueco de
+seguridad, datos que se pierden, una prioridad del usuario o un requisito [team] del nivel sin cumplir). Publicar en una URL, desplegar,
+cargar secretos o variables de un host, crear cuentas, correr CI en un servidor real o conseguir dominios lo hace el USUARIO desde Tably
+(Publicar): eso nunca es bloqueante; como mucho, una [mejora] que diga que queda listo para publicar.
+CONVERGENCIA: desde la ronda 2, no abras alcance nuevo. Un bloqueante nuevo solo si es un defecto real que rompe el producto; lo demás es
+[mejora]. Si los bloqueantes de la ronda anterior quedaron resueltos y no hay defectos reales, aprobá."""
 
 TAGS = ("thinking", "reflexion", "message", "stance", "confidence", "next", "reason", "vote", "headline", "why", "key_moment", "others", "verdict", "changes", "resolved", "priorities", "level")
 
@@ -705,12 +711,13 @@ class Session:
         prio_txt = ("\n\nPRIORIDADES DEL USUARIO (decidí para cada una cumplida/parcial/pendiente; las no cumplidas van a <changes> como [bloqueante] [Usuario]):\n"
                     + "\n".join(f"- [P{i + 1}] {t}" for i, t in enumerate(prios))) if prios else ""
         lvl = (cfg.review_of or {}).get("level") or {}
-        lv_items = [i for i in (lvl.get("items") or []) if isinstance(i, dict) and i.get("text")]
+        # "approved" is this very verdict: asking the council about it would block the approval on itself
+        lv_items = [i for i in (lvl.get("items") or []) if isinstance(i, dict) and i.get("text") and i.get("id") != "approved"]
         level_txt = (f"\n\nREQUISITOS DEL NIVEL {lvl.get('next')} · {lvl.get('label')} (decidí para cada uno cumplido/parcial/pendiente según el proyecto y los veredictos; los [team] no cumplidos van a <changes> como [bloqueante] [Nivel {lvl.get('next')}]):\n"
                      + "\n".join(f"- [{i['id']}] [{i.get('who', 'team')}] {i['text']}" for i in lv_items)) if lv_items else ""
         focus_txt = ("\n\nENFOQUE DE LA RONDA: DISEÑO. Los <changes> son únicamente de UI/UX (layout, componentes, paleta, tipografía, estados, interacciones, responsive, pulido) con pantalla y archivo. "
                      "Descartá cualquier pedido de tests, CI, deploy, legales, rendimiento o deuda técnica aunque algún rol lo haya mencionado.") if (cfg.review_of or {}).get("focus") == "design" else ""
-        user = f"PROYECTO: {(cfg.review_of or {}).get('title') or cfg.topic}\n\nDEBATE DEL CONSEJO:\n{transcript}\n\nVEREDICTOS FINALES POR ROL:\n{verdicts}{prior_txt}{prio_txt}{level_txt}{focus_txt}"
+        user = f"PROYECTO: {(cfg.review_of or {}).get('title') or cfg.topic} · RONDA {(cfg.review_of or {}).get('round') or 1}\n\nDEBATE DEL CONSEJO:\n{transcript}\n\nVEREDICTOS FINALES POR ROL:\n{verdicts}{prior_txt}{prio_txt}{level_txt}{focus_txt}"
         system = COUNCIL_SYSTEM.format(model=judge.model, language=cfg.language) + lang_rule(cfg.language)
         self.emit("judge.started", judge_id=judge.id, model=judge.model, provider=judge.provider)
         try:
