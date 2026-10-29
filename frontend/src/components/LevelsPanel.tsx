@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ArrowRight, BarChart3, Check, Copy, ExternalLink, Gavel, Globe, HardHat, Loader2, Lock, Send, Store, Trophy, User, X } from 'lucide-react'
+import { ArrowRight, BarChart3, Check, CloudUpload, Copy, ExternalLink, Gavel, Globe, HardHat, Loader2, Lock, Send, Store, Trophy, User, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { reconnectBuild, useBuild } from '../buildStore'
 import { api, type LevelsInfo, type LevelsPayload, type MarketListing } from '../lib/api'
@@ -193,8 +193,14 @@ export default function LevelsPanel() {
                         {busy === 'council' ? <Loader2 size={13} className="animate-spin" /> : <Gavel size={13} />} {T('Enviar a revisión', 'Send for review')}
                       </button>
                     )}
-                    {!c.ok && c.id === 'published' && <div className="mt-0.5 text-[11px] text-ink-3">{T('Panel «Publicar» → un clic y queda en una URL pública.', '"Publish" pane → one click and it is on a public URL.')}</div>}
-                    {!c.ok && c.id === 'republished' && <div className="mt-0.5 text-[11px] text-ink-3">{T('Volvé a publicar la última versión desde «Publicar».', 'Publish the latest version again from "Publish".')}</div>}
+                    {!c.ok && (c.id === 'published' || c.id === 'republished') && (
+                      <>
+                        <div className="mt-0.5 text-[11px] text-ink-3">{c.id === 'published' ? T('Un clic y queda en una URL pública de Tably Cloud.', 'One click and it is on a public Tably Cloud URL.') : T('Publicá la última versión para que la URL muestre lo nuevo.', 'Publish the latest version so the URL shows what is new.')}</div>
+                        <button onClick={() => useBuild.getState().set({ pane: 'cloud', paneOpen: true })} disabled={running || Object.keys(b.files).length === 0} className="mt-1.5 inline-flex h-8 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40">
+                          <CloudUpload size={13} /> {c.id === 'published' ? T('Publicar', 'Publish') : T('Volver a publicar', 'Publish again')}
+                        </button>
+                      </>
+                    )}
                     {!c.ok && c.id === 'visits' && data?.app?.url && <div className="mt-0.5 text-[11px] text-ink-3">{T('Compartí la URL: cada visita cuenta.', 'Share the URL: every visit counts.')} <a href={data.app.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">{data.app.url}</a></div>}
                   </div>
                   <Who who={c.who} />
