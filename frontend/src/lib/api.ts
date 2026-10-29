@@ -87,6 +87,7 @@ export interface TeamMemory {
   memory: RoleInsight[]
 }
 export interface Employee {
+  avatar: import('./avatar').AvatarConfig | null
   id: string
   key: string
   role: string | null
@@ -155,8 +156,9 @@ export const api = {
   teamMemory: () => j<TeamMemory>(authed('/api/team/memory')),
   employees: () => j<{ employees: Employee[] }>(authed('/api/team/employees')),
   createEmployee: (body: { role?: string | null; name?: string; persona?: string; provider?: string; model?: string }) => j<{ employees: Employee[] }>(post('/api/team/employees', body)),
-  updateEmployee: (id: string, body: Partial<Pick<Employee, 'name' | 'persona' | 'provider' | 'model' | 'skills'>>) => j<{ employees: Employee[] }>(authed(`/api/team/employees/${id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })),
+  updateEmployee: (id: string, body: Partial<Pick<Employee, 'name' | 'persona' | 'provider' | 'model' | 'skills' | 'avatar'>>) => j<{ employees: Employee[] }>(authed(`/api/team/employees/${id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })),
   deleteEmployee: (id: string) => j<{ employees: Employee[] }>(authed(`/api/team/employees/${id}`, { method: 'DELETE' })),
+  suggestRolePrompt: (id: string, hint: string, lang: string) => j<{ prompt: string; model: string }>(post(`/api/team/employees/${id}/suggest-prompt`, { hint, lang })),
   employeeDocs: (id: string) => j<{ docs: KnowledgeDoc[] }>(authed(`/api/team/employees/${id}/docs`)),
   addEmployeeNote: (id: string, title: string, text: string) => j<{ docs: KnowledgeDoc[] }>(post(`/api/team/employees/${id}/docs`, { title, text })),
   addEmployeeUrl: (id: string, url: string) => j<{ docs: KnowledgeDoc[] }>(post(`/api/team/employees/${id}/docs`, { url })),

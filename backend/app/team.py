@@ -47,9 +47,15 @@ with _db() as _c:
     )
 
 
+with _db() as _c:  # the employee's avatar (an illustrated face the user designs; null = the role's default portrait)
+    if "avatar" not in [r[1] for r in _c.execute("PRAGMA table_info(employees)")]:
+        _c.execute("ALTER TABLE employees ADD COLUMN avatar TEXT")
+
+
 def _row(r) -> dict:
     d = dict(r)
     d["skills"] = json.loads(d.get("skills") or "[]")
+    d["avatar"] = json.loads(d["avatar"]) if d.get("avatar") else None
     return d
 
 
@@ -132,6 +138,9 @@ def update(user_id: str, eid: str, body: dict) -> dict | None:
     fields = {k: body[k] for k in ("name", "persona", "provider", "model") if isinstance(body.get(k), str)}
     if isinstance(body.get("skills"), list):
         fields["skills"] = json.dumps([str(s) for s in body["skills"]][:20])
+    if "avatar" in body:  # a small dict of drawing options, or null to go back to the default portrait
+        av = body.get("avatar")
+        fields["avatar"] = json.dumps({str(k)[:24]: str(v)[:32] for k, v in list(av.items())[:20]}) if isinstance(av, dict) else None
     if "name" in fields:
         fields["name"] = fields["name"].strip()[:80] or e["name"]
         new_key = role_key(e["role"], fields["name"])

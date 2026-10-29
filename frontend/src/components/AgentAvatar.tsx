@@ -1,3 +1,4 @@
+import { avatarSrc, roleKey, useAvatars } from '../lib/avatar'
 import ProviderLogo from './ProviderLogo'
 
 /**
@@ -31,11 +32,13 @@ export function avatarUri(agent?: { name?: string; role?: string | null } | null
 
 export default function AgentAvatar({ agent, size = 40, className = '', ring = true, logo: logoRatio = 0.24, chip = false }: { agent?: { name?: string; role?: string | null; provider?: string | null; wanted_provider?: string | null; color?: string | null } | null; size?: number; className?: string; ring?: boolean; logo?: number; chip?: boolean }) {
   const provider = agent?.wanted_provider ?? agent?.provider ?? undefined
+  // the face the user designed for this employee (Mi equipo), else the role's portrait
+  const designed = useAvatars((st) => (agent ? st.byKey[roleKey(agent.role, agent.name)] : undefined))
   const badge = Math.max(14, Math.round(size * Math.min(0.3, logoRatio + 0.04)))
   return (
     <span className={`relative inline-block shrink-0 ${className}`} style={{ width: size, height: size }} aria-hidden>
       <span className={`block h-full w-full overflow-hidden rounded-full bg-[#EEF1EC] ${ring ? 'ring-1 ring-black/10' : ''}`}>
-        <img src={avatarUri(agent)} alt="" width={size} height={size} loading="lazy" draggable={false} className="block h-full w-full select-none object-cover" />
+        <img src={designed ? avatarSrc(designed) : avatarUri(agent)} alt="" width={size} height={size} loading="lazy" draggable={false} className="block h-full w-full select-none object-cover" />
       </span>
       {provider && (
         <span

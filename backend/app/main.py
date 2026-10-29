@@ -74,7 +74,7 @@ from .config import CORS_ORIGINS, env
 from .orchestrator import SESSIONS, drop_self_approval, start_session
 from .presets import PRESETS
 from .roles import ROLE_GROUPS, ROLES
-from .providers import PROVIDERS, Cred, available_models, list_models
+from .providers import PROVIDERS, CallResult, Cred, available_models, list_models, stream
 from .schemas import SessionConfig
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -1493,6 +1493,56 @@ def team_employee_delete(eid: str, user: User = CurrentUser):
     if not teammod.delete(user.id, eid):
         raise HTTPException(404)
     return {"employees": teammod.listing(user.id)}
+
+
+ROLE_PROMPT_SYSTEM = """Sos un experto en diseñar equipos de IA. Escribí el PROMPT de un rol de un equipo que debate, diseña, construye y revisa apps.
+El prompt se suma al mandato base del rol del catálogo: no lo repitas, agregá carácter y criterio propio.
+Estructura (texto corrido o viñetas cortas, 120 a 220 palabras, en {language}, en segunda persona dirigida al rol):
+- Quién es y desde qué experiencia mira los problemas.
+- Qué prioriza y qué cosas defiende siempre.
+- Qué pide como bloqueante (solo lo que rompe el producto o el negocio) y qué deja como mejora.
+- Cómo habla en el debate (tono, nivel de detalle, cómo discrepa).
+- Si hay CONOCIMIENTO DE LA EMPRESA, usalo: industria, clientes, stack, tono, restricciones reales.
+No inventes datos de la empresa que no estén en el contexto. Devolvé SOLO el prompt, sin título ni comillas."""
+
+
+@app.post("/api/team/employees/{eid}/suggest-prompt")
+async def team_employee_suggest_prompt(eid: str, body: dict | None = None, user: User = CurrentUser):
+    """AI help for a role's prompt: from its catalog mandate, what it knows about the company and an optional idea of the user."""
+    e = teammod.get(user.id, eid)
+    if not e:
+        raise HTTPException(404)
+    pick = _classify_model(user)
+    if not pick:
+        eff = keystore.creds(user.id)
+        c = eff.get("baseten")
+        if c and c.source != "none":
+            pick = ("baseten", c.model or PROVIDERS["baseten"].default_model, c)
+    if not pick:
+        raise HTTPException(400, "Conectá un modelo (por ejemplo Muse) en Modelos y API keys para que la IA te sugiera prompts")
+    provider, model, cred = pick
+    from .roles import role_of
+
+    r = role_of(e.get("role"))
+    hint = str((body or {}).get("hint") or "").strip()[:800]
+    know = teammod.knowledge_block(user.id, e.get("role"), e.get("name"), f"{e.get('name')} {hint} empresa producto clientes")
+    en = str((body or {}).get("lang") or "") == "en"
+    prompt_user = (f"ROL: {e.get('name')}" + (f" — {r['label']}. Mandato base: {r.get('mandate', '')}" if r else " (rol propio, sin mandato del catálogo)")
+                   + (f"\n\nPROMPT ACTUAL (mejoralo, no lo descartes sin motivo):\n{e.get('persona')[:3000]}" if e.get("persona") else "")
+                   + (f"\n\nLO QUE PIDE EL USUARIO:\n{hint}" if hint else "")
+                   + (f"\n\n{know[:6000]}" if know else "\n\n(Sin conocimiento de la empresa cargado todavía.)"))
+    result, out = CallResult(), []
+    try:
+        async for kind, delta in stream(provider, model, ROLE_PROMPT_SYSTEM.format(language="English" if en else "español rioplatense"), prompt_user,
+                                        temperature=0.6, max_tokens=4000, result=result, cred=cred):
+            if kind == "text":
+                out.append(delta)
+    except Exception as ex:  # noqa: BLE001
+        raise HTTPException(502, f"El modelo no respondió: {str(ex)[:200]}")
+    text = re.sub(r"^\s*[\"“]|[\"”]\s*$", "", "".join(out).strip())
+    if not text:
+        raise HTTPException(502, "El modelo no devolvió un prompt; probá de nuevo")
+    return {"prompt": text[:6000], "model": model}
 
 
 @app.get("/api/team/employees/{eid}/docs")

@@ -1,10 +1,12 @@
-import { BookOpen, FileText, Globe, Loader2, Plus, StickyNote, Trash2, Upload } from 'lucide-react'
+import { BookOpen, Check, FileText, Globe, Loader2, Pencil, Plus, Sparkles, StickyNote, Trash2, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { create } from 'zustand'
 import { api, type Employee, type KnowledgeDoc } from '../lib/api'
 import { getLang, tr, useT } from '../lib/i18n'
 import type { AgentConfig, Role } from '../types'
+import { useAvatars, type AvatarConfig } from '../lib/avatar'
 import AgentAvatar from './AgentAvatar'
+import AvatarEditor from './AvatarEditor'
 import { toast } from './Toast'
 
 /**
@@ -12,7 +14,11 @@ import { toast } from './Toast'
  * and knowledge base. Feeding a role (notes, documents, web pages) is a small RAG: the backend picks what matters for each topic.
  */
 export const useEmployees = create<{ list: Employee[] | null; set: (list: Employee[]) => void }>((set) => ({ list: null, set: (list) => set({ list }) }))
-export const loadEmployees = () => api.employees().then((d) => { useEmployees.getState().set(d.employees); return d.employees }).catch(() => null)
+export const loadEmployees = () => api.employees().then((d) => {
+  useEmployees.getState().set(d.employees)
+  useAvatars.getState().set(Object.fromEntries(d.employees.filter((e) => e.avatar).map((e) => [e.key, e.avatar!])))
+  return d.employees
+}).catch(() => null)
 
 const roleName = (e: Employee) => (getLang() === 'en' ? e.role_label_en : e.role_label) || e.name
 
@@ -83,6 +89,19 @@ function EmployeeDetail({ e, onDeleted }: { e: Employee; onDeleted: () => void }
   const [url, setUrl] = useState('')
   const [busy, setBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const [editingFace, setEditingFace] = useState(false)
+  const [asking, setAsking] = useState(false)
+  const [hint, setHint] = useState('')
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestion, setSuggestion] = useState<string | null>(null)
+  const suggest = async () => {
+    setSuggesting(true)
+    try { setSuggestion((await api.suggestRolePrompt(e.id, hint, getLang())).prompt) } catch (err) { toast.error(tr('No se pudo sugerir', 'Could not suggest'), (err as Error).message) }
+    setSuggesting(false)
+  }
+  const saveFace = async (avatar: AvatarConfig | null) => {
+    try { await api.updateEmployee(e.id, { avatar }); await loadEmployees(); setEditingFace(false); toast.ok(tr('Cara guardada', 'Face saved'), tr('Se ve así en el equipo, la arena y el constructor.', 'It shows like this in the team, the arena and the builder.')) } catch (err) { toast.error(tr('No se pudo guardar', 'Could not save'), (err as Error).message) }
+  }
   useEffect(() => { api.employeeDocs(e.id).then((d) => setDocs(d.docs)).catch(() => setDocs([])) }, [e.id])
   const dirty = name !== e.name || persona !== e.persona
   const save = async () => {
@@ -110,8 +129,12 @@ function EmployeeDetail({ e, onDeleted }: { e: Employee; onDeleted: () => void }
   )
   return (
     <div className="min-w-0 space-y-4">
+      {editingFace && <AvatarEditor value={e.avatar} onSave={(c) => saveFace(c)} onReset={() => saveFace(null)} onClose={() => setEditingFace(false)} />}
       <div className="flex items-center gap-3">
-        <AgentAvatar agent={{ name: e.name, role: e.role, provider: e.provider }} size={44} />
+        <button onClick={() => setEditingFace(true)} className="group relative shrink-0 rounded-full" title={T('Cambiar su cara', 'Change their face')}>
+          <AgentAvatar agent={{ name: e.name, role: e.role, provider: e.provider }} size={56} />
+          <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border border-line bg-surface text-ink-2 shadow-sm transition group-hover:text-accent"><Pencil size={11} /></span>
+        </button>
         <div className="min-w-0 flex-1">
           <input value={name} onChange={(ev) => setName(ev.target.value)} className="w-full bg-transparent text-[18px] font-semibold outline-none focus:underline" />
           <div className="truncate text-[12px] text-ink-3">{roleName(e)}{e.model ? ` · ${e.model}` : ''} · {T(`${e.projects} proyecto${e.projects === 1 ? '' : 's'}`, `${e.projects} project${e.projects === 1 ? '' : 's'}`)}{e.lessons ? ` · ${e.lessons} ${T('lecciones en memoria', 'lessons in memory')}` : ''}</div>
@@ -119,7 +142,28 @@ function EmployeeDetail({ e, onDeleted }: { e: Employee; onDeleted: () => void }
         <button onClick={remove} className="rounded-full p-2 text-ink-4 transition hover:bg-danger/10 hover:text-danger" title={T('Sacar del equipo', 'Remove from the team')}><Trash2 size={15} /></button>
       </div>
       <div>
-        <div className="text-[11.5px] uppercase tracking-widest text-ink-3">{T('Prompt del rol', 'Role prompt')}</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="text-[11.5px] uppercase tracking-widest text-ink-3">{T('Prompt del rol', 'Role prompt')}</div>
+          <button onClick={() => setAsking(!asking)} className="ml-auto flex h-7 items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-3 text-[12px] font-semibold text-accent transition hover:bg-accent hover:text-white"><Sparkles size={12} /> {T('Sugerir con IA', 'Suggest with AI')}</button>
+        </div>
+        {asking && (
+          <div className="mt-2 rounded-xl border border-accent/30 bg-accent-soft/40 p-3">
+            <div className="flex flex-wrap gap-2">
+              <input value={hint} onChange={(ev) => setHint(ev.target.value)} onKeyDown={(ev) => ev.key === 'Enter' && suggest()} placeholder={T('¿Qué querés que priorice? (opcional) Ej.: que piense en pymes y sea directo', 'What should it prioritise? (optional) e.g. think about SMBs and be direct')} className="min-w-[220px] flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] outline-none focus:border-accent" />
+              <button onClick={suggest} disabled={suggesting} className="flex h-8 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[12.5px] font-semibold text-white disabled:opacity-50">{suggesting ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} {suggestion ? T('Otra versión', 'Another version') : T('Sugerir', 'Suggest')}</button>
+            </div>
+            <div className="mt-1.5 text-[11.5px] text-ink-3">{T('Usa el rol, su prompt actual y lo que le cargaste en Conocimiento sobre tu empresa.', 'Uses the role, its current prompt and what you loaded in Knowledge about your company.')}</div>
+            {suggestion && (
+              <div className="mt-2 rounded-lg border border-line bg-surface p-3">
+                <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink">{suggestion}</p>
+                <div className="mt-2 flex gap-2">
+                  <button onClick={() => { setPersona(suggestion); setSuggestion(null); setAsking(false) }} className="flex h-8 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[12.5px] font-semibold text-white"><Check size={13} /> {T('Usar este prompt', 'Use this prompt')}</button>
+                  <button onClick={() => setSuggestion(null)} className="h-8 rounded-full px-3 text-[12.5px] text-ink-3 hover:text-ink">{T('Descartar', 'Dismiss')}</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         <textarea value={persona} onChange={(ev) => setPersona(ev.target.value)} rows={4} placeholder={T('Cómo trabaja, qué prioriza, cómo habla (se suma al rol del catálogo)', 'How it works, what it prioritises, how it speaks (added to the catalog role)')} className="mt-1.5 w-full resize-y rounded-xl border border-line bg-surface px-3 py-2 text-[13.5px] outline-none focus:border-accent" />
         {dirty && <button onClick={save} disabled={saving} className="mt-1.5 flex h-8 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[13px] font-semibold text-white disabled:opacity-50">{saving && <Loader2 size={13} className="animate-spin" />} {T('Guardar', 'Save')}</button>}
       </div>

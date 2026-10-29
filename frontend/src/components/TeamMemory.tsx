@@ -31,6 +31,7 @@ export function TeamMemoryWatcher() {
   const seen = useRef<number | null>(null)
   useEffect(() => {
     if (!user) return
+    loadEmployees()  // the faces designed in «Mi equipo» show everywhere (arena, builder, council)
     const tick = async () => {
       const d = await load()
       if (!d) return
