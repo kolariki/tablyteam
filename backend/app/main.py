@@ -1546,7 +1546,7 @@ async def team_employee_suggest_prompt(eid: str, body: dict | None = None, user:
 
 
 FACES_DIR = DATA_DIR.parent / "faces"
-FACE_STYLE = ("Editorial corporate portrait photograph, head and shoulders, centered, facing the camera, soft diffused window light, realistic skin texture, "
+FACE_STYLE = ("Editorial corporate portrait photograph, head and shoulders framed from mid-chest up with some space above the head, centered, facing the camera, soft diffused window light, realistic skin texture, "
               "shallow depth of field, painterly textured studio backdrop with a soft gradient from warm cream on the left to muted sage teal on the right, "
               "subtle film grain, refined muted color grade, square composition, no text, no logos. Person: ")
 
@@ -1554,12 +1554,17 @@ FACE_STYLE = ("Editorial corporate portrait photograph, head and shoulders, cent
 @app.post("/api/team/employees/{eid}/generate-face")
 async def team_employee_generate_face(eid: str, body: dict, user: User = CurrentUser):
     """A realistic portrait for an employee, in the same editorial style as the role portraits, from the traits the user picked.
-    Runs on the user's own OpenAI key (image generation is billed per image)."""
+    Muse first (muse-image-1.0 on the Meta key), OpenAI (gpt-image-2) when there is no Meta key; billed per image."""
     if not teammod.get(user.id, eid):
         raise HTTPException(404)
-    key = keystore.get_key(user.id, "openai") or env("OPENAI_API_KEY")
-    if not key:
-        raise HTTPException(400, "Para crear caras con IA cargá tu key de OpenAI en Modelos y API keys (mientras tanto elegí una de las prediseñadas)")
+    eff = keystore.creds(user.id)
+    meta, openai = eff.get("meta"), eff.get("openai")
+    if meta and meta.source != "none" and meta.api_key:
+        url, key, model = (meta.base_url or PROVIDERS["meta"].base_url).rstrip("/") + "/images/generations", meta.api_key, "muse-image-1.0"
+    elif openai and openai.source != "none" and openai.api_key:
+        url, key, model = "https://api.openai.com/v1/images/generations", openai.api_key, "gpt-image-2"
+    else:
+        raise HTTPException(400, "Para crear caras con IA conectá Muse (o OpenAI) en Modelos y API keys; mientras tanto elegí una de las prediseñadas")
     pick = lambda k, n=60: re.sub(r"[^\w\s,.'/-]", "", str(body.get(k) or ""))[:n].strip()  # noqa: E731
     parts = [f"a {pick('gender') or 'person'} in their {pick('age') or '30s'}", f"{pick('skin') or 'medium'} skin"]
     hair = pick("hair")
@@ -1574,13 +1579,13 @@ async def team_employee_generate_face(eid: str, body: dict, user: User = Current
         parts.append(pick("extra", 160))
     try:
         async with httpx.AsyncClient(timeout=240) as cx:
-            r = await cx.post("https://api.openai.com/v1/images/generations", headers={"Authorization": f"Bearer {key}"},
-                              json={"model": "gpt-image-2", "prompt": FACE_STYLE + ", ".join(parts), "size": "1024x1024", "quality": "medium", "n": 1})
+            req = {"model": model, "prompt": FACE_STYLE + ", ".join(parts), "size": "1024x1024", "n": 1} | ({"quality": "medium"} if model.startswith("gpt-image") else {})
+            r = await cx.post(url, headers={"Authorization": f"Bearer {key}"}, json=req)
     except httpx.HTTPError as e:
         raise HTTPException(502, f"No se pudo generar la cara: {e}")
     if r.status_code != 200:
         msg = (r.json().get("error") or {}).get("message", r.text[:200]) if r.headers.get("content-type", "").startswith("application/json") else r.text[:200]
-        raise HTTPException(400 if r.status_code < 500 else 502, f"OpenAI no generó la cara: {msg}")
+        raise HTTPException(400 if r.status_code < 500 else 502, f"{'Muse' if model.startswith('muse') else 'OpenAI'} no generó la cara: {msg}")
     import base64
     import io
 
@@ -1588,7 +1593,14 @@ async def team_employee_generate_face(eid: str, body: dict, user: User = Current
 
     FACES_DIR.mkdir(parents=True, exist_ok=True)
     name = secrets.token_hex(12)
-    img = Image.open(io.BytesIO(base64.b64decode(r.json()["data"][0]["b64_json"]))).convert("RGB").resize((384, 384), Image.LANCZOS)
+    d0 = (r.json().get("data") or [{}])[0]
+    raw = base64.b64decode(d0["b64_json"]) if d0.get("b64_json") else b""
+    if not raw and d0.get("url"):
+        async with httpx.AsyncClient(timeout=60) as cx:
+            raw = (await cx.get(d0["url"])).content
+    if not raw:
+        raise HTTPException(502, "El modelo no devolvió la imagen; probá de nuevo")
+    img = Image.open(io.BytesIO(raw)).convert("RGB").resize((384, 384), Image.LANCZOS)
     img.save(FACES_DIR / f"{name}.webp", "WEBP", quality=82, method=6)
     return {"src": f"/api/faces/{name}.webp"}
 

@@ -65,7 +65,7 @@ export default function AvatarEditor({ employeeId, value, onSave, onReset, onClo
               </div>
             ) : (
               <div className="mt-4 space-y-3">
-                <p className="text-[12.5px] text-ink-3">{T('Elegí cómo es y la IA genera un retrato realista con el mismo estilo que el resto del equipo. Usa tu key de OpenAI (se cobra por imagen).', 'Choose how they look and AI generates a realistic portrait in the same style as the rest of the team. Uses your OpenAI key (billed per image).')}</p>
+                <p className="text-[12.5px] text-ink-3">{T('Elegí cómo es y la IA genera un retrato realista con el mismo estilo que el resto del equipo. Lo genera Muse con tu key de Meta (o OpenAI si no tenés Muse); se cobra por imagen.', 'Choose how they look and AI generates a realistic portrait in the same style as the rest of the team. Muse generates it with your Meta key (or OpenAI if you have no Muse); billed per image.')}</p>
                 {(Object.keys(CHOICES) as (keyof typeof CHOICES)[]).map((k) => (
                   <div key={k}>
                     <div className="mb-1 text-[11.5px] uppercase tracking-widest text-ink-3">{T(...LABELS[k])}</div>
