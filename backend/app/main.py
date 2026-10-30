@@ -91,7 +91,17 @@ _auth_hits: dict[str, list[float]] = {}
 
 class SecurityHeaders(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
+        path = request.url.path
+        if not path.startswith("/r/"):  # an absolute path asked by an app running at /r/<token>/ (/assets/x.js, /api/…): into it
+            ref = re.search(r"^https?://([^/]+)/r/([\w-]{16,})/", request.headers.get("referer") or "")
+            if ref and ref.group(2) in runmod.TOKENS and ref.group(1) == request.headers.get("host"):
+                q = f"?{request.url.query}" if request.url.query else ""
+                return Response(status_code=307, headers={"Location": f"/r/{ref.group(2)}{path}{q}"})
         resp = await call_next(request)
+        if path.startswith("/r/"):  # the running app is shown inside Tably's panel
+            if "x-frame-options" in resp.headers:
+                del resp.headers["x-frame-options"]
+            return resp
         resp.headers.setdefault("X-Content-Type-Options", "nosniff")
         resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
@@ -2001,6 +2011,102 @@ async def app_run_stop(session_id: str, build_id: str, user: User = CurrentUser)
     return {"ok": True}
 
 
+# «Correr la app» on a server: the user's browser can't open the server's 127.0.0.1, so the app is reached through Tably at
+# <run base>/r/<token>/ — preferably another host than Tably's own (TABLY_RUN_URL, or Railway's service domain), so the
+# app's code never shares an origin with Tably's session. Absolute paths the app asks for (/assets/x.js, /api/…) come back
+# here with a Referer under /r/<token>/ and are sent into it (see SecurityHeaders).
+def _run_base() -> str | None:
+    if env("TABLY_RUN_URL"):
+        return env("TABLY_RUN_URL").rstrip("/")
+    pub = cloudmod.public_url()
+    if re.search(r"//(localhost|127\.0\.0\.1)", pub):
+        return None
+    dom = env("RAILWAY_PUBLIC_DOMAIN")
+    return f"https://{dom}" if dom and dom not in pub else pub
+
+
+runmod.RUN_BASE = _run_base()
+_RUN_HTTP = httpx.AsyncClient(timeout=httpx.Timeout(120, connect=5), follow_redirects=False)
+_RUN_DROP = {"content-security-policy", "content-security-policy-report-only", "x-frame-options", "referrer-policy", "content-length", "transfer-encoding", "content-encoding", "connection", "keep-alive"}
+_RUN_HOP = {"host", "connection", "keep-alive", "accept-encoding", "content-length", "x-tably-sw"}
+_RUN_WAIT = ("<!doctype html><meta charset=utf-8><meta http-equiv=refresh content=4><title>Cargando…</title>"
+             "<body style='margin:0;display:grid;place-items:center;height:100vh;font:15px system-ui;color:#55625C;background:#F7F5F0'>Cargando…</body>")
+
+
+@app.api_route("/r/{token}/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"], include_in_schema=False)
+async def run_proxy(token: str, path: str, request: Request):
+    r = runmod.TOKENS.get(token)
+    if not r:
+        return Response(_RUN_WAIT, status_code=404, media_type="text/html")
+    if path == "__tably/errors" and request.method == "POST":  # the reporter in the app's page: browser errors
+        try:
+            body = json.loads((await request.body())[:8000] or b"{}")
+        except ValueError:
+            body = {}
+        msg = str((body or {}).get("message") or "")[:500]
+        if msg and body.get("kind") != "http" and not incidentsmod.BROWSER_NOISE.search(msg + str(body.get("stack") or "")) and r.status == "running" and not r.fix:
+            incidentsmod.record(r.user_id, r.build_id, "run", msg, f"{msg}\n(página: {str(body.get('page') or '')[:200]})\n{str(body.get('stack') or '')[:2000]}")
+            spawn(_kick_async(r.user_id, r.build_id))
+        return Response(status_code=204)
+    if r.status != "running":
+        return Response(_RUN_WAIT, status_code=503, media_type="text/html")
+    host = f"[{r.host}]" if ":" in r.host else r.host
+    url = f"http://{host}:{r.port}/{path}" + (f"?{request.url.query}" if request.url.query else "")
+    headers = [(k, v) for k, v in request.headers.items() if k.lower() not in _RUN_HOP]
+    headers.append(("host", f"127.0.0.1:{r.port}"))
+    body = await request.body()
+    try:
+        resp = await _RUN_HTTP.send(_RUN_HTTP.build_request(request.method, url, headers=headers, content=body or None), stream=True)
+    except httpx.HTTPError:
+        return Response(_RUN_WAIT, status_code=503, media_type="text/html")
+    prefix = f"/r/{token}"
+    out = []
+    for k, v in resp.headers.multi_items():
+        if k.lower() in _RUN_DROP:
+            continue
+        if k.lower() == "location" and v.startswith("/") and not v.startswith(prefix):
+            v = prefix + v
+        out.append((k, v))
+    ctype = resp.headers.get("content-type", "")
+    if resp.status_code >= 500 and r.status == "running" and not r.fix:  # the app's server failed a request: its log says why
+        await asyncio.sleep(0.4)  # let the log pump catch up with what the server printed before answering
+        tail = [ln for ln in r.logs[-60:] if ln.strip()]
+        head = incidentsmod.log_headline(tail)
+        incidentsmod.record(r.user_id, r.build_id, "run", head or f"{request.method} /{path} → {resp.status_code}", f"{request.method} /{path} → {resp.status_code}\n--- log ---\n" + "\n".join(tail))
+        spawn(_kick_async(r.user_id, r.build_id))
+    if "text/html" in ctype:  # the page reports its own errors back (uncaught exceptions, rejected promises)
+        html = (await resp.aread()).decode(resp.encoding or "utf-8", "replace")
+        await resp.aclose()
+        tag = f"<script>{incidentsmod.reporter_js(prefix + '/__tably/errors')}</script>"
+        m = re.search(r"<head[^>]*>", html, re.I)  # first thing in the page, so it sees the app's own errors
+        html = html[:m.end()] + tag + html[m.end():] if m else tag + html
+        return _run_response(html.encode(), resp.status_code, out)
+
+    async def stream():
+        try:
+            async for chunk in resp.aiter_bytes():
+                yield chunk
+        finally:
+            await resp.aclose()
+
+    sr = StreamingResponse(stream(), status_code=resp.status_code)
+    for k, v in out:
+        sr.headers.append(k, v)
+    return sr
+
+
+def _run_response(body: bytes, status: int, headers: list[tuple[str, str]]) -> Response:
+    resp = Response(body, status_code=status)
+    for k, v in headers:
+        resp.headers.append(k, v)
+    return resp
+
+
+@app.api_route("/r/{token}", methods=["GET", "HEAD"], include_in_schema=False)
+async def run_proxy_root(token: str):
+    return Response(status_code=307, headers={"Location": f"/r/{token}/"})
+
+
 # --------------------------------------------------------------------------- skills (knowledge attached to roles)
 
 @app.get("/api/skills")
@@ -3217,10 +3323,34 @@ def on_app_errors(user_id: str, build_id: str) -> None:
         _start_error_fix(user, b, rows)
 
 
+def _note(b, text: str) -> None:
+    """A line from Tably in the build's chat (live too)."""
+    ts = time.time()
+    b.chat.append({"role": "system", "text": text, "ts": ts})
+    b.emit("notice", text=text)
+    b._save()
+
+
+def _run_fix(b, state: str | None, **fields) -> None:
+    """What the «App real» pane shows while Tably fixes the run: a loader (fixing/restarting) or a card (needs_approval/stuck/manual)."""
+    r = runmod.RUNS.get(b.id)
+    if not r:
+        return
+    r.fix = None if state is None else {**(r.fix or {}), "state": state, "since": (r.fix or {}).get("since") or time.time(), **fields}  # one clock for the whole fix
+    r.announce()
+
+
+def _published(user_id: str, build_id: str) -> bool:
+    a = cloudmod.get_app(user_id, build_id) or {}
+    return a.get("status") in ("live", "deploying") or (a.get("status") == "error" and bool(a.get("url")))
+
+
 def _start_error_fix(user: User, b, rows: list[dict], approved: dict | None = None) -> None:
-    """One builder pass over these errors. `approved`: a big fix the user said yes to (it is applied and published)."""
+    """One builder pass over these errors. `approved`: a big fix the user said yes to (it is applied and published).
+    Errors of «Correr la app» (source run) end with the app running again; the published app gets the fix too."""
     ids = [r["id"] for r in rows]
     app_ = cloudmod.get_app(user.id, b.id) or {}
+    on_run = any(r["source"] == "run" for r in rows)
     _project_write(b, incidentsmod.ERRORS_FILE, incidentsmod.render_md(incidentsmod.list_for(user.id, b.id)))
     _project_write(b, incidentsmod.FIX_FILE, None)
     before = len(b.versions)
@@ -3228,15 +3358,17 @@ def _start_error_fix(user: User, b, rows: list[dict], approved: dict | None = No
              f"Las tres explicaciones en {b.req.language or 'español'} simple, para alguien que no sabe programar: una o dos frases cada una, sin jerga técnica "
              "(nada de «migración», «endpoint», «stack», «500»; por ejemplo: «la base de datos no tenía armadas las tablas donde se guardan los turnos, así que la agenda no podía cargar»). "
              "«que_cambia» dice qué va a notar la persona que usa la app. Al terminar emití <done>.")
-    errors = "\n\n".join(f"- {r['title']} ({r['count']} vez/veces, {'servidor' if r['source'] == 'server' else 'navegador'})\n{(r['sample'] or r['detail'] or '')[-1800:]}" for r in rows)
+    where = {"server": "servidor publicado", "browser": "navegador", "run": "al correr la app en Tably"}
+    errors = "\n\n".join(f"- {r['title']} ({r['count']} vez/veces, {where.get(r['source'], r['source'])})\n{(r['sample'] or r['detail'] or '')[-2500:]}" for r in rows)
+    scene = ("AL CORRER LA APP DENTRO DE TABLY («Correr la app»: instala dependencias y levanta el servidor de desarrollo) FALLÓ O TUVO ERRORES"
+             if on_run else f"LA APP PUBLICADA ({app_.get('url')}) ESTÁ TENIENDO ERRORES MIENTRAS LA USAN")
     if approved:
-        text = (f"EL USUARIO APROBÓ ESTE ARREGLO de la app publicada ({app_.get('url')}).\nProblema: {approved.get('what')}\nArreglo aprobado: {approved.get('fix')}\n"
+        text = (f"EL USUARIO APROBÓ ESTE ARREGLO ({scene.lower()}).\nProblema: {approved.get('what')}\nArreglo aprobado: {approved.get('fix')}\n"
                 "Aplicalo completo, verificá que compila (build/typecheck) y que los tests pasan. Los errores están en .tably/errores.md.\n" + plain.replace("\"tamano\": \"chico\"|\"grande\"", "\"tamano\": \"grande\"") + "\n\nERRORES:\n" + errors)
     else:
-        text = (f"LA APP PUBLICADA ({app_.get('url')}) ESTÁ TENIENDO ERRORES MIENTRAS LA USAN. Tably los detectó en el log del servidor o en el navegador de los usuarios; "
-                "están abajo y en .tably/errores.md. Encontrá la causa raíz de cada uno.\n"
+        text = (f"{scene}. Tably los detectó (log del servidor, navegador o el arranque); están abajo y en .tably/errores.md. Encontrá la causa raíz de cada uno.\n"
                 "Primero decidí el tamaño del arreglo:\n"
-                "- CHICO: corregir un bug acotado, hacer que las tablas/migraciones se creen solas al arrancar, una validación, el manejo de un error, configuración. "
+                "- CHICO: corregir un bug acotado, una dependencia o un script que falta, que las tablas/migraciones se creen solas al arrancar, una variable de entorno con valor por defecto, el puerto, una validación, el manejo de un error. "
                 "No borra ni transforma datos existentes y no cambia lo que la app hace ni cómo se ve.\n"
                 f"- GRANDE: rehacer partes de la app, cambiar el modelo de datos transformando o borrando datos existentes, cambiar lo que la app hace o cómo se ve, sumar un servicio externo o un cobro, o tocar más de {BIG_FIX_FILES - 2} archivos.\n"
                 "Si es CHICO: aplicalo y verificá que compila (build/typecheck) y que los tests pasan. Si es GRANDE: NO cambies código, solo explicá la propuesta.\n"
@@ -3245,13 +3377,17 @@ def _start_error_fix(user: User, b, rows: list[dict], approved: dict | None = No
     lessonsmod.record(user.id, b.id, "runtime", "error en producción", "\n".join(r["detail"] or "" for r in rows))
     b._error_fix = True
     b.resume(text)
-    b._pending_requests = [{"severity": "bloqueante", "role": "Tably Cloud", "text": f"Error en producción: {r['title']}"[:300]} for r in rows]
+    b._pending_requests = [{"severity": "bloqueante", "role": "Tably Cloud", "text": f"Error: {r['title']}"[:300]} for r in rows]
     b._pending_trigger = "runtime"
+    if on_run:
+        _run_fix(b, "fixing", id=rows[0]["id"])
+    _note(b, b.tx(f"Tably encontró un error {'al correr la app' if on_run else 'en la app publicada'} ({rows[0]['title'].lower()}) y el constructor lo está arreglando.",
+                  f"Tably found an error {'running the app' if on_run else 'in the published app'} ({rows[0]['title'].lower()}) and the builder is fixing it."))
 
     async def finish() -> None:
         try:
             while b.status in ("running", "reviewing", "design_review"):
-                await asyncio.sleep(10)
+                await asyncio.sleep(5)
         finally:
             b._error_fix = False
         plan = _fix_plan(b)
@@ -3260,28 +3396,113 @@ def _start_error_fix(user: User, b, rows: list[dict], approved: dict | None = No
         changed = [*st.get("added", []), *st.get("modified", []), *st.get("deleted", [])]
         changed = [p for p in changed if not p.startswith(".tably/")]
         fields = {k: plan[k] for k in ("what", "fix", "impact") if plan[k]}
-        if b.status == "error":
-            incidentsmod.update(ids, status="open", **fields)
-            return
         big = len(changed) > BIG_FIX_FILES or int(st.get("insertions") or 0) + int(st.get("deletions") or 0) > BIG_FIX_LINES
-        if not approved and (plan["size"] == "big" or big):
+        if b.status != "error" and not approved and (plan["size"] == "big" or big):
             # nothing goes out without the user's yes; what was already changed stays unpublished until then
             incidentsmod.update(ids, status="needs_approval", size="big", applied=int(bool(changed)), **fields)
-            b.chat.append({"role": "system", "text": b.tx(f"Tably encontró un error en la app publicada que necesita tu OK para arreglarse: {plan['what'] or rows[0]['title']}. Revisalo en «Publicar».",
-                                                           f"Tably found an error in the published app that needs your OK to be fixed: {plan['what'] or rows[0]['title']}. Review it in «Publish»."), "ts": time.time()})
-            b._save()
+            if on_run:
+                _run_fix(b, "needs_approval", id=ids[0], what=plan["what"] or rows[0]["title"], fix=plan["fix"], impact=plan["impact"], applied=bool(changed))
+            _note(b, b.tx(f"Para arreglar este error hace falta un cambio grande y necesita tu OK: {plan['what'] or rows[0]['title']}" + ("" if on_run else ". Revisalo en «Publicar»."),
+                          f"Fixing this error needs a big change and your OK: {plan['what'] or rows[0]['title']}" + ("" if on_run else ". Review it in «Publish».")))
             return
-        if not changed:
-            incidentsmod.update(ids, status="open", **fields)  # nothing changed: next round (or «stuck» after the attempts)
+        if b.status == "error" or not changed:
+            incidentsmod.update(ids, status="open", **fields)  # next round, or «stuck» after the attempts
+            if on_run:
+                _kick_run_errors(user.id, b.id)
             return
         if v:
             lessonsmod.note_fix(user.id, b.id, v.get("summary") or plan["fix"], changed)
         incidentsmod.update(ids, status="deploying", size=plan["size"] or "small", applied=1, **fields)
-        b.chat.append({"role": "system", "text": b.tx(f"Tably detectó un error en la app publicada y lo arregló solo: {plan['what'] or rows[0]['title']}. Publicando la corrección…",
-                                                       f"Tably detected an error in the published app and fixed it by itself: {plan['what'] or rows[0]['title']}. Publishing the fix…"), "ts": time.time()})
-        _start_publish(user, b)
+        _note(b, b.tx(f"Arreglado: {plan['what'] or rows[0]['title']}" + (f" {plan['fix']}" if plan["fix"] else "") + (" Volviendo a correr la app…" if on_run else "") + (" Publicando la corrección…" if _published(user.id, b.id) else ""),
+                      f"Fixed: {plan['what'] or rows[0]['title']}" + (f" {plan['fix']}" if plan["fix"] else "") + (" Running the app again…" if on_run else "") + (" Publishing the fix…" if _published(user.id, b.id) else "")))
+        if on_run:
+            await _restart_run(user, b)
+        if _published(user.id, b.id):
+            _start_publish(user, b)
 
     spawn(finish())
+
+
+def _kick_run_errors(user_id: str, build_id: str) -> None:
+    """Open errors of «Correr la app»: fix them now (they can't wait for the monitor: the user is looking at the app).
+    Fixed twice and still failing, the daily limit, or the builder busy with something else: the pane shows a card instead."""
+    rows = [r for r in incidentsmod.with_status(user_id, build_id, "open") if r["source"] == "run"]
+    user, b = _owner_build(user_id, build_id)
+    if not b:
+        return
+    if not rows:  # this error already waits for the user (approval, stuck, dismissed) or is being fixed: say so, never a dead pane
+        last = next((r for r in incidentsmod.list_for(user_id, build_id) if r["source"] == "run"), None)
+        if last and last["status"] != "fixing":
+            st = {"needs_approval": "needs_approval", "stuck": "stuck"}.get(last["status"], "manual")
+            _run_fix(b, st, id=last["id"], what=last["what"] or last["title"], fix=last["fix"], impact=last["impact"], applied=bool(last["applied"]))
+        return
+    stuck = [r for r in rows if r["attempts"] >= ERROR_FIX_ATTEMPTS]
+    if stuck:
+        incidentsmod.update([r["id"] for r in stuck], status="stuck")
+        _run_fix(b, "stuck", id=stuck[0]["id"], what=stuck[0]["what"] or stuck[0]["title"], fix=stuck[0]["fix"], impact=stuck[0]["impact"])
+        _note(b, b.tx(f"Lo intentamos arreglar dos veces y la app sigue fallando ({stuck[0]['title'].lower()}). Hace falta que lo mires: tenés el detalle en «App real».",
+                      f"We tried to fix it twice and the app keeps failing ({stuck[0]['title'].lower()}). It needs your look: details in «Real app»."))
+        return
+    if _busy(b):
+        _run_fix(b, "manual", id=rows[0]["id"], what=rows[0]["title"], reason="busy")
+        return
+    if incidentsmod.fixes_today(user_id, build_id) >= ERROR_FIX_PER_DAY:
+        _run_fix(b, "manual", id=rows[0]["id"], what=rows[0]["title"], reason="limit")
+        return
+    _start_error_fix(user, b, rows)
+
+
+async def _restart_run(user: User, b) -> None:
+    """Run the app again after a fix, same service; the pane keeps the loader until it answers."""
+    old = runmod.RUNS.get(b.id)
+    svc_id = old.service["id"] if old else None
+    fix = dict(old.fix or {}) if old else {}
+    if old:
+        await old.stop()
+    root = _run_root(b)
+    services = runmod.detect(root)
+    svc = next((s for s in services if s["id"] == svc_id), services[0] if services else None)
+    if not svc:
+        return
+    r = runmod.AppRun(root, svc, user.id, b.id, b.files, lambda t, d: b.emit(t, **d))
+    r.fix = {**fix, "state": "restarting"}
+    runmod.RUNS[b.id] = r
+    b.app_run = r
+    r.task = spawn(r.run())
+
+
+def on_run_status(run) -> None:
+    """«Correr la app» changed state. A failure goes to the builder (the pane shows a loader, never a dead app); a run that
+    comes back after a fix closes it."""
+    if run.status == "running" and run.fix and run.fix.get("state") in ("restarting", "fixing"):
+        with auth._db() as c:
+            c.execute("UPDATE app_errors SET status = 'fixed', fixed_ts = ? WHERE user_id = ? AND build_id = ? AND source = 'run' AND status = 'deploying'", (time.time(), run.user_id, run.build_id))
+        run.fix = None
+    elif run.status == "error":
+        _run_failed(run, run.error or "La app no arrancó")
+
+
+def _run_failed(run, what: str) -> None:
+    with auth._db() as c:  # failed again after a fix: that fix did not hold
+        c.execute("UPDATE app_errors SET status = 'open' WHERE user_id = ? AND build_id = ? AND source = 'run' AND status = 'deploying'", (run.user_id, run.build_id))
+    tail = [ln for ln in run.logs[-80:] if ln.strip()]
+    head = incidentsmod.log_headline(tail)
+    row = incidentsmod.record(run.user_id, run.build_id, "run", head or what, f"{what}\n--- log ---\n" + "\n".join(tail[-60:]))
+    if row.get("status") == "fixed":  # it broke again right after the fix
+        incidentsmod.update([row["id"]], status="open")
+    run.fix = {**(run.fix or {}), "state": "fixing", "since": (run.fix or {}).get("since") or time.time()}  # the loader shows right away; _kick_run_errors decides what happens
+    spawn(_kick_async(run.user_id, run.build_id))
+
+
+async def _kick_async(user_id: str, build_id: str) -> None:
+    await asyncio.sleep(0.5)  # out of the run's own status change
+    try:
+        _kick_run_errors(user_id, build_id)
+    except Exception:  # noqa: BLE001
+        log.exception("run error fix")
+
+
+runmod.ON_STATUS = on_run_status
 
 
 incidentsmod.ON_ERRORS = on_app_errors
@@ -3308,6 +3529,8 @@ async def build_app_error_action(session_id: str, build_id: str, eid: str, actio
         raise HTTPException(404)
     if action == "dismiss":
         incidentsmod.update([eid], status="ignored")
+        if r["source"] == "run":
+            _run_fix(b, "manual", id=eid, what=r["what"] or r["title"], fix=r["fix"], impact=r["impact"])
         return _errors_payload(user, build_id)
     if action not in ("approve", "fix"):
         raise HTTPException(400)
@@ -3315,7 +3538,11 @@ async def build_app_error_action(session_id: str, build_id: str, eid: str, actio
         raise HTTPException(409, "El constructor está trabajando: probá en un rato")
     if action == "approve" and r["status"] == "needs_approval" and r["applied"]:
         incidentsmod.update([eid], status="deploying")  # the fix is already in the code: it only needed the yes to go out
-        _start_publish(user, b)
+        if r["source"] == "run":
+            _run_fix(b, "restarting")
+            spawn(_restart_run(user, b))
+        if _published(user.id, build_id):
+            _start_publish(user, b)
     elif action == "approve" and r["status"] == "needs_approval":
         _start_error_fix(user, b, [r], approved=r)
     else:

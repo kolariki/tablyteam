@@ -13,6 +13,7 @@ import asyncio
 import json
 import os
 import re
+import secrets
 import shutil
 import signal
 import socket
@@ -29,6 +30,10 @@ Log = Callable[[str], None | Awaitable[None]]
 MAX_DEPTH = 3
 READY_TIMEOUT = 150  # s: `next dev` first compile can be slow
 INSTALL_TIMEOUT = 600
+# on a server, the user's browser can't open 127.0.0.1: the app is shown through Tably itself at <RUN_BASE>/r/<token>/
+# (set by main; None on a local installation, where the frame proxy on 127.0.0.1 is used)
+RUN_BASE: str | None = None
+ON_STATUS: Callable[["AppRun"], None] | None = None  # set by main: a run that fails goes to the builder, a fixed one comes back
 
 
 # ------------------------------------------------------------------ detection
@@ -238,16 +243,30 @@ class AppRun:
         self.proc: asyncio.subprocess.Process | None = None
         self.task: asyncio.Task | None = None
         self.started = time.time()
+        self.host = "127.0.0.1"
+        self.token = secrets.token_urlsafe(16)  # the app's address through Tably (/r/<token>/)
+        self.fix: dict | None = None  # Tably fixing it: {state: fixing|restarting|needs_approval|stuck|manual, since, what, fix, impact, id}
+        TOKENS[self.token] = self
 
     def state(self) -> dict:
         return {"status": self.status, "service": self.service["id"], "label": self.service["label"], "url": self.url, "embed_url": self.embed_url, "port": self.port, "error": self.error,
-                "logs": self.logs[-200:], "started": self.started}
+                "logs": self.logs[-200:], "started": self.started, "fix": self.fix}
 
     def _set(self, status: str, **extra) -> None:
+        changed = status != self.status
         self.status = status
         for k, v in extra.items():
             setattr(self, k, v)
-        self.emit("app.status", {"status": status, "service": self.service["id"], "label": self.service["label"], "url": self.url, "embed_url": self.embed_url, "port": self.port, "error": self.error})
+        if changed and ON_STATUS:
+            try:
+                ON_STATUS(self)
+            except Exception:  # pragma: no cover
+                pass
+        self.announce()
+
+    def announce(self) -> None:
+        self.emit("app.status", {"status": self.status, "service": self.service["id"], "label": self.service["label"], "url": self.url, "embed_url": self.embed_url, "port": self.port, "error": self.error,
+                                 "fix": self.fix, "started": self.started})
 
     def _log(self, line: str) -> None:
         line = line[-400:]
@@ -329,7 +348,16 @@ class AppRun:
                     self._log(f"· la app responde en el puerto {chosen}")
                 if chosen is not None:
                     host = await _host_of(self.port)
+                    self.host = host
                     self.url = f"http://localhost:{self.port}" if host != "127.0.0.1" else f"http://127.0.0.1:{self.port}"
+                    if RUN_BASE:  # Tably on a server: the browser reaches the app through Tably's own address
+                        self.url = self.embed_url = f"{RUN_BASE}/r/{self.token}/"
+                        self._log(f"· la app se ve en {self.url}")
+                        self._set("running")
+                        code = await server
+                        if self.status == "running":
+                            self._set("stopped" if code in (0, -15, 143, None) else "error", error=None if code in (0, -15, 143, None) else f"El servidor se cerró (código {code}).")
+                        return
                     try:  # the UI frames the proxy, not the app: production CSP/X-Frame-Options would blank the iframe
                         self.proxy = FrameProxy(self.port, free_port(), host)
                         await self.proxy.start()
@@ -400,6 +428,7 @@ class AppRun:
 
 
 RUNS: dict[str, AppRun] = {}
+TOKENS: dict[str, AppRun] = {}
 
 
 async def stop_all() -> None:

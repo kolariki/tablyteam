@@ -1,4 +1,7 @@
 import type { CloudApp, LevelsInfo } from './lib/api'
+/** Tably fixing «Correr la app» by itself: a loader while it works, a card when it needs the user. */
+export type RunFix = { state: 'fixing' | 'restarting' | 'needs_approval' | 'stuck' | 'manual'; since: number; id?: string; what?: string | null; fix?: string | null; impact?: string | null; applied?: boolean; reason?: string }
+
 export interface Usage { input: number; output: number; cache_read: number; cache_write: number; unsplit?: number; total: number; engine: number; api: number; measured: boolean; engine_value_usd: number; cache_saved_usd: number; api_cost_usd: number; models: string[] }
 import { srv } from './lib/serverText'
 import { create } from 'zustand'
@@ -142,7 +145,7 @@ interface BuildState {
   councilSessionsKnown: number  // how many council rounds the build had when the research started (the poll detects the new one)
   pendingCouncil: string | null
   versions: BuildVersion[]
-  appRun: { status: string; service: string | null; label?: string; url: string | null; embedUrl?: string | null; port: number | null; error: string | null; logs: string[] }
+  appRun: { status: string; service: string | null; label?: string; url: string | null; embedUrl?: string | null; port: number | null; error: string | null; logs: string[]; fix?: RunFix | null; started?: number }
   deploys: { target: string; ok: boolean | null; url: string | null; error: string | null; ts: number }[]
   recording: boolean
   liveRaw: string
@@ -269,7 +272,7 @@ export const useBuild = create<BuildState>((set, get) => ({
           id: b.id, sessionId: b.session_id, provider: b.provider, model: b.model, title: b.title,
           engineSession: b.engine_session ?? s.engineSession, workdir: b.workdir ?? s.workdir,
           activity: b.activity ?? s.activity, todos: b.todos ?? s.todos, versions: b.versions ?? s.versions, pendingCouncil: b.pending_council ?? null, designRounds: b.design_rounds ?? s.designRounds, designHtml: b.design_html ?? s.designHtml,
-          appRun: b.app_run ? { status: b.app_run.status, service: b.app_run.service, label: b.app_run.label, url: b.app_run.url, embedUrl: b.app_run.embed_url ?? null, port: b.app_run.port, error: b.app_run.error, logs: b.app_run.logs ?? [] } : s.appRun,
+          appRun: b.app_run ? { status: b.app_run.status, service: b.app_run.service, label: b.app_run.label, url: b.app_run.url, embedUrl: b.app_run.embed_url ?? null, port: b.app_run.port, error: b.app_run.error, logs: b.app_run.logs ?? [], fix: b.app_run.fix ?? null, started: b.app_run.started } : s.appRun,
           status: b.status === 'running' ? 'running' : b.status, files: { ...s.files, ...b.files }, chat: b.chat, stages: b.stages,
           councilSessionsKnown: (b.council_sessions ?? []).length, cost: b.cost_usd, buildSeconds: (b as { build_seconds?: number }).build_seconds ?? s.buildSeconds, fees: (b as { fees_usd?: number }).fees_usd ?? 0, usage: (b as { usage?: Usage }).usage ?? s.usage, language: (b as { language?: string }).language ?? s.language, engineCost: (b as { engine_cost_usd?: number }).engine_cost_usd ?? s.engineCost, turns: (b as { turns?: number }).turns ?? s.turns, feesDue: (b as { fees_due_usd?: number }).fees_due_usd ?? 0, tokens: b.tokens, done: b.done, selected: s.selected ?? Object.keys(b.files)[0] ?? null,
           ...(b.live ? { liveTurn: b.live.turn, livePhase: b.live.phase, liveRaw: b.live.raw, liveFile: liveFileFrom(b.live.raw) } : {}),
@@ -340,7 +343,7 @@ export const useBuild = create<BuildState>((set, get) => ({
         set({ councilSession: ev.session_id, status: 'completed', liveTurn: null, livePhase: null, researching: s.researching ? { ...s.researching, finished: true, opening: true } : null })
         break
       case 'app.status':
-        set({ appRun: { ...s.appRun, status: ev.status, service: ev.service, label: ev.label, url: ev.url ?? null, embedUrl: ev.embed_url ?? null, port: ev.port ?? null, error: ev.error ?? null, logs: ev.status === 'installing' ? [] : s.appRun.logs } })
+        set({ appRun: { ...s.appRun, status: ev.status, service: ev.service, label: ev.label, url: ev.url ?? null, embedUrl: ev.embed_url ?? null, port: ev.port ?? null, error: ev.error ?? null, fix: ev.fix ?? null, started: ev.started ?? s.appRun.started, logs: ev.status === 'installing' && !ev.fix ? [] : s.appRun.logs } })
         break
       case 'app.log':
         set({ appRun: { ...s.appRun, logs: [...s.appRun.logs.slice(-600), ev.line] } })

@@ -1,3 +1,4 @@
+import type { RunFix } from '../buildStore'
 import { getLang } from './i18n'
 import type { AgentConfig, ArenaEvent, Preset, Provider, Role, SessionConfig, SessionSummary } from '../types'
 
@@ -597,6 +598,8 @@ export interface AppRunState {
   port: number
   error: string | null
   logs?: string[]
+  fix?: RunFix | null
+  started?: number
 }
 
 export interface ResearchJob {

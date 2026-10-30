@@ -1,7 +1,7 @@
-import { ChevronDown, ExternalLink, Loader2, Maximize2, Minimize2, MonitorPlay, Play, RefreshCw, Square, Wrench } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ExternalLink, Loader2, Maximize2, Minimize2, MonitorPlay, Play, RefreshCw, Square, Wrench } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useEffect, useRef, useState } from 'react'
-import { reconnectBuild, useBuild } from '../buildStore'
+import { reconnectBuild, useBuild, type RunFix } from '../buildStore'
 import { api, type RunService } from '../lib/api'
 import { tr, useT } from '../lib/i18n'
 import { toast } from './Toast'
@@ -16,6 +16,74 @@ const STEP = (): Record<string, string> => ({
   error: tr('No arrancó', 'Did not start'),
   idle: tr('Lista para correr', 'Ready to run'),
 })
+
+// what the loader says as time goes by: never a dead app, just honest patience
+const WAIT_START = (): [number, string, string][] => [
+  [0, tr('Cargando…', 'Loading…'), tr('Preparando todo para abrir tu app.', 'Getting everything ready to open your app.')],
+  [25, tr('Preparando tu app…', 'Preparing your app…'), tr('Instalando lo que necesita y arrancando el servidor.', 'Installing what it needs and starting the server.')],
+  [70, tr('Estamos tardando más de lo habitual…', 'This is taking longer than usual…'), tr('La primera vez lleva un poco más: sigue avanzando.', 'The first time takes a bit longer: it keeps moving.')],
+  [150, tr('Sigue cargando…', 'Still loading…'), tr('Falta poco: estamos terminando de levantarla.', 'Almost there: we are finishing starting it.')],
+  [300, tr('Ya casi está, gracias por la paciencia', 'Almost done, thanks for your patience'), tr('Seguimos trabajando para que abra bien.', 'We keep working so it opens properly.')],
+]
+const WAIT_FIX = (): [number, string, string][] => [
+  [0, tr('Cargando…', 'Loading…'), tr('Un momento, estamos preparando tu app.', 'One moment, we are preparing your app.')],
+  [20, tr('Estamos tardando más de lo habitual…', 'This is taking longer than usual…'), tr('Encontramos algo para ajustar y ya lo estamos resolviendo.', 'We found something to adjust and are already on it.')],
+  [60, tr('Ajustando unos detalles…', 'Adjusting a few details…'), tr('El equipo está corrigiendo la app para que funcione bien. No tenés que hacer nada.', 'The team is fixing the app so it works properly. You don\'t need to do anything.')],
+  [180, tr('Seguimos ajustando…', 'Still adjusting…'), tr('Tu app va a estar lista en unos minutos; se abre sola acá.', 'Your app will be ready in a few minutes; it opens here by itself.')],
+  [360, tr('Ya casi está, gracias por la paciencia', 'Almost done, thanks for your patience'), tr('Estamos terminando y la volvemos a abrir.', 'We are finishing and opening it again.')],
+]
+
+function RunWait({ since, fixing }: { since?: number; fixing: boolean }) {
+  const [now, setNow] = useState(() => Date.now() / 1000)
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now() / 1000), 1000)
+    return () => window.clearInterval(id)
+  }, [])
+  const secs = Math.max(0, now - (since ?? now))
+  const steps = fixing ? WAIT_FIX() : WAIT_START()
+  const [, caption, sub] = [...steps].reverse().find(([t]) => secs >= t) ?? steps[0]
+  return <PanelLoader caption={caption} sub={sub} />
+}
+
+/** Tably needs the user: a big fix to approve, an error that keeps coming back, or a fix that could not start by itself. */
+function RunFixCard({ fix, onDone }: { fix: RunFix; onDone: () => void }) {
+  const T = useT()
+  const b = useBuild()
+  const [busy, setBusy] = useState<string | null>(null)
+  const act = async (action: 'approve' | 'fix' | 'dismiss') => {
+    if (!b.sessionId || !b.id || !fix.id) return
+    setBusy(action)
+    try { await api.appErrorAction(b.sessionId, b.id, fix.id, action); reconnectBuild(b.id); onDone() } catch (e) { toast.error(tr('No se pudo', 'Could not do it'), (e as Error).message) } finally { setBusy(null) }
+  }
+  const title = fix.state === 'needs_approval' ? T('Para que funcione hace falta un cambio grande', 'Making it work needs a big change')
+    : fix.state === 'stuck' ? T('La app sigue con un problema', 'The app still has a problem')
+    : T('La app tiene un problema para arrancar', 'The app has a problem starting')
+  return (
+    <div className="flex flex-1 items-center justify-center p-6">
+      <div className="w-full max-w-lg rounded-2xl border border-gold/40 bg-gold/5 p-5 shadow-[0_14px_30px_-18px_rgba(30,38,34,.4)]">
+        <div className="flex items-start gap-2.5">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-gold" />
+          <div className="min-w-0">
+            <div className="text-[15px] font-semibold text-ink">{title}</div>
+            {fix.what && <div className="mt-1 text-[13px] leading-snug text-ink-2">{fix.what}</div>}
+          </div>
+        </div>
+        <dl className="mt-3 space-y-2 pl-7 text-[12.5px] leading-snug">
+          {fix.state === 'stuck' && <div className="text-ink-2">{T('Lo intentamos arreglar dos veces y vuelve a pasar: conviene mirarlo con más calma.', 'We tried to fix it twice and it happens again: it deserves a closer look.')}</div>}
+          {fix.state === 'manual' && <div className="text-ink-2">{fix.reason === 'busy' ? T('El constructor está terminando otro trabajo. Cuando quieras, lo arreglamos.', 'The builder is finishing other work. Whenever you want, we fix it.') : fix.reason === 'limit' ? T('Hoy ya hicimos varios arreglos automáticos en esta app: este lo hacemos cuando nos digas.', 'We already made several automatic fixes on this app today: we do this one when you say so.') : T('Cuando quieras, lo arreglamos.', 'Whenever you want, we fix it.')}</div>}
+          {fix.fix && <div><dt className="text-[11px] font-semibold uppercase tracking-wide text-ink-4">{T('Cómo se arregla', 'How it gets fixed')}</dt><dd className="mt-0.5 text-ink-2">{fix.fix}</dd></div>}
+          {fix.impact && <div><dt className="text-[11px] font-semibold uppercase tracking-wide text-ink-4">{T('Qué cambia para vos', 'What changes for you')}</dt><dd className="mt-0.5 text-ink-2">{fix.impact}</dd></div>}
+        </dl>
+        <div className="mt-4 flex flex-wrap gap-2 pl-7">
+          {fix.state === 'needs_approval'
+            ? <button disabled={!!busy} onClick={() => act('approve')} className="flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-[12.5px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40">{busy === 'approve' ? <Loader2 size={13} className="animate-spin" /> : <Wrench size={13} />} {T('Aprobar y arreglar', 'Approve and fix')}</button>
+            : <button disabled={!!busy || !fix.id} onClick={() => act('fix')} className="flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-[12.5px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40">{busy === 'fix' ? <Loader2 size={13} className="animate-spin" /> : <Wrench size={13} />} {fix.state === 'stuck' ? T('Intentar de nuevo', 'Try again') : T('Arreglarlo ahora', 'Fix it now')}</button>}
+          {fix.state === 'needs_approval' && <button disabled={!!busy} onClick={() => act('dismiss')} className="flex h-9 items-center rounded-full border border-line bg-paper px-4 text-[12.5px] text-ink-2 transition hover:border-accent hover:text-accent">{T('Ahora no', 'Not now')}</button>}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 /** The iOS Simulator / Android emulator screen, refreshed every second, inside a phone frame. Android takes taps. */
 function DeviceView({ target, sessionId, buildId }: { target: 'ios' | 'android'; sessionId: string; buildId: string }) {
@@ -83,8 +151,8 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
       // a run started earlier (or from another tab) is shown as it is, not as "ready to run"
       const r = d.run
       const cur = useBuild.getState().appRun
-      if (r && (cur.status === 'idle' || cur.status === 'stopped' || cur.service !== r.service || cur.url !== r.url)) {
-        useBuild.getState().set({ appRun: { status: r.status, service: r.service, label: r.label, url: r.url ?? null, embedUrl: r.embed_url ?? null, port: r.port ?? null, error: r.error ?? null, logs: r.logs ?? cur.logs } })
+      if (r && (cur.status === 'idle' || cur.status === 'stopped' || cur.service !== r.service || cur.url !== r.url || cur.status !== r.status || JSON.stringify(cur.fix ?? null) !== JSON.stringify(r.fix ?? null))) {
+        useBuild.getState().set({ appRun: { status: r.status, service: r.service, label: r.label, url: r.url ?? null, embedUrl: r.embed_url ?? null, port: r.port ?? null, error: r.error ?? null, logs: r.logs ?? cur.logs, fix: r.fix ?? null, started: r.started } })
         if (r.status === 'installing' || r.status === 'starting' || r.status === 'running') reconnectBuild(b.id!)
       }
     }).catch((e) => toast.error(tr('No pude analizar el proyecto', 'Could not analyze the project'), (e as Error).message))
@@ -94,8 +162,8 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
   }, [run.logs.length])
   useEffect(() => {
-    if (run.status === 'error') setLogsOpen(true)
-  }, [run.status])
+    if (run.status === 'error' && !run.fix) setLogsOpen(true)
+  }, [run.status, run.fix])
   // opened from "Correr la app": start right away if nothing is running yet
   const [autoDone, setAutoDone] = useState(false)
   useEffect(() => {
@@ -139,6 +207,15 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
   }
 
   const active = run.status === 'installing' || run.status === 'starting' || run.status === 'running'
+  // Tably fixing the app by itself: a loader, never the dead app; a card only when it needs the user
+  const fixWait = !!run.fix && (run.fix.state === 'fixing' || run.fix.state === 'restarting')
+  const fixCard = !!run.fix && !fixWait
+  useEffect(() => {  // a finished build may have no live socket: follow the fix until the app is back
+    if (!fixWait) return
+    const id = window.setInterval(load, 5000)
+    return () => window.clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fixWait, b.sessionId, b.id])
   const sel = services?.find((s) => s.id === service)
 
   return (
@@ -161,12 +238,12 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
             ) : (
               <button onClick={stop} className="flex h-9 items-center gap-1.5 rounded-full border border-danger/40 bg-paper px-4 text-[12.5px] font-semibold text-danger shadow-sm transition hover:bg-danger/5"><Square size={13} /> {T('Detener', 'Stop')}</button>
             )}
-            <span className={`flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] font-medium ${run.status === 'running' ? 'border-ok/30 bg-ok/10 text-ok' : run.status === 'error' ? 'border-danger/30 bg-danger/5 text-danger' : 'border-line bg-paper text-ink-3'}`}>
-              {(run.status === 'installing' || run.status === 'starting') && <Loader2 size={12} className="animate-spin" />}
+            <span className={`flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] font-medium ${fixWait ? 'border-accent/30 bg-accent-soft text-accent' : fixCard ? 'border-gold/40 bg-gold/10 text-gold' : run.status === 'running' ? 'border-ok/30 bg-ok/10 text-ok' : run.status === 'error' ? 'border-danger/30 bg-danger/5 text-danger' : 'border-line bg-paper text-ink-3'}`}>
+              {(run.status === 'installing' || run.status === 'starting' || fixWait) && <Loader2 size={12} className="animate-spin" />}
               {run.status === 'running' && <span className="w-2 h-2 rounded-full bg-ok animate-pulse" />}
-              {step[run.status] ?? run.status}{run.status === 'running' && run.url ? ` ${T('en', 'at')} ${run.url}` : ''}
+              {fixWait ? T('Cargando…', 'Loading…') : fixCard ? T('En pausa', 'Paused') : (step[run.status] ?? run.status)}{run.status === 'running' && run.url && !fixWait ? ` ${T('en', 'at')} ${run.url}` : ''}
             </span>
-            {run.status === 'running' && run.url && (
+            {run.status === 'running' && run.url && !fixWait && (
               <div className="ml-auto flex items-center gap-1.5">
                 <button onClick={() => setFrameKey((k) => k + 1)} className="flex h-8 items-center gap-1 rounded-full border border-line bg-paper px-2.5 text-[12px] text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent" title={T('Recargar la app', 'Reload the app')}><RefreshCw size={12} /> {T('recargar', 'reload')}</button>
                 <a href={run.url} target="_blank" rel="noreferrer" className="flex h-8 items-center gap-1 rounded-full border border-line bg-paper px-2.5 text-[12px] text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent" title={T('Abrir en una pestaña nueva', 'Open in a new tab')}><ExternalLink size={12} /> {T('pestaña', 'tab')}</a>
@@ -183,18 +260,22 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
         <div className="px-3 py-1.5 text-[11.5px] text-ink-3 border-b border-line font-mono">{sel.dir === '.' ? '' : `${sel.dir}/ · `}{sel.needs_install ? `${sel.install} → ` : ''}{sel.run.replace('{port}', T('<puerto libre>', '<free port>'))}</div>
       )}
 
-      {(notice || b.status === 'running' || b.status === 'reviewing' || b.status === 'connecting') && (
+      {(notice || (!fixWait && (b.status === 'running' || b.status === 'reviewing' || b.status === 'connecting'))) && (
         <div className="space-y-2 border-b border-line px-3 py-2">
           {notice && <BlockedNotice kind={/ya estaba|already/.test(notice) ? 'info' : 'blocked'} title={notice} action={{ label: T('Cerrar', 'Close'), onClick: () => setNotice(null) }} />}
-          <BuilderBusyNotice what={T('La app puede cambiar mientras corre: los archivos se están escribiendo.', 'The app may change while it runs: files are being written.')} />
+          {!fixWait && <BuilderBusyNotice what={T('La app puede cambiar mientras corre: los archivos se están escribiendo.', 'The app may change while it runs: files are being written.')} />}
         </div>
       )}
       {/* body */}
       <div className="flex-1 min-h-0 flex flex-col">
         {services === null ? (
           <PanelLoader caption={T('Analizando el proyecto…', 'Analyzing the project…')} sub={T('Buscando qué se puede correr: package.json, APIs en Python, docker compose.', 'Looking for what can run: package.json, Python APIs, docker compose.')} />
+        ) : fixWait ? (
+          <RunWait since={run.fix?.since ?? run.started} fixing />
+        ) : fixCard && run.fix ? (
+          <RunFixCard fix={run.fix} onDone={load} />
         ) : (run.status === 'installing' || run.status === 'starting') && !logsOpen ? (
-          <PanelLoader caption={step[run.status]} sub={run.status === 'installing' ? T('La primera vez tarda: instala las dependencias del proyecto. Abrí los logs abajo para ver el detalle.', 'The first time takes a while: it installs the project dependencies. Open the logs below to see the detail.') : T('Esperando a que el servidor responda en un puerto libre.', 'Waiting for the server to answer on a free port.')} />
+          <RunWait since={run.started} fixing={false} />
         ) : run.status === 'running' && sel?.device && b.sessionId && b.id ? (
           <DeviceView target={sel.device} sessionId={b.sessionId} buildId={b.id} />
         ) : run.status === 'running' && run.url && sel?.web !== false ? (
@@ -203,7 +284,7 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
               <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-line bg-surface-2/70 px-3">
                 <span className="h-2.5 w-2.5 rounded-full bg-[#E6A19A]" /><span className="h-2.5 w-2.5 rounded-full bg-[#E9C97A]" /><span className="h-2.5 w-2.5 rounded-full bg-[#9FCDA8]" />
                 <span className="ml-3 flex h-5 items-center rounded-md border border-line bg-surface px-2 font-mono text-[10.5px] text-ink-2">{run.url}</span>
-                <span className="ml-2 text-[10.5px] text-ink-3">{T('la app real, corriendo en esta máquina', 'the real app, running on this machine')}</span>
+                <span className="ml-2 text-[10.5px] text-ink-3">{/\/r\//.test(run.url) ? T('la app real, corriendo en Tably', 'the real app, running on Tably') : T('la app real, corriendo en esta máquina', 'the real app, running on this machine')}</span>
                 <button onClick={() => setFull(true)} className="ml-auto flex h-6 w-6 items-center justify-center rounded-md text-ink-3 transition hover:bg-surface hover:text-accent" title={T('Pantalla completa', 'Full screen')}><Maximize2 size={13} /></button>
               </div>
               {!full && <iframe key={frameKey} title={T('App corriendo', 'App running')} src={run.embedUrl ?? run.url} className="min-h-0 w-full flex-1 bg-white" />}

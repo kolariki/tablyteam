@@ -61,6 +61,7 @@ FRIENDLY: list[tuple[str, str]] = [
 
 ERROR_LINE = re.compile(r"\b(error|exception|traceback|unhandled|uncaught|fatal|panic|crash(ed)?|failed)\b|ECONN\w+|does not exist|cannot find|→ 5\d\d", re.I)
 NOT_ERROR = re.compile(r"\b0 errors?\b|no errors|error[_ ]?(rate|count|handler registered)|errors?: ?0\b|npm (warn|notice)|deprecat", re.I)
+LOG_NOISE = re.compile(r"complete log of this run|_logs/.*debug.*\.log|^\s*npm (error|ERR!)\s*$|^\s*npm (error|ERR!) (code|errno|syscall)\b|^\s*at |^\s*$", re.I)
 STACK_LINE = re.compile(r"^\s+at |^\s+File \"|^Traceback|^\s{2,}\S|^\w*(Error|Exception):")
 BROWSER_NOISE = re.compile(r"^Script error\.?$|ResizeObserver loop|chrome-extension://|moz-extension://|safari-extension://|Non-Error promise rejection|Load failed|Failed to fetch|NetworkError", re.I)
 
@@ -387,3 +388,9 @@ def inject_reporter(root: Path, script_url: str) -> list[str]:
             p.write_text(new)
             touched.append(str(p.relative_to(root)))
     return touched
+
+
+def log_headline(lines: list[str]) -> str | None:
+    """The line of a run's log that best says what went wrong (not npm's «see the debug log» footer)."""
+    hits = [ln.strip() for ln in lines if ERROR_LINE.search(ln) and not NOT_ERROR.search(ln) and not LOG_NOISE.search(ln)]
+    return hits[-1][:400] if hits else None
