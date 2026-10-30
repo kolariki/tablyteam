@@ -104,11 +104,11 @@ export function StatTiles() {
     [T('Duración', 'Duration'), fmtMs(elapsed)],
   ]
   return (
-    <div className="grid grid-cols-5 gap-2">
+    <div className="grid grid-cols-5 gap-1 sm:gap-2">
       {tiles.map(([k, v]) => (
-        <div key={k} className="flex min-w-0 flex-col items-center justify-center rounded-xl border border-line bg-surface px-2 py-2.5 text-center">
-          <div className="truncate text-[10px] uppercase tracking-widest text-ink-3">{k}</div>
-          <motion.div key={v} initial={{ opacity: 0.4, y: 3 }} animate={{ opacity: 1, y: 0 }} className={`mt-0.5 whitespace-nowrap font-mono font-bold tabular-nums text-ink ${String(v).length > 7 ? 'text-base' : 'text-xl'}`}>{v}</motion.div>
+        <div key={k} className="flex min-w-0 flex-col items-center justify-center overflow-hidden rounded-lg border border-line bg-surface px-1 py-1.5 text-center sm:rounded-xl sm:px-2 sm:py-2.5">
+          <div className="w-full truncate text-[9px] text-ink-3 sm:text-[10px] sm:uppercase sm:tracking-widest">{k}</div>
+          <motion.div key={v} initial={{ opacity: 0.4, y: 3 }} animate={{ opacity: 1, y: 0 }} className={`mt-0.5 w-full truncate whitespace-nowrap font-mono font-bold tabular-nums text-ink ${String(v).length > 7 ? 'text-[11px] sm:text-base' : String(v).length > 4 ? 'text-[13px] sm:text-xl' : 'text-base sm:text-xl'}`} title={String(v)}>{v}</motion.div>
         </div>
       ))}
     </div>

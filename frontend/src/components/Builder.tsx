@@ -308,7 +308,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
         <div className={`flex min-h-0 min-w-0 flex-1 flex-col border-r border-line transition-opacity duration-300 ${(paneFull || phone) && b.paneOpen ? 'pointer-events-none opacity-0' : ''}`}>
           <div
             ref={chatRef}
-            className="flex-1 overflow-y-auto scroll-thin px-5 py-5 space-y-4 [&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[900px]"
+            className="flex-1 overflow-y-auto scroll-thin space-y-4 px-2.5 py-4 sm:px-5 sm:py-5 [&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[900px]"
             onClick={(e) => {
               const chip = (e.target as HTMLElement).closest('code[data-path]') as HTMLElement | null
               const path = chip?.getAttribute('data-path')
@@ -323,7 +323,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
               {b.liveTurn != null && (
                 <motion.div key="live" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
                   <span className="shrink-0 w-8 h-8 rounded-full bg-surface border flex items-center justify-center" style={{ borderColor: `${color}66` }}><ProviderLogo provider={b.provider} size={18} /></span>
-                  <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md bg-surface border border-line px-4 py-3">
+                  <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md border border-line bg-surface px-3 py-3 sm:px-4">
                     {b.livePhase === 'preview' && <div className="text-[10px] font-bold uppercase tracking-widest text-accent mb-1">{T('🖼 Vista previa del producto', '🖼 Product preview')}</div>}
                     {b.livePhase === 'report' && <div className="text-[10px] font-bold uppercase tracking-widest text-accent mb-1">{T('📄 Escribiendo el informe de auditoría', '📄 Writing the audit report')}</div>}
                     {b.livePhase === 'design' && <div className="text-[10px] font-bold uppercase tracking-widest text-accent mb-1">{T('🎨 El Product Designer diseña la interfaz (sistema, pantallas, mockup) antes de escribir código', '🎨 The Product Designer designs the interface (system, screens, mockup) before writing code')}</div>}
@@ -902,7 +902,7 @@ function Bubble({ c, color, provider, onOpen }: { c: ChatItem; color: string; pr
   }
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
-      <span className="shrink-0 w-8 h-8 rounded-full bg-surface border flex items-center justify-center" style={{ borderColor: `${color}66` }}><ProviderLogo provider={provider} size={18} /></span>
+      <span className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-surface sm:flex" style={{ borderColor: `${color}66` }}><ProviderLogo provider={provider} size={18} /></span>
       <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md bg-surface border border-line px-4 py-3">
         <div className="mb-1 flex items-center gap-2 font-mono text-[10px] text-ink-4">{T('turno', 'turn')} {c.turn}{c.phase === 'preview' ? T(' · 🖼 vista previa del producto', ' · 🖼 product preview') : c.phase === 'design' ? T(' · 🎨 diseño de la interfaz', ' · 🎨 interface design') : ''}{c.seconds != null && <span className="inline-flex items-center gap-1 rounded-full border border-line bg-paper px-1.5 py-[1px] text-ink-3" title={T('Duración del turno', 'Turn duration')}><Clock3 size={9} /> {fmtDur(c.seconds)}</span>}</div>
         {c.activity && (c.activity.written + c.activity.edited + c.activity.commands + c.activity.tests > 0) && (

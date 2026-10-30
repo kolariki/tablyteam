@@ -603,7 +603,7 @@ function AppInner() {
       {exporter}
       <TopBar onRerun={rerun} onNew={leave} />
       <div className="flex-1 min-h-0 flex flex-col md:flex-row">
-        <div className="relative flex-1 min-w-0 min-h-[55%] md:min-h-0 flex flex-col">
+        <div className="relative flex-1 min-w-0 min-h-[64%] md:min-h-0 flex flex-col">
           <div className="relative flex-1 min-h-0">
             <ArenaGraph />
             <div className="absolute left-3 right-3 top-3 md:left-4 md:right-auto md:w-[520px] md:max-w-[60%]"><StatTiles /></div>
@@ -622,7 +622,7 @@ function AppInner() {
           </div>
         </div>
         {/* focus mode (councils by default): the debate is the show, the transcript is a narrow side column */}
-        <div className={`${focus ? 'md:w-[300px]' : recMode ? 'md:w-[380px]' : 'md:w-[420px]'} h-[45%] w-full shrink-0 border-t border-line bg-surface flex flex-col md:h-auto md:border-l md:border-t-0`}>
+        <div className={`${focus ? 'md:w-[300px]' : recMode ? 'md:w-[380px]' : 'md:w-[420px]'} h-[36%] w-full shrink-0 border-t border-line bg-surface flex flex-col md:h-auto md:border-l md:border-t-0`}>
           <div className="px-4 py-2.5 text-[11px] uppercase tracking-widest text-ink-3 border-b border-line">{T('Transcripción en vivo', 'Live transcript')}</div>
           <div className="flex-1 min-h-0"><LiveFeed compact={focus} all /></div>
         </div>

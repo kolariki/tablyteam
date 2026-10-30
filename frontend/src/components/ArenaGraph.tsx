@@ -300,10 +300,20 @@ function Graph() {
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
-  const vertical = layout === 'vertical'
+  const vertical = layout === 'vertical' || size.w < 640  // a phone gets the top → bottom tree: side by side the roles would overlap
   // screen-space margins: top keeps clear of the stat tiles, bottom leaves room for the model/turn labels
-  const margin = vertical ? { top: 60, bottom: 60, side: 24 } : { top: 96, bottom: 56, side: 70 }
-  const zoom = Math.min(1.7, Math.max(0.6, vertical ? size.w / 460 : Math.min(size.h / 500, size.w / 1250)))
+  const margin = size.w < 640 ? { top: 84, bottom: 30, side: 12 } : vertical ? { top: 60, bottom: 60, side: 24 } : { top: 96, bottom: 56, side: 70 }
+  // on a phone the whole tree has to fit the short stage: as many rows as levels (two roles side by side at most)
+  const phoneRows = useMemo(() => {
+    const byLevel = new Map<number, number>()
+    for (const a of agents) byLevel.set(levelOf(a), (byLevel.get(levelOf(a)) ?? 0) + 1)
+    return [...byLevel.values()].reduce((n, c) => n + Math.ceil(c / 2), 0) || 1
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agents.map((a) => `${a.id}:${a.role ?? ''}`).join(',')])
+  const phone = size.w < 640
+  const zoom = phone
+    ? Math.min(0.5, Math.max(0.26, Math.min(size.w / 520, (size.h - margin.top - margin.bottom) / (phoneRows * (NODE + 60)))))
+    : Math.min(1.7, Math.max(0.6, vertical ? size.w / 460 : Math.min(size.h / 500, size.w / 1250)))
   const fw = size.w / zoom
   const fh = size.h / zoom
   const rx = Math.max(NODE, (fw - (2 * margin.side) / zoom - NODE) / 2)

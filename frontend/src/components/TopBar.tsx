@@ -1,4 +1,4 @@
-import { Focus, ChevronDown, Download, FileText, Hammer, Home, Rocket, Pause, Users, Square, Trophy, RotateCcw } from 'lucide-react'
+import { Focus, ChevronDown, Download, FileText, Hammer, Home, Menu, Rocket, Pause, Users, Square, Trophy, RotateCcw, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../lib/api'
@@ -10,6 +10,7 @@ import { useArena } from '../store'
 export default function TopBar({ onNew, onRerun }: { onNew: () => void; onRerun?: () => void }) {
   const T = useT()
   const s = useArena()
+  const [menuOpen, setMenuOpen] = useState(false)
   const compact = s.layout === 'vertical'
   useEffect(() => { setSfx(true) }, [])  // sound effects are always on
   const live = s.status === 'running' || s.status === 'paused' || s.status === 'voting' || s.status === 'connecting'
@@ -18,7 +19,7 @@ export default function TopBar({ onNew, onRerun }: { onNew: () => void; onRerun?
   const primary = 'flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-sm transition hover:brightness-110'
 
   return (
-    <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line bg-surface/90 px-2 backdrop-blur sm:h-16 sm:gap-3 sm:px-4">
+    <div className="relative z-[70] flex h-14 shrink-0 items-center gap-2 border-b border-line bg-surface/90 px-2 backdrop-blur sm:h-16 sm:gap-3 sm:px-4">
       <img src="/icon.svg" alt="Tably Team" title="Tably Team" className="h-9 w-9 shrink-0 rounded-xl shadow-sm" draggable={false} />
       <div className="ml-1 flex shrink-0 items-center gap-2 sm:ml-2">
         {s.recording ? null : s.status === 'paused' ? (
@@ -46,7 +47,8 @@ export default function TopBar({ onNew, onRerun }: { onNew: () => void; onRerun?
           </span>
         )}
       </div>
-      <div className={`ml-auto flex min-w-0 items-center gap-2 overflow-x-auto ${s.recording ? 'invisible' : s.recMode ? 'opacity-0 hover:opacity-100 transition' : ''}`}>
+      <button type="button" onClick={() => setMenuOpen((v) => !v)} aria-expanded={menuOpen} aria-label={T('Menú', 'Menu')} className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-ink shadow-sm md:hidden">{menuOpen ? <X size={17} /> : <Menu size={17} />}</button>
+      <div onClick={(e) => { if ((e.target as HTMLElement).closest('button') && window.innerWidth < 768) setMenuOpen(false) }} className={`${menuOpen ? 'fixed inset-x-3 top-16 z-[80] flex max-h-[calc(100dvh-5rem)] flex-col items-stretch overflow-y-auto rounded-2xl border border-line bg-surface p-3 shadow-xl [&>*]:w-full [&>*]:justify-center' : 'hidden'} gap-2 md:static md:z-auto md:ml-auto md:flex md:min-w-0 md:max-h-none md:flex-row md:items-center md:overflow-x-auto md:rounded-none md:border-0 md:bg-transparent md:p-0 md:shadow-none md:[&>*]:w-auto ${s.recording ? 'invisible' : s.recMode ? 'opacity-0 hover:opacity-100 transition' : ''}`}>
         {s.source === 'replay' && (
           <select className={`${btn} appearance-none pr-3 font-mono`} value={s.speed} onChange={(e) => s.set({ speed: Number(e.target.value) })} title={T('Velocidad de reproducción', 'Playback speed')}>
             {[0.5, 1, 1.5, 2, 4, 8].map((v) => <option key={v} value={v}>{v}×</option>)}

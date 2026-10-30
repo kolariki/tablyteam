@@ -111,7 +111,7 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
   return (
     <div ref={page} className="relative h-full overflow-y-auto overflow-x-hidden scroll-thin arena-bg">
       {/* the team building, blurred, behind everything */}
-      <TeamBackdrop fixed blur={8} opacity={0.45} />
+      <div className="hidden md:block"><TeamBackdrop fixed blur={8} opacity={0.45} /></div>
       {/* everything else sits above the backdrop (positioned, so the fixed scene never paints over cards or buttons) */}
       <div className="relative z-10">
       {/* header */}
