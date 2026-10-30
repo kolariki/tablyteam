@@ -1,5 +1,5 @@
 import type { RunFix } from '../buildStore'
-import { getLang } from './i18n'
+import { getLang, tr } from './i18n'
 import type { AgentConfig, ArenaEvent, Preset, Provider, Role, SessionConfig, SessionSummary } from '../types'
 
 const TOKEN_KEY = 'arena.token'
@@ -49,6 +49,8 @@ async function j<T>(res: Promise<Response>): Promise<T> {
     } catch {
       /* not json */
     }
+    if (!detail || detail === 'Internal Server Error')  // HTTP/2 has no status text: never an empty error
+      detail = r.status >= 500 ? tr('Falló algo de nuestro lado. Ya quedó registrado; probá de nuevo en un rato.', 'Something failed on our side. It was logged; try again in a while.') : `Error ${r.status}`
     throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail))
   }
   const body = await r.json()
