@@ -2,7 +2,7 @@ import DOMPurify from 'dompurify'
 import { openTeam } from './TeamMemory'
 import { srv } from '../lib/serverText'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Trophy, FlaskConical, Gauge, Home, ListChecks, Search, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2, CloudUpload, Clock3, Menu, Users, Languages } from 'lucide-react'
+import { AlertTriangle, Hammer, ArrowLeft, ArrowRight, CheckCircle2, Trophy, FlaskConical, Gauge, Home, ListChecks, Search, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2, CloudUpload, Clock3, Menu, Users, Languages } from 'lucide-react'
 import { marked } from 'marked'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { reconnectBuild, useBuild, type Activity, type ChatItem, type Todo } from '../buildStore'
@@ -854,21 +854,47 @@ const NOTICE_BTN = 'flex h-9 items-center justify-center gap-1.5 rounded-full bg
 function AppNotice({ c }: { c: ChatItem }) {
   const T = useT()
   const [more, setMore] = useState(false)
-  const tone = c.tone === 'done' ? { box: 'border-ok/40 bg-ok/10', icon: <CheckCircle2 size={18} className="text-ok" />, label: T('Arreglado', 'Fixed') }
-    : c.tone === 'attention' ? { box: 'border-gold/50 bg-gold/10', icon: <AlertTriangle size={18} className="text-gold" />, label: T('Necesita tu atención', 'Needs your attention') }
-    : { box: 'border-accent/40 bg-accent-soft/60', icon: <Loader2 size={18} className="animate-spin text-accent" />, label: T('Arreglando la app', 'Fixing the app') }
+  const [busy, setBusy] = useState(false)
+  const check = !!c.checks
+  // one click: the builder gets what the delivery check finds missing right now and completes it
+  const completeDelivery = async () => {
+    const b = useBuild.getState()
+    if (!b.id) return
+    setBusy(true)
+    const text = T('Completá lo que falta de la entrega', 'Complete what the delivery is missing')
+    const r = await api.buildMessage(b.id, text, b.sessionId).catch(() => null)
+    if (r && (r as { resumed?: boolean }).resumed) {
+      useBuild.getState().set({ status: 'connecting', chat: [...useBuild.getState().chat, { role: 'user', text, ts: Date.now() / 1000 }], error: null })
+      reconnectBuild(b.id)
+    }
+    setBusy(false)
+  }
+  const tone = c.tone === 'done' ? { box: 'border-ok/40 bg-ok/10', icon: <CheckCircle2 size={18} className="text-ok" />, label: check ? T('Entrega verificada', 'Delivery verified') : T('Arreglado', 'Fixed') }
+    : c.tone === 'attention' ? { box: 'border-gold/50 bg-gold/10', icon: <AlertTriangle size={18} className="text-gold" />, label: check ? T('Verificación de entrega', 'Delivery check') : T('Necesita tu atención', 'Needs your attention') }
+    : { box: 'border-accent/40 bg-accent-soft/60', icon: <Loader2 size={18} className="animate-spin text-accent" />, label: check ? T('Completando la entrega', 'Completing the delivery') : T('Arreglando la app', 'Fixing the app') }
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`mx-auto flex w-full max-w-3xl gap-3 rounded-2xl border-2 px-4 py-3 ${tone.box}`}>
       <span className="mt-0.5 shrink-0">{tone.icon}</span>
       <div className="min-w-0 flex-1">
         <div className="text-[10.5px] font-bold uppercase tracking-[0.2em] text-ink-3">Tably · {tone.label}</div>
         <div className="mt-0.5 text-[14.5px] font-medium text-ink">{c.text}</div>
+        {c.checks && c.checks.length > 0 && (
+          <ul className="mt-2 grid gap-1 sm:grid-cols-2">
+            {c.checks.map((k) => (
+              <li key={k.label} className="flex items-start gap-1.5 text-[13px] text-ink-2">
+                {k.ok ? <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-ok" /> : <AlertTriangle size={14} className="mt-0.5 shrink-0 text-gold" />}
+                <span>{k.label}</span>
+              </li>
+            ))}
+          </ul>
+        )}
         {c.detail && (more
           ? <div className="mt-1.5 break-words rounded-lg border border-line bg-paper px-2.5 py-1.5 font-mono text-[11px] text-ink-3">{c.detail}</div>
           : <button onClick={() => setMore(true)} className="mt-1 text-[11.5px] text-ink-3 underline-offset-2 hover:underline">{T('Ver el detalle técnico', 'See the technical detail')}</button>)}
       </div>
-      {(c.run || c.link || c.go) && (
+      {(c.run || c.link || c.go || (c.checks && c.tone === 'attention')) && (
         <div className="flex shrink-0 flex-col items-stretch gap-1.5 self-center">
+          {c.checks && c.tone === 'attention' && <button onClick={completeDelivery} disabled={busy} className={NOTICE_BTN}>{busy ? <Loader2 size={13} className="animate-spin" /> : <Hammer size={13} />} {T('Completar lo que falta', 'Complete what is missing')}</button>}
           {c.link && <a href={c.link.url} target="_blank" rel="noreferrer" className={NOTICE_BTN}><ExternalLink size={13} /> {c.link.label}</a>}
           {c.go && <button onClick={() => useBuild.getState().set({ paneOpen: true, pane: c.go! })} className={NOTICE_BTN}><CloudUpload size={13} /> {c.go === 'cloud' ? T('Ir a Publicar', 'Go to Publish') : T('Abrir', 'Open')}</button>}
           {c.run && <button onClick={() => useBuild.getState().set({ runOpen: true })} className={NOTICE_BTN}><MonitorPlay size={13} /> {T('Ver la app', 'See the app')}</button>}

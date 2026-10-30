@@ -92,6 +92,7 @@ export interface ChatItem {
   phase?: 'build' | 'preview' | 'design'
   seconds?: number  // wall-clock of that turn
   tone?: 'working' | 'done' | 'attention'  // a Tably notice about the app: a card, not a faint line
+  checks?: { label: string; ok: boolean }[]  // the delivery check: what Tably verified before handing the first delivery over
   detail?: string  // the technical error under that notice
   run?: boolean  // the notice offers «Ver la app»
   link?: { label: string; url: string } | null  // and/or a page to act on (e.g. change a leaked key)
@@ -328,7 +329,7 @@ export const useBuild = create<BuildState>((set, get) => ({
         break
       }
       case 'notice':
-        set({ chat: [...s.chat, { role: 'system', text: ev.text, tone: ev.tone, detail: ev.detail, run: ev.run, link: ev.link, go: ev.go, ts: ev.ts }] })
+        set({ chat: [...s.chat, { role: 'system', text: ev.text, tone: ev.tone, detail: ev.detail, run: ev.run, link: ev.link, go: ev.go, checks: ev.checks, ts: ev.ts }] })
         break
       case 'build.version': {
         const { type: _t, seq: _s, ts, ...v } = ev

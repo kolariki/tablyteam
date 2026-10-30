@@ -1455,10 +1455,16 @@ async def build_message(build_id: str, body: dict, user: User = CurrentUser):
         from .design import POLISH_PROMPT
         extra = re.sub(r"^\s*(aplic[aá]\s+el\s+)?(pulido\s+visual|visual\s+polish|polish)\b[:.,\s-]*", "", text, flags=re.I).strip()
         text = POLISH_PROMPT + (f"\n\nADEMÁS, pedido del usuario: {extra}" if extra else "")
+    shown = text
+    # «Completá lo que falta de la entrega» (the delivery-check card's button) → what the check finds missing right now
+    if re.match(r"^\s*(complet[aá] lo que falta de la entrega|complete what the delivery is missing)", text, re.I):
+        from . import delivery
+        found = delivery.check(b.files, b.brief, b.title)
+        text = delivery.prompt(found) if found["gaps"] else text + ". Revisá .tably/entrega.md y el brief, completá lo que falte de punta a punta y emití <done>."
     if b.status == "running":
         b.say(text[:6000])
         return {"ok": True, "resumed": False}
-    b.chat.append({"role": "user", "text": text[:6000], "ts": __import__("time").time()})
+    b.chat.append({"role": "user", "text": shown[:6000], "ts": __import__("time").time()})
     b.resume(text[:6000])
     return {"ok": True, "resumed": True}
 

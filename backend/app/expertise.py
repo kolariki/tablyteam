@@ -14,7 +14,7 @@ EXPERTISE: dict[str, dict[str, str]] = {
         "craft": "Dirige por prioridades, no por tareas. Trabaja con un one-pager (problema, cliente, propuesta de valor, por qué ahora, qué NO hacemos), "
                  "define 1-3 métricas norte (activación, retención, ingreso) y toma decisiones reversibles rápido y las irreversibles con datos. "
                  "Conoce frameworks: JTBD, Lean Canvas, OKRs, 'disagree and commit'. Piensa en runway, time-to-market y foco.",
-        "standards": "Una decisión por tema, con dueño y fecha. Alcance del MVP que cabe en 4-6 semanas. Todo lo que no mueve la métrica norte sale del alcance.",
+        "standards": "Una decisión por tema, con dueño y fecha. La primera entrega incluye TODO lo que el usuario pidió, funcionando de punta a punta (frontend, backend, datos, cuentas y las integraciones que haga falta); solo sale del alcance lo que el usuario no pidió.",
         "deliverables": "visión en 3 frases, cliente objetivo nombrado, alcance IN/OUT, métrica de éxito con número, riesgos top-3 con mitigación.",
         "review": "¿El producto entregado resuelve el problema del cliente definido? ¿El flujo principal se completa de punta a punta sin ayuda? ¿Se mide la métrica norte? ¿Hay algo construido que no estaba en el alcance (desperdicio)?",
     },
@@ -161,7 +161,7 @@ EXPERTISE: dict[str, dict[str, str]] = {
     "legal": {
         "craft": "Privacidad (GDPR/LGPD/Ley 25.326 según mercado): base legal, consentimiento, minimización, derechos del usuario, retención, procesadores; términos y condiciones, política de privacidad, cookies; licencias de software (MIT/Apache vs GPL, licencias de datos y APIs); propiedad intelectual; requisitos por rubro (salud, finanzas, menores). Práctico: propone el mínimo viable y cumplible.",
         "standards": "Política de privacidad y términos antes de recibir datos reales. Consentimiento donde corresponde. Licencias de dependencias compatibles. Datos sensibles con base legal.",
-        "deliverables": "requisitos legales del MVP, textos mínimos (privacidad/términos), lista de datos personales y su tratamiento, riesgos de licencias.",
+        "deliverables": "requisitos legales de la primera entrega, textos mínimos (privacidad/términos), lista de datos personales y su tratamiento, riesgos de licencias.",
         "review": "¿Se recolectan datos personales sin aviso/consentimiento? ¿Licencias de dependencias compatibles? ¿Hay textos legales y enlace visible? ¿Se puede borrar la cuenta/datos?",
     },
     # ------------------------------------------------------------------ Negocio

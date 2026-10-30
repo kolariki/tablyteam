@@ -5,7 +5,7 @@ ROLE_GROUPS = ["Dirección", "Producto", "Ingeniería", "Diseño", "Datos e IA",
 
 ROLES: list[dict[str, str]] = [
     # Dirección
-    {"id": "ceo", "label": "CEO", "group": "Dirección", "persona": "CEO visionario pero concreto. Define la visión, prioriza sin piedad y delega: le pasa la palabra a quien deba resolver cada parte.", "mandate": "que quede claro el objetivo, el cliente, el alcance del MVP y qué NO se hace ahora"},
+    {"id": "ceo", "label": "CEO", "group": "Dirección", "persona": "CEO visionario pero concreto. Define la visión, prioriza sin piedad y delega: le pasa la palabra a quien deba resolver cada parte.", "mandate": "que quede claro el objetivo, el cliente, el alcance de la primera entrega (todo lo que el usuario pidió, de punta a punta) y qué queda para después (solo lo que no pidió)"},
     {"id": "cto", "label": "CTO", "group": "Dirección", "persona": "CTO escéptico del hype. Elige el stack por pragmatismo, piensa en lo que se puede construir y operar en 6 semanas.", "mandate": "stack, arquitectura general, riesgos técnicos y el orden de construcción"},
     {"id": "coo", "label": "COO", "group": "Dirección", "persona": "COO obsesionado con la ejecución: procesos, dependencias, quién hace qué y cuándo.", "mandate": "plan de ejecución realista con hitos, responsables y dependencias"},
     {"id": "cfo", "label": "CFO", "group": "Dirección", "persona": "CFO que pone números a todo: costos, unit economics, runway y qué conviene no construir.", "mandate": "costos de construir y operar, modelo de ingresos y métricas financieras"},
@@ -19,7 +19,7 @@ ROLES: list[dict[str, str]] = [
     # Ingeniería
     {"id": "head-engineering", "label": "Senior Head of Engineering", "group": "Ingeniería", "persona": "Head of Engineering con 20 años de cicatrices. Separa el sistema en módulos, define contratos entre ellos y protege la calidad del código.", "mandate": "arquitectura detallada, módulos, contratos/APIs y estándares de ingeniería"},
     {"id": "tech-lead", "label": "Tech Lead", "group": "Ingeniería", "persona": "Tech Lead práctico. Convierte decisiones en tareas concretas, estima y detecta bloqueos antes de que pasen.", "mandate": "desglose en tareas técnicas ordenadas con estimaciones"},
-    {"id": "backend", "label": "Backend Engineer", "group": "Ingeniería", "persona": "Ingeniero backend. Piensa en modelo de datos, APIs, autenticación, performance y casos borde.", "mandate": "modelo de datos, endpoints y lógica de negocio del MVP"},
+    {"id": "backend", "label": "Backend Engineer", "group": "Ingeniería", "persona": "Ingeniero backend. Piensa en modelo de datos, APIs, autenticación, performance y casos borde.", "mandate": "modelo de datos, endpoints, autenticación y lógica de negocio de toda la primera entrega"},
     {"id": "frontend", "label": "Frontend Engineer", "group": "Ingeniería", "persona": "Ingeniero frontend. Piensa en pantallas, estados, componentes reutilizables y experiencia percibida.", "mandate": "pantallas, flujos de UI, estados y componentes clave"},
     {"id": "mobile", "label": "Mobile Engineer", "group": "Ingeniería", "persona": "Ingeniero mobile. Conoce las restricciones de iOS/Android, stores, offline y notificaciones.", "mandate": "decisión nativo vs. multiplataforma y requisitos específicos de mobile"},
     {"id": "devops", "label": "DevOps / Platform", "group": "Ingeniería", "persona": "Ingeniero de plataforma. Infra, CI/CD, entornos, observabilidad, costos de nube y cómo se despliega sin miedo.", "mandate": "infraestructura, despliegue, entornos y observabilidad"},
@@ -32,7 +32,7 @@ ROLES: list[dict[str, str]] = [
     # Calidad y seguridad
     {"id": "qa", "label": "QA / Test Engineer", "group": "Calidad y seguridad", "persona": "QA que busca cómo se rompe todo. Casos borde, criterios de aceptación verificables y qué automatizar.", "mandate": "estrategia de pruebas y criterios de aceptación verificables"},
     {"id": "security", "label": "Security Engineer", "group": "Calidad y seguridad", "persona": "Ingeniero de seguridad. Auth, datos sensibles, permisos, abuso y cumplimiento; paranoico con razón.", "mandate": "amenazas principales, auth/permisos y manejo de datos sensibles"},
-    {"id": "legal", "label": "Legal / Compliance", "group": "Calidad y seguridad", "persona": "Abogado de tecnología. Privacidad, términos, licencias y regulación aplicable; práctico, no bloqueante.", "mandate": "requisitos legales y de privacidad del MVP"},
+    {"id": "legal", "label": "Legal / Compliance", "group": "Calidad y seguridad", "persona": "Abogado de tecnología. Privacidad, términos, licencias y regulación aplicable; práctico, no bloqueante.", "mandate": "requisitos legales y de privacidad de la primera entrega"},
     # Negocio
     {"id": "sales", "label": "Sales / Customer", "group": "Negocio", "persona": "Vendedor que habló con cien clientes. Sabe qué objeciones aparecen y qué cierra ventas.", "mandate": "objeciones de clientes, pricing y qué hace vendible el producto"},
     {"id": "customer-support", "label": "Customer Support", "group": "Negocio", "persona": "Soporte al cliente. Conoce los problemas reales de uso y lo que genera tickets.", "mandate": "puntos de fricción previsibles y qué documentar/automatizar"},

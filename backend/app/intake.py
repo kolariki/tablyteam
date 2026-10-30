@@ -76,8 +76,8 @@ El Markdown del prompt tiene estas secciones, en este orden, concretas y sin rel
 ## Objetivo
 ## Para quién
 ## Contexto y material adjunto  (qué hay en lo adjunto y cómo usarlo; citá archivos por nombre)
-## Alcance del MVP  (lista numerada)
-## Fuera de alcance
+## Alcance de la primera entrega  (lista numerada: todo lo pedido, de punta a punta)
+## Fuera de alcance  (solo lo que el usuario no pidió)
 ## Requisitos funcionales  (lista numerada, verificables)
 ## Datos e integraciones  (fuentes reales, APIs, qué es demo)
 ## Restricciones técnicas y de producto
@@ -88,7 +88,7 @@ El Markdown del prompt tiene estas secciones, en este orden, concretas y sin rel
 
 LANGUAGE_RULES = {
     "es": "Idioma: español rioplatense (títulos de sección como están arriba), aunque el usuario escriba en otro idioma.",
-    "en": "LANGUAGE: ENGLISH. Everything you write — the questions, understanding, scope and the whole Markdown prompt — must be in English, even if the user wrote in Spanish. Use these exact English section titles instead of the Spanish ones above: # <product name>, ## Goal, ## Who it is for, ## Context and attached material, ## MVP scope, ## Out of scope, ## Functional requirements, ## Data and integrations, ## Technical and product constraints, ## Acceptance criteria, ## Decisions already made by the user, ## Instructions for the team.",
+    "en": "LANGUAGE: ENGLISH. Everything you write — the questions, understanding, scope and the whole Markdown prompt — must be in English, even if the user wrote in Spanish. Use these exact English section titles instead of the Spanish ones above: # <product name>, ## Goal, ## Who it is for, ## Context and attached material, ## First delivery scope, ## Out of scope, ## Functional requirements, ## Data and integrations, ## Technical and product constraints, ## Acceptance criteria, ## Decisions already made by the user, ## Instructions for the team.",
 }
 
 
@@ -132,7 +132,7 @@ def _mock_round(text: str, round_no: int, answers: dict[str, str], att: list[Att
                               {"id": "q2", "question": "¿Datos reales desde el día uno o una demo con datos de ejemplo?", "why": "Define integraciones.", "options": ["Reales", "Demo"]}]}
     names = ", ".join(a.name for a in att[:5]) or "sin adjuntos"
     decided = "\n".join(f"- {k}: {v}" for k, v in answers.items()) or "- (sin preguntas)"
-    return {"status": "ready", "markdown": f"# Producto\n\n## Objetivo\n{text.strip()[:400]}\n\n## Para quién\nUsuarios iniciales del producto.\n\n## Contexto y material adjunto\n{names}\n\n## Alcance del MVP\n1. Flujo principal end-to-end.\n2. Pantallas clave.\n\n## Fuera de alcance\n- Todo lo que no esté arriba.\n\n## Requisitos funcionales\n1. El usuario completa el flujo principal.\n\n## Datos e integraciones\n- Según decisiones.\n\n## Restricciones técnicas y de producto\n- Simples y operables.\n\n## Criterios de aceptación\n1. Flujo principal probado.\n\n## Decisiones ya tomadas por el usuario\n{decided}\n\n## Instrucción para el equipo\nDejar un plan por etapas y criterios de aceptación."}
+    return {"status": "ready", "markdown": f"# Producto\n\n## Objetivo\n{text.strip()[:400]}\n\n## Para quién\nUsuarios iniciales del producto.\n\n## Contexto y material adjunto\n{names}\n\n## Alcance de la primera entrega\n1. Flujo principal end-to-end.\n2. Pantallas clave.\n\n## Fuera de alcance\n- Todo lo que no esté arriba.\n\n## Requisitos funcionales\n1. El usuario completa el flujo principal.\n\n## Datos e integraciones\n- Según decisiones.\n\n## Restricciones técnicas y de producto\n- Simples y operables.\n\n## Criterios de aceptación\n1. Flujo principal probado.\n\n## Decisiones ya tomadas por el usuario\n{decided}\n\n## Instrucción para el equipo\nDejar un plan por etapas y criterios de aceptación."}
 
 
 class Intake:

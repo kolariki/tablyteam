@@ -50,6 +50,7 @@ from .roles import role_of
 from . import research as rsch
 from . import uikit
 from . import levels as levelsmod
+from . import delivery
 
 log = logging.getLogger("arena.builder")
 
@@ -77,10 +78,10 @@ REGLAS:
 - Código real, completo, que compila y corre. Nada de pseudocódigo, TODOs vacíos ni placeholders.
 - Primera etapa: estructura del proyecto, README.md (setup), .env.example con TODAS las variables del brief, dependencias y config base.
 - Publicable con un clic (Tably Cloud): si es frontend, `npm run build` tiene que dejar un `dist/` (o `build/`/`out/`) estático que funcione servido desde cualquier ruta (assets relativos o `base` configurable por `--base`); si tiene servidor, tiene que arrancar con la variable `PORT` y escuchar en `0.0.0.0`, con un `Dockerfile` si no es Node o Python estándar. Postgres solo por `DATABASE_URL`; sin `DATABASE_URL` (al probarla en Tably) los datos se guardan en disco en la carpeta de `TABLY_DATA_DIR` (o `.data/`, ignorada en git y Docker): PGlite con dataDir o SQLite, nunca solo en memoria, y el seed de ejemplo solo si la base está vacía, así lo que se crea al probar no se pierde; auth y storage por Supabase (`SUPABASE_URL`, `SUPABASE_ANON_KEY`).
-- Si la app llama a modelos de IA: cada llamada se reporta a Tably desde el servidor (un helper `reportAI` fire-and-forget: POST `${TABLY_URL}/api/llm/${TABLY_SITE}` con `Authorization: Bearer ${TABLY_TOKEN}` y {provider, model, name, input_tokens, output_tokens, latency_ms, status, error}); si TABLY_URL no existe no hace nada. Tably carga esas variables al publicar.
-- Si la app usa datos de cuentas del usuario (su Google Calendar…), los lee de Tably desde el servidor: GET `${TABLY_URL}/api/connect/${TABLY_SITE}/google-calendar/events?from=<ISO>&to=<ISO>` con `Authorization: Bearer ${TABLY_TOKEN}` → {connected, account, calendars, events:[{id,calendar,title,start,end,all_day,location,description,link,meet,attendees}]}; nunca OAuth propio ni claves de Google; si connected es false, un estado claro «Conectá tu Google Calendar en Tably → Servicios».
+- Si la app llama a modelos de IA: cada llamada se reporta a Tably desde el servidor (un helper `reportAI` fire-and-forget: POST `${{TABLY_URL}}/api/llm/${{TABLY_SITE}}` con `Authorization: Bearer ${{TABLY_TOKEN}}` y {{provider, model, name, input_tokens, output_tokens, latency_ms, status, error}}); si TABLY_URL no existe no hace nada. Tably carga esas variables al publicar.
+- Si la app usa datos de cuentas del usuario (su Google Calendar…), los lee de Tably desde el servidor: GET `${{TABLY_URL}}/api/connect/${{TABLY_SITE}}/google-calendar/events?from=<ISO>&to=<ISO>` con `Authorization: Bearer ${{TABLY_TOKEN}}` → {{connected, account, calendars, events:[{{id,calendar,title,start,end,all_day,location,description,link,meet,attendees}}]}}; nunca OAuth propio ni claves de Google; si connected es false, un estado claro «Conectá tu Google Calendar en Tably → Servicios».
 - Identidad propia (apps web): un logo diseñado para esta app en SVG (`public/logo.svg`: símbolo + nombre, para el header) y su ícono (`public/icon.svg`: el símbolo solo, cuadrado, legible a 16 px) con los colores del diseño; el header usa el logo, nunca un ícono genérico de librería, y el HTML de entrada enlaza `<link rel="icon" href="/icon.svg" type="image/svg+xml">` y `<link rel="apple-touch-icon" href="/apple-touch-icon.png">` (los PNG los genera Tably al publicar).
-- Respetá el stack, el modelo de datos, los contratos y las pantallas del brief. Si algo falta, decidilo y anotalo en NOTES.md.
+{delivery_rule}- Respetá el stack, el modelo de datos, los contratos y las pantallas del brief. Si algo falta, decidilo y anotalo en NOTES.md.
 - Cada archivo se entrega una sola vez por turno. Un archivo por <file>. Rutas sin "./" inicial.
 - MÁXIMO 4 archivos por turno (o menos si son largos): tu salida tiene un límite y un archivo cortado no sirve. Si una etapa
   necesita más archivos, repartila en varios turnos y cerrá la etapa en el último.
@@ -658,6 +659,8 @@ class Build:
                         await self._ensure_mockup()
                 if self.status != "error":
                     await self.run(resume_with)
+                if resume_with in (None, CONTINUE):
+                    await self._ensure_delivery()
                 # a last pass that makes the UI match the design (typography, tokens, states, first impact): the difference
                 # between "works" and "looks like a product"
                 if resume_with is None and self.req.design and self.status == "completed" and self.files and not self._stop.is_set():
@@ -709,7 +712,7 @@ class Build:
         if self.engine:
             await self._run_engine(resume_with)
             return
-        system = BUILDER_SYSTEM.format(language=self.req.language, quality_bar=quality_bar([a.get("role") for a in self.team] or None), design_rule=(BUILDER_DESIGN_RULE if self.design_html else "") + frontend_design_guide())
+        system = BUILDER_SYSTEM.format(delivery_rule=delivery.CONTRACT_RULE, language=self.req.language, quality_bar=quality_bar([a.get("role") for a in self.team] or None), design_rule=(BUILDER_DESIGN_RULE if self.design_html else "") + frontend_design_guide())
         kit = await self._seed_uikit() if resume_with is None else self._uikit_reminder()
         first = f"BRIEF.md:\n\n{self.brief}{research_context(self.research_md, bool(self.req.deep_analysis))}{design_context_for_builder(self.files)}{platform_note(self.req.platform)}{kit}{self.levels_block()}\n\n---\nEmpezá por la Etapa 1 del plan. Entregá los archivos completos."
         pending_user = resume_with or first
@@ -935,7 +938,8 @@ class Build:
                       f"Al terminar, creá también `{PREVIEW_PATH}`: un único archivo HTML autocontenido (CSS/JS inline, sin dependencias) con las pantallas "
                       f"principales navegables y datos de ejemplo, fiel al diseño del brief, para ver cómo queda el producto. "
                       f"Cuando termines, resumí en 5-10 líneas qué quedó construido, cómo correrlo y qué verificar.\n\n"
-                      f"ESTÁNDAR DE CALIDAD (el equipo que diseñó el producto lo va a revisar con esta vara; construí para aprobarla a la primera):\n{bar}"
+                      f"ESTÁNDAR DE CALIDAD (el equipo que diseñó el producto lo va a revisar con esta vara; construí para aprobarla a la primera):\n{bar}\n\n"
+                      + delivery.CONTRACT_RULE
                       + (BUILDER_DESIGN_RULE if (self.workdir / "design" / "mockup.html").exists() else "")
                       + frontend_design_guide()
                       + platform_note(self.req.platform)
@@ -1443,6 +1447,40 @@ class Build:
         if getattr(self, "_auto_publish_after_save", False):
             self._auto_publish_after_save = False
             self._auto_publish()
+
+    async def _ensure_delivery(self) -> None:
+        """The first delivery is everything the user asked for, end to end: when the builder says it is done, Tably checks the
+        code against the brief and the delivery contract and sends it back to complete what is missing (at most twice)."""
+        if getattr(self, "_error_fix", False) or getattr(self, "_deploy_fix", False):
+            return
+        result = None
+        for attempt in range(3):
+            if self.status != "completed" or not self.files or self._stop.is_set():
+                return
+            result = delivery.check(self.files, self.brief, self.title)
+            if not result["gaps"] or attempt == 2:
+                break
+            missing = [c for c in result["checks"] if not c["ok"]]
+            again = self.tx("Segunda pasada. ", "Second pass. ") if attempt else ""
+            self._delivery_note(again + self.tx(f"Verificación de entrega: faltan {len(missing)} {'cosa' if len(missing) == 1 else 'cosas'} de lo que pediste. El constructor las completa antes de entregarte la app.",
+                                        f"Delivery check: {len(missing)} {'thing is' if len(missing) == 1 else 'things are'} missing from what you asked for. The builder completes them before handing the app over."),
+                                "working", result)
+            await self.run(delivery.prompt(result))
+        if result is None or not result["checks"]:
+            return
+        if result["gaps"]:
+            self._delivery_note(self.tx("Verificación de entrega: después de dos pasadas de completado quedan puntos sin cubrir. Tocá «Completar lo que falta» para otra pasada.",
+                                        "Delivery check: after two completion passes some points are still open. Tap «Complete what is missing» for another pass."), "attention", result)
+        else:
+            self._delivery_note(self.tx("Verificación de entrega: todo lo que pediste está construido de punta a punta.", "Delivery check: everything you asked for is built end to end."), "done", result)
+
+    def _delivery_note(self, text: str, tone: str, result: dict) -> None:
+        checks = [{"label": c["label"], "ok": c["ok"]} for c in result["checks"]]
+        detail = " · ".join(result["gaps"])[:400]
+        item = {"role": "system", "text": text, "ts": time.time(), "tone": tone, "checks": checks, **({"detail": detail} if detail else {})}
+        self.chat.append(item)
+        self.emit("notice", **{k: v for k, v in item.items() if k not in ("role", "ts")})
+        self._save()
 
     async def _ensure_identity(self) -> None:
         """A web app ends with its own logo and tab icon: if they are missing, the builder designs them (once per run)."""

@@ -69,8 +69,8 @@ Formato EXACTO (Markdown, con estos encabezados):
 ## 2. Decisiones del equipo
 (tabla: Decisión | Quién (rol) | Turno | Por qué · incluí las de la ronda de cierre)
 ## 3. Desacuerdos y resolución
-## 4. Alcance del MVP
-(lista "Incluye" / lista "Fuera de alcance" / supuestos)
+## 4. Alcance de la primera entrega
+(lista "Incluye": TODO lo que el usuario pidió, funcionando de punta a punta — frontend, backend, datos, cuentas, pagos, emails e integraciones que el producto necesite; lista "Después": solo lo que el usuario NO pidió; supuestos)
 ## 5. Usuarios e historias de usuario
 (checklist "- [ ] US-NN · como … quiero … para …" con criterios de aceptación verificables)
 ## 6. Stack y servicios externos
@@ -113,7 +113,7 @@ BRIEF_HEADINGS_EN = [
     ("## 2. Decisiones del equipo", "## 2. Team decisions"),
     ("(tabla: Decisión | Quién (rol) | Turno | Por qué · incluí las de la ronda de cierre)", "(table: Decision | Who (role) | Turn | Why · include the closing round ones)"),
     ("## 3. Desacuerdos y resolución", "## 3. Disagreements and resolution"),
-    ("## 4. Alcance del MVP", "## 4. MVP scope"),
+    ("## 4. Alcance de la primera entrega", "## 4. First delivery scope"),
     ('(lista "Incluye" / lista "Fuera de alcance" / supuestos)', '("Included" list / "Out of scope" list / assumptions)'),
     ("## 5. Usuarios e historias de usuario", "## 5. Users and user stories"),
     ('(checklist "- [ ] US-NN · como … quiero … para …" con criterios de aceptación verificables)', '(checklist "- [ ] US-NN · as a … I want … so that …" with verifiable acceptance criteria)'),
@@ -275,7 +275,7 @@ Métrica **(supuesto)**: un prototipo usable por 5 personas en 2 semanas.
 ## 3. Desacuerdos y resolución recomendada
 {disl}
 
-## 4. Alcance del MVP
+## 4. Alcance de la primera entrega
 **Incluye:** flujo principal, persistencia simple, una pantalla de resultados.
 **Fuera de alcance:** pagos, multi-idioma, app móvil.
 
