@@ -39,6 +39,14 @@ PACKAGES: list[dict] = [
         "name_en": "Production launch", "eta_en": "48 business hours", "badge_en": "most requested", "tagline_en": "From «works on my machine» to a real URL, with everything configured.", "includes_en": ["Domain and HTTPS", "Deploy on Vercel / Railway (or your cloud)", "Variables and secrets per environment", "Managed database + migrations", "CI with tests on every push", "Basic monitoring and alerts", "Handover report with access and how to operate it"], "excludes_en": ["Functionality changes", "New integrations (see «Integration»)"], "needs_en": ["Collaborator invite to your Vercel/Railway and GitHub accounts", "Domain (if you already have one)"],
     },
     {
+        "id": "service_setup", "name": "Un experto configura el servicio", "price_usd": 49, "eta": "24 h hábiles", "badge": "nuevo",
+        "tagline": "Mercado Pago, emails, login con Google… lo dejamos funcionando en tu app, con vos o por vos.",
+        "includes": ["Te ayudamos a crear o configurar la cuenta del servicio", "Cargamos las claves en tu app (prueba y producción)", "Probamos que funcione de verdad (un pago, un email…)", "Te dejamos anotado cómo cambiarlo"],
+        "excludes": ["Cambios en cómo funciona la app", "Los costos o comisiones del propio servicio"],
+        "needs": ["Acceso a tu cuenta del servicio: nos invitás o lo hacemos juntos en una llamada"],
+        "name_en": "An expert sets up the service", "eta_en": "24 business hours", "badge_en": "new", "tagline_en": "Mercado Pago, email, Google login… we leave it working in your app, with you or for you.", "includes_en": ["We help you create or configure the service account", "We load the keys into your app (test and production)", "We check it really works (a payment, an email…)", "A short note on how to change it"], "excludes_en": ["Changes to how the app works", "The service's own costs or fees"], "needs_en": ["Access to your service account: invite us or we do it together on a call"],
+    },
+    {
         "id": "integration", "name": "Integración de un servicio", "price_usd": 149, "eta": "24–48 h hábiles", "badge": None,
         "tagline": "Pagos, email, login social, una API externa real (datos, mapas, SMS…), analítica.",
         "includes": ["Cuenta y keys configuradas (modo test y producción)", "Código de integración revisado y probado", "Webhooks / reintentos / errores manejados", "Documentación corta de cómo cambiarlo"],

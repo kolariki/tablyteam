@@ -137,6 +137,8 @@ interface BuildState {
   auditReport: string | null
   pane: 'code' | 'preview' | 'report' | 'deploy' | 'app' | 'versions' | 'design' | 'cloud' | 'levels'
   levels: LevelsInfo | null  // growth level of the project (ladder, next step's checks, %), from the snapshot and the levels endpoint
+  servicesMissing: { count: number; impacts: string[] } | null  // services the app needs that are not set up (rail badge, Publish notice)
+  fdeOrder: { pkg: string; notes: string } | null  // open "Pedir un developer" on this package with this text (e.g. «un experto configura Mercado Pago»)
   fdePrefill: string | null  // open "Pedir un developer" with this text once the builder is shown
   runOpen: boolean  // the «Correr la app» window: in the store so nothing but the user closes it while Tably fixes the app
   paneOpen: boolean  // right drawer (code/preview/…) closed by default: the agent's work is the show
@@ -223,6 +225,8 @@ const empty = {
   paneOpen: false,
   runOpen: false,
   fdePrefill: null as string | null,
+  fdeOrder: null as { pkg: string; notes: string } | null,
+  servicesMissing: null as { count: number; impacts: string[] } | null,
   recording: false,
   liveRaw: '',
   activity: [] as Activity[],

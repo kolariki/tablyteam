@@ -384,6 +384,8 @@ export interface ServiceVar {
   required: boolean
   secret: boolean
   configured: boolean
+  tier?: 'needed' | 'auto' | 'optional'  // needed for the app to work · Tably provides it · an improvement
+  auto_reason?: string
 }
 
 export interface CloudStatus {
@@ -550,12 +552,18 @@ export interface ServiceGuideData {
   steps: { title: string; detail: string; url: string | null }[]
   generated: boolean
   model?: string
+  curated?: boolean  // hand-written by Tably (not a model)
+  time?: string | null
+  test?: string | null  // how to try it without risk
+  looks?: Record<string, string>  // var → what its value looks like
 }
 
 export interface ServicesInfo {
   items: ServiceVar[]
-  groups: { service: string; url: string | null; purpose: string | null; vars: ServiceVar[] }[]
+  groups: { service: string; url: string | null; purpose: string | null; vars: ServiceVar[]; tier?: 'needed' | 'auto' | 'optional'; kind?: string; impact?: string }[]
   missing: string[]
+  app?: { status: string | null; url: string | null; updated: number | null } | null
+  pending_publish?: boolean  // values saved after the last publish: the published app gets them when it is published again
   stack: string[]
   recommended_target: string
   deploy_targets: DeployTarget[]

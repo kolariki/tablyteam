@@ -53,6 +53,7 @@ from .builder import BUILDS, Build, BuildRequest, list_builds, load_build, rehyd
 from .local_engine import ENGINES, engine_status, is_engine, snapshot_dir
 from . import deploy as deploymod
 from . import service_guide
+from . import service_tutorials
 from . import billing
 from . import research_jobs
 from . import providers as provmod
@@ -1214,8 +1215,20 @@ def _build_any(user: User, session_id: str, build_id: str):
 @app.get("/api/sessions/{session_id}/builds/{build_id}/services")
 def build_services(session_id: str, build_id: str, user: User = CurrentUser):
     b = _build_any(user, session_id, build_id)
-    saved = set(deploymod.load_secrets(user.id, build_id))
-    data = deploymod.services_for(b.files, b.brief, saved)
+    values = deploymod.load_secrets(user.id, build_id)
+    data = deploymod.services_for(b.files, b.brief, set(values))
+    # keys of outside services that an older Tably filled with a random value (it took them for the app's own secrets): out
+    invented = [i["var"] for i in data["items"] if i["tier"] != "auto" and re.fullmatch(r"[A-Za-z0-9_-]{64}", values.get(i["var"]) or "")
+                and re.search(r"TURNSTILE|TRIGGER|RECAPTCHA|HCAPTCHA|SLACK|DISCORD|POSTMARK|MAILGUN", i["var"])]
+    if invented:
+        deploymod.save_secrets(user.id, build_id, {v: "" for v in invented})
+        data = deploymod.services_for(b.files, b.brief, set(values) - set(invented))
+    app_ = cloudmod.get_app(user.id, build_id) or {}
+    data["app"] = {"status": app_.get("status"), "url": app_.get("url"), "updated": app_.get("updated")} if app_ else None
+    # values saved after the last publish only reach the published app when it is published again
+    with auth._db() as c:
+        last = c.execute("SELECT MAX(updated) FROM build_secrets WHERE user_id = ? AND build_id = ?", (user.id, build_id)).fetchone()[0]
+    data["pending_publish"] = bool(app_ and app_.get("status") in ("live", "error") and last and last > (app_.get("updated") or 0) + 2)
     data["deploy_targets"] = deploymod.deploy_status(user.id)
     data["deploys"] = b.deploys
     return data
@@ -1229,6 +1242,14 @@ async def build_service_guide(session_id: str, build_id: str, service: str, lang
     group = next((g for g in data["groups"] if g["service"] == service), None)
     if not group:
         raise HTTPException(404, "service not found")
+    tut = service_tutorials.find(group)
+    if tut and lang == "en" and service_guide._pick_model(user, {"agents": []}):
+        tut = None  # the tutorials are in Spanish: in English a model writes it (without a key, the Spanish one beats the generic)
+    if tut:  # hand-written and checked, with the app's real addresses
+        app_ = cloudmod.get_app(user.id, build_id) or {}
+        url = (app_.get("url") or "").rstrip("/") or None
+        path = service_tutorials.webhook_path(b.files, group)
+        return {**service_tutorials.render(tut, group, url, (url + path) if url and path else None), "lang": lang}
     return await service_guide.guide(user, build_id, group, b.title, data.get("stack") or [], "en" if lang == "en" else "es", refresh=refresh)
 
 
@@ -3373,6 +3394,26 @@ def on_leaks(user_id: str, build_id: str, keys: list[dict], logs: str) -> bool:
 
 
 cloudmod.ON_LEAKS = on_leaks
+
+
+def on_app_live(user_id: str, build_id: str) -> None:
+    """The app is online: what only its address could tell (APP_URL, API_URL…) is filled and it is published once more to use it."""
+    user, b = _owner_build(user_id, build_id)
+    app_ = cloudmod.get_app(user_id, build_id) or {}
+    if not b or not app_.get("url"):
+        return
+    examples = [t for rel, t in b.files.items() if rel.rsplit("/", 1)[-1] == ".env.example" and rel.count("/") <= 2]
+    urls = cloudmod.url_values(examples, deploymod.load_secrets(user_id, build_id), app_["url"])
+    if not urls:
+        return
+    deploymod.save_secrets(user_id, build_id, urls)
+    if not _busy(b):
+        _note(b, b.tx(f"Completé la dirección de tu app ({', '.join(urls)}) y la vuelvo a publicar para que la use.",
+                      f"I filled in your app's address ({', '.join(urls)}) and I'm publishing it again so it uses it."), tone="working")
+        _start_publish(user, b)
+
+
+cloudmod.ON_LIVE = on_app_live
 
 
 # ------------------------------------------------------------------------------------------------ errors of the published app

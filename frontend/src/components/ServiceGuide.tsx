@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, ExternalLink, Loader2, RefreshCw, Save, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, ExternalLink, FlaskConical, HardHat, Loader2, RefreshCw, Save, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useBuild } from '../buildStore'
 import { api, type ServiceGuideData, type ServicesInfo } from '../lib/api'
 import { useLang, useT } from '../lib/i18n'
 
@@ -81,7 +82,10 @@ export default function ServiceGuide({ group, sessionId, buildId, onClose, onSav
             <div className="text-[11px] uppercase tracking-[0.3em] text-accent">{T('Cómo conseguirlo', 'How to get it')}</div>
             <h3 className="mt-1 truncate text-2xl">{group.service}</h3>
             {data?.intro && <p className="mt-1 text-[13px] leading-snug text-ink-2">{data.intro}</p>}
-            {data?.cost && <span className="mt-2 inline-flex rounded-full border border-line bg-paper px-2.5 py-0.5 text-[11px] text-ink-2">{T('Costo', 'Cost')}: {data.cost}</span>}
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {data?.cost && <span className="inline-flex rounded-lg border border-line bg-paper px-2.5 py-0.5 text-[11px] leading-snug text-ink-2">{T('Costo', 'Cost')}: {data.cost}</span>}
+              {data?.time && <span className="inline-flex items-center gap-1 rounded-full border border-line bg-paper px-2.5 py-0.5 text-[11px] text-ink-2"><Clock3 size={11} /> {data.time}</span>}
+            </div>
           </div>
           <button onClick={onClose} className="rounded-full p-1.5 text-ink-3 transition hover:bg-surface-2 hover:text-ink" aria-label={T('Cerrar', 'Close')}><X size={18} strokeWidth={2.5} /></button>
         </div>
@@ -136,7 +140,7 @@ export default function ServiceGuide({ group, sessionId, buildId, onClose, onSav
                               {v.configured && <span className="inline-flex items-center gap-1 rounded-full border border-ok/30 bg-ok/10 px-2 py-0.5 text-[10.5px] font-medium text-ok"><CheckCircle2 size={11} /> {T('guardada', 'saved')}</span>}
                               {!v.required && <span className="text-[10.5px] text-ink-4">{T('opcional', 'optional')}</span>}
                             </div>
-                            {v.note && <div className="mt-0.5 text-[11.5px] text-ink-3">{v.note}</div>}
+                            {(data.looks?.[v.var] || v.note) && <div className="mt-0.5 text-[11.5px] text-ink-3">{data.looks?.[v.var] ? <>{T('Se ve así', 'Looks like')}: <span className="font-mono">{data.looks[v.var]}</span></> : v.note}</div>}
                             <input
                               type={v.secret ? 'password' : 'text'}
                               autoComplete="off"
@@ -149,6 +153,11 @@ export default function ServiceGuide({ group, sessionId, buildId, onClose, onSav
                           </label>
                         ))}
                       </div>
+                      {data.test && (
+                        <div className="mt-4 flex gap-2 rounded-xl border border-accent/30 bg-accent-soft/40 px-3 py-2.5 text-[12.5px] leading-snug text-ink-2">
+                          <FlaskConical size={15} className="mt-0.5 shrink-0 text-accent" /> <span><b className="text-ink">{T('Para probar sin riesgo', 'To try it safely')}:</b> {data.test}</span>
+                        </div>
+                      )}
                       {error && <div className="mt-3 text-sm text-danger">{error}</div>}
                     </div>
                   </div>
@@ -160,7 +169,10 @@ export default function ServiceGuide({ group, sessionId, buildId, onClose, onSav
 
         {/* footer */}
         <div className="flex items-center gap-2 border-t border-line bg-paper px-6 py-4">
-          {data && (
+          <button onClick={() => { onClose(); useBuild.getState().set({ fdeOrder: { pkg: 'service_setup', notes: `${T('Configurar', 'Set up')} ${group.service} (${group.vars.map((v) => v.var).join(', ')})` } }) }} className="flex h-10 items-center gap-1.5 rounded-full border border-gold/50 bg-gold/10 px-4 text-[12.5px] font-semibold text-ink shadow-sm transition hover:bg-gold/20" title={T('Un experto de Tably lo configura por vos', 'A Tably expert sets it up for you')}>
+            <HardHat size={14} className="text-gold" /> {T('Que lo haga un experto · USD 49', 'Have an expert do it · USD 49')}
+          </button>
+          {data && !data.curated && (
             <button onClick={() => load(true)} className="flex items-center gap-1.5 text-[12px] text-ink-3 transition hover:text-ink" title={T('Volver a escribir la guía', 'Rewrite the guide')}>
               <RefreshCw size={12} /> {data.generated ? data.model : T('guía genérica (sin API key para escribirla)', 'generic guide (no API key to write it)')}
             </button>

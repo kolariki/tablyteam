@@ -13,7 +13,7 @@ import { downloadBlob, requestTabStream, startRecording, type Recording } from '
 import { toast } from './Toast'
 import ProviderLogo from './ProviderLogo'
 import { LiveReview, ReviewLauncher, ReviewRoundCard } from './ReviewPanel'
-import ServicesDeploy from './ServicesDeploy'
+import ServicesDeploy, { servicesMissing } from './ServicesDeploy'
 import CloudPanel from './CloudPanel'
 import LevelsPanel, { LevelBadge } from './LevelsPanel'
 import { fmtDur } from '../lib/duration'
@@ -42,7 +42,7 @@ const PANES: { id: BuildState['pane']; icon: typeof FileCode2; es: string; en: s
   { id: 'versions', icon: GitBranch, es: 'Versiones', en: 'Versions', off: (b) => b.versions.length === 0 },
   { id: 'cloud', icon: CloudUpload, es: 'Publicar', en: 'Publish', off: () => false },
   { id: 'levels', icon: Trophy, es: 'Niveles', en: 'Levels', off: () => false },
-  { id: 'deploy', icon: KeyRound, es: 'Servicios y deploy', en: 'Services & deploy', off: () => false },
+  { id: 'deploy', icon: KeyRound, es: 'Servicios', en: 'Services', off: () => false },
   { id: 'report', icon: FileText, es: 'Informe', en: 'Report', off: (b) => !b.auditReport },
 ]
 
@@ -97,6 +97,10 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
   const rec = useRef<Recording | null>(null)
   const [picked, setPicked] = useState<Record<string, boolean>>({})
   const [applyRounds, setApplyRounds] = useState(2)
+  useEffect(() => {  // the rail badge and the Publish notice know what is missing without opening «Servicios»
+    if (!b.sessionId || !b.id || !Object.keys(b.files).length || b.status === 'running' || b.status === 'connecting') return
+    api.services(b.sessionId, b.id).then((d) => useBuild.getState().set({ servicesMissing: servicesMissing(d) })).catch(() => {})
+  }, [b.sessionId, b.id, b.status, b.versions.length]) // eslint-disable-line react-hooks/exhaustive-deps
   const runOpen = b.runOpen
   const setRunOpen = (v: boolean) => useBuild.getState().set({ runOpen: v })
   const [councilOpen, setCouncilOpen] = useState<false | 'launch' | 'edit'>(false)
@@ -276,6 +280,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
       <DeployWatcher />
       {runOpen && <RunModal onClose={() => setRunOpen(false)} onDownload={downloadZip} />}
       {fdeOpen !== null && <FdeModal onClose={() => setFdeOpen(null)} prefill={fdeOpen ? `${T('Resolver los bloqueantes del consejo:', 'Resolve the council blockers:')}\n${fdeOpen}` : ''} />}
+      {b.fdeOrder && <FdeModal onClose={() => useBuild.getState().set({ fdeOrder: null })} prefill={b.fdeOrder.notes} initialPackage={b.fdeOrder.pkg} />}
       {councilOpen && (
         <CouncilLaunch team={b.team} startEditing={councilOpen === 'edit'} onClose={() => setCouncilOpen(false)} onLaunch={async (priorities, rounds, references, deep, focus) => {
           if (!b.id) return
@@ -415,7 +420,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
                     { id: 'run', icon: MonitorPlay, title: T('Correr la app', 'Run the app'), text: T('Levantala en esta máquina y vela acá', 'Start it on this machine and see it here'), primary: true, show: true, go: () => setRunOpen(true) },
                     { id: 'preview', icon: Eye, title: T('Prototipo navegable', 'Clickable prototype'), text: T('Sin correr nada, en un clic', 'Without running anything, one click'), primary: false, show: !!b.previewHtml, go: () => useBuild.getState().set({ paneOpen: true, pane: 'preview' }) },
                     { id: 'design', icon: Palette, title: T('Diseño', 'Design'), text: T('Qué tiene y pedile cambios', 'What it has, ask for changes'), primary: false, show: true, go: () => useBuild.getState().set({ paneOpen: true, pane: 'design' }) },
-                    { id: 'deploy', icon: KeyRound, title: T('Servicios y deploy', 'Services & deploy'), text: T('Keys, variables y publicar', 'Keys, variables and publishing'), primary: false, show: true, go: () => useBuild.getState().set({ paneOpen: true, pane: 'deploy' }) },
+                    { id: 'deploy', icon: KeyRound, title: T('Servicios', 'Services'), text: T('Lo que necesita para cobrar y mandar emails', 'What it needs to take payments and send email'), primary: false, show: true, go: () => useBuild.getState().set({ paneOpen: true, pane: 'deploy' }) },
                     { id: 'fde', icon: HardHat, title: T('Pedir un developer', 'Request a developer'), text: T('Un ingeniero nuestro lo sube por vos', 'One of our engineers ships it for you'), primary: false, show: true, go: () => setFdeOpen('') },
                   ] as const).filter((a) => a.show).map((a) => {
                     const Icon = a.icon
@@ -519,7 +524,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
                 ) : b.pane === 'levels' ? (
                   <span className="ml-auto text-[11px] text-ink-3">{T('qué nivel tiene el proyecto, qué falta para el siguiente, analytics y marketplace', 'the project level, what the next one needs, analytics and marketplace')}</span>
                 ) : b.pane === 'deploy' ? (
-                  <span className="ml-auto text-[11px] text-ink-3">{T('keys, variables y hosting', 'keys, variables and hosting')}</span>
+                  <span className="ml-auto text-[11px] text-ink-3">{T('lo que tu app necesita para cobrar, mandar emails y más', 'what your app needs to take payments, send email and more')}</span>
                 ) : b.pane === 'app' ? (
                   <span className="ml-auto text-[11px] text-ink-3">{T('corre en esta máquina, sin deploy', 'runs on this machine, no deploy')}</span>
                 ) : b.pane === 'versions' ? (
@@ -609,6 +614,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
                 <Icon size={17} />
                 <span className="text-[8px] leading-none">{T(x.es, x.en).split(' ')[0]}</span>
                 {x.id === 'app' && b.appRun.status === 'running' && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-ok animate-pulse" />}
+                {x.id === 'deploy' && !!b.servicesMissing?.count && <span className="absolute -right-0.5 -top-0.5 rounded-full border border-surface bg-gold px-1 text-[8px] font-bold leading-[13px] text-white" title={T('Servicios que faltan', 'Missing services')}>{b.servicesMissing.count}</span>}
                 {x.id === 'versions' && b.versions.length > 0 && <span className="absolute -right-0.5 -top-0.5 rounded-full border border-surface bg-accent px-1 text-[8px] font-bold leading-[13px] text-white">{b.versions.length}</span>}
                 <span className="pointer-events-none absolute right-full top-1/2 mr-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-ink px-2 py-1 text-[11px] font-medium normal-case text-paper opacity-0 shadow-lg transition group-hover:opacity-100">{T(x.es, x.en)}{disabled ? ` · ${T('todavía no', 'not yet')}` : ''}</span>
               </motion.button>

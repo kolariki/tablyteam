@@ -309,6 +309,8 @@ class AppRun:
         data_dir = self.root / ".data"
         data_dir.mkdir(exist_ok=True)
         env.setdefault("TABLY_DATA_DIR", str(data_dir))
+        for var, val in (("PGLITE_DIR", data_dir / "pglite"), ("PGLITE_DATA_DIR", data_dir / "pglite"), ("DATA_DIR", data_dir), ("SQLITE_PATH", data_dir / "app.db"), ("DB_PATH", data_dir / "app.db")):
+            env.setdefault(var, str(val))  # the names apps use most for a local database folder or file
         # the saved service values → .env (never overwrite one the agent/user already wrote)
         values = load_secrets(self.user_id, self.build_id)
         for d in {self.root, cwd}:

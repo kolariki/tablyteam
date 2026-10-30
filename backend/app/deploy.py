@@ -57,6 +57,14 @@ KNOWN: list[tuple[str, str, str, str]] = [  # (regex on var name, service, where
     (r"^LANGFUSE_", "Langfuse", "https://cloud.langfuse.com", "Observabilidad de LLM"),
     (r"^VERCEL_", "Vercel", "https://vercel.com/account/tokens", "Hosting"),
     (r"^RAILWAY_", "Railway", "https://railway.com/account/tokens", "Hosting"),
+    (r"^(CF_|CLOUDFLARE_)?TURNSTILE_", "Cloudflare Turnstile", "https://dash.cloudflare.com/?to=/:account/turnstile", "Captcha invisible contra bots"),
+    (r"^RECAPTCHA_|^HCAPTCHA_", "Captcha", None, "Captcha contra bots"),
+    (r"^TRIGGER_", "Trigger.dev", "https://cloud.trigger.dev", "Tareas programadas"),
+    (r"^SLACK_", "Slack", "https://api.slack.com/apps", "Alertas por Slack"),
+    (r"^DISCORD_", "Discord", "https://discord.com/developers/applications", "Alertas por Discord"),
+    (r"^POSTMARK_", "Postmark", "https://account.postmarkapp.com/servers", "Envío de emails"),
+    (r"^MAILGUN_", "Mailgun", "https://app.mailgun.com/settings/api_security", "Envío de emails"),
+    (r"^(EMAIL|MAIL)_FROM$|^FROM_EMAIL$|^EMAIL_SENDER$", "Remitente de emails", None, "Desde qué dirección salen los emails"),
     (r"^CLOUDFLARE_|^CF_", "Cloudflare", "https://dash.cloudflare.com/profile/api-tokens", "Hosting / Workers / DNS"),
     (r"^NOMINATIM|^OPENCAGE|^GEOCOD", "Geocoding", None, "Direcciones ↔ coordenadas"),
     (r"^OPENWEATHER|^WEATHER", "OpenWeather", "https://home.openweathermap.org/api_keys", "Datos de clima"),
@@ -130,6 +138,60 @@ def parse_brief_services(brief: str) -> dict[str, dict]:
     return out
 
 
+# ------------------------------------------------------------------ what the app really needs (and what Tably solves by itself)
+# Tably provides these itself: the database when publishing, the app's own URL, the hosting, the data folder, its own secrets
+AUTO_VAR = re.compile(r"^(DATABASE_URL|POSTGRES\w*|PG(HOST|PORT|USER|PASSWORD|DATABASE)|PGLITE_\w+|DATA_DIR|SQLITE_\w+|DB_PATH|DATABASE_PATH|"
+                      r"PORT|HOST|NODE_ENV|TZ|LOG_LEVEL|VITE_PORT|(NEXT_PUBLIC_|VITE_|PUBLIC_|EXPO_PUBLIC_|REACT_APP_)?(APP|API|SITE|BASE|PUBLIC|WEB|FRONTEND|BACKEND|SERVER)(_BASE)?_URL|"
+                      r"NEXTAUTH_URL|VERCEL_\w+|RAILWAY_\w+|NETLIFY_\w+|FLY_\w+|CLOUDFLARE_(API_TOKEN|ACCOUNT_ID))$")
+INTERNAL_SECRET = re.compile(r"(^|_)(SECRET|SECRET_KEY|TOKEN|SALT|PEPPER|SIGNING_KEY|ENCRYPTION_KEY|COOKIE_KEY)$")
+_AUTO_SERVICES = {"Postgres", "Secreto propio", "URL de la app", "Configuración local", "Vercel", "Railway"}
+# the app works without these (it simulates or skips them): improvements, not requirements
+OPTIONAL_HINT = re.compile(r"sentry|posthog|langfuse|slack|discord|datadog|logtail|better ?stack|anal[ií]tic|analytics|monitor|alerta|alert|redis|upstash|\bkv\b|"
+                           r"rate.?limit|turnstile|captcha|trigger\.dev|\bcron\b|opcional|optional|errores$|error tracking", re.I)
+IMPACT: list[tuple[str, str, str]] = [  # (pattern over the service, its purpose and its variables, kind, what does not work while it is missing)
+    (r"MP_|MERCADO|STRIPE|PAYPAL|LEMON|PADDLE|pago|cobro|payment|checkout|seña", "payments", "Los cobros son de prueba: nadie puede pagar de verdad."),
+    (r"RESEND|SENDGRID|POSTMARK|MAILGUN|SMTP|MAIL_|EMAIL", "email", "La app no manda emails: ni confirmaciones, ni recordatorios, ni recuperar la contraseña."),
+    (r"TWILIO|WHATSAPP|SMS", "sms", "No se mandan SMS ni WhatsApp."),
+    (r"OPENAI|ANTHROPIC|GEMINI|GOOGLE_(GENERATIVE|AI)|MISTRAL|GROQ|\bIA\b|\bAI\b", "ai", "Las funciones con inteligencia artificial no responden."),
+    (r"GOOGLE_(CLIENT|OAUTH)|GITHUB_CLIENT|OAUTH|CLERK|AUTH0|FIREBASE|login", "auth", "No funciona entrar con Google u otras cuentas."),
+    (r"MAPS|MAPBOX|GEOCOD", "maps", "Los mapas y las direcciones no cargan."),
+    (r"CLOUDINARY|UPLOADTHING|S3_|AWS_|STORAGE|BUCKET", "storage", "No se pueden subir archivos ni imágenes."),
+]
+
+
+def _tier(item: dict) -> tuple[str, str]:
+    """needed (the app does not work fully without it) · auto (Tably provides it) · optional (an improvement). With the reason."""
+    var, svc = item["var"], item["service"]
+    text = f"{svc} {item.get('purpose') or ''} {item.get('note') or ''}"
+    if svc in _AUTO_SERVICES or AUTO_VAR.search(var):
+        why = ("La base de datos la crea Tably al publicar." if re.search(r"DATABASE|POSTGRES|^PG", var) else
+               "La guarda Tably en su disco." if re.search(r"DIR$|PATH$|SQLITE|PGLITE", var) else
+               "La completa Tably con la dirección de tu app al publicarla." if re.search(r"URL$", var) else
+               "La hospeda Tably: no hace falta." if re.search(r"^(VERCEL|RAILWAY|NETLIFY|FLY|CLOUDFLARE)_", var) else "No requiere nada.")
+        return "auto", why
+    if INTERNAL_SECRET.search(var) and classify(var)["service"] in ("Secreto propio",) or (INTERNAL_SECRET.search(var) and not classify(var)["url"] and not any(re.search(rx, var, re.I) for rx, *_ in KNOWN)):
+        return "auto", "Un secreto propio de la app: Tably lo genera solo."
+    if OPTIONAL_HINT.search(text) or OPTIONAL_HINT.search(var):
+        return "optional", ""
+    return "needed", ""
+
+
+def _impact(group: dict) -> tuple[str, str]:
+    text = " ".join([group["service"], group.get("purpose") or "", *[v["var"] for v in group["vars"]]])
+    for rx, kind, msg in IMPACT:
+        if re.search(rx, text, re.I):
+            return kind, msg
+    return "other", (f"Sin esto no funciona: {group['purpose'].lower()}." if group.get("purpose") else "Una parte de la app no va a funcionar completa.")
+
+
+def _group(service: str, vs: list[dict]) -> dict:
+    g = {"service": service, "url": next((v["url"] for v in vs if v["url"]), None), "purpose": next((v["purpose"] for v in vs if v["purpose"]), None), "vars": vs}
+    tiers = {v["tier"] for v in vs}
+    g["tier"] = "needed" if "needed" in tiers else "optional" if "optional" in tiers else "auto"
+    g["kind"], g["impact"] = _impact(g)
+    return g
+
+
 def services_for(files: dict[str, str], brief: str, saved: set[str]) -> dict:
     env = parse_env_example(files.get(".env.example") or files.get(".env.sample") or files.get("env.example") or "")
     from_brief = parse_brief_services(brief or "")
@@ -148,6 +210,15 @@ def services_for(files: dict[str, str], brief: str, saved: set[str]) -> dict:
             "url": b.get("url") or k["url"], "cost": b.get("cost"), "example": e["example"], "note": e["note"] or None,
             "public": public, "required": not local, "secret": not public and not local, "configured": e["var"] in saved,
         })
+    for it in items:
+        it["tier"], it["auto_reason"] = _tier(it)
+        if it["tier"] != "needed":
+            it["required"] = False
+    # the sender address goes with the email service it belongs to
+    mailer = next((it["service"] for it in items if re.search(r"RESEND|SENDGRID|POSTMARK|MAILGUN|SMTP", it["var"])), None)
+    for it in items:
+        if mailer and it["service"] == "Remitente de emails":
+            it["service"] = mailer
     # group by service for the UI
     groups: dict[str, list[dict]] = {}
     for it in items:
@@ -162,7 +233,7 @@ def services_for(files: dict[str, str], brief: str, saved: set[str]) -> dict:
     elif "pyproject.toml" in files or "requirements.txt" in files:
         stack = ["python"]
     return {
-        "items": items, "groups": [{"service": s, "url": v[0]["url"], "purpose": v[0]["purpose"], "vars": v} for s, v in groups.items()],
+        "items": items, "groups": [_group(s, v) for s, v in groups.items()],
         "missing": [i["var"] for i in items if i["required"] and not i["configured"]], "stack": stack,
         "recommended_target": "vercel" if any(s in stack for s in ("next", "vite", "react", "nuxt", "svelte")) and not any(s in stack for s in ("express", "fastify", "hono", "python")) else "railway",
     }

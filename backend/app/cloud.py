@@ -486,7 +486,27 @@ async def railway_failure_logs(token: str, deployment: str) -> str:
     return "\n".join(out)[-14000:]
 
 
-_INTERNAL_SECRET = re.compile(r"(^|_)(SECRET|SECRET_KEY|TOKEN|SALT|PEPPER|SIGNING_KEY|ENCRYPTION_KEY|COOKIE_KEY)$")
+_INTERNAL_SECRET = deploymod.INTERNAL_SECRET
+
+
+_URL_VAR = re.compile(r"^(NEXT_PUBLIC_|VITE_|PUBLIC_|EXPO_PUBLIC_|REACT_APP_)?(APP|API|SITE|BASE|PUBLIC|WEB|FRONTEND|BACKEND|SERVER)(_BASE)?_URL$|^NEXTAUTH_URL$")
+
+
+def url_values(env_examples: list[str], values: dict[str, str], url: str | None) -> dict[str, str]:
+    """The app's own address (APP_URL, API_URL, NEXT_PUBLIC_SITE_URL…) once it has one: the published URL, keeping the path
+    the example shows (http://localhost:8787/api → https://app…/api). Never replaces a value the user set."""
+    if not url:
+        return {}
+    base = url.rstrip("/")
+    out: dict[str, str] = {}
+    for text in env_examples:
+        for r in deploymod.parse_env_example(text):
+            var = r["var"]
+            if var in values or var in out or not _URL_VAR.search(var):
+                continue
+            path = re.sub(r"^[a-z]+://[^/]+", "", (r.get("example") or "").strip().strip("'\""), flags=re.I) if re.match(r"^[a-z]+://", (r.get("example") or "").strip().strip("'\""), re.I) else ""
+            out[var] = base + (path.rstrip("/") if path not in ("", "/") else "")
+    return out
 
 
 def _internal_secrets(root: Path, values: dict[str, str]) -> dict[str, str]:
@@ -615,7 +635,12 @@ async def publish(user_id: str, build_id: str, title: str, root: Path, files: di
     if gen:  # the app's own secrets (JWT, sessions…): generated once, saved with the build, the same on every republish
         deploymod.save_secrets(user_id, build_id, gen)
         values.update(gen)
-        await log_(f"· generé {len(gen)} secreto(s) propio(s) de la app ({', '.join(gen)}); quedan guardados en «Servicios y deploy»")
+        await log_(f"· generé {len(gen)} secreto(s) propio(s) de la app ({', '.join(gen)}); quedan guardados en «Servicios»")
+    urls = url_values([p.read_text(errors="replace") for p in [root / ".env.example", *root.glob("*/.env.example")][:6] if p.exists()], values, prev.get("url"))
+    if urls:  # the app's own address: Tably knows it, the user never has to look it up
+        deploymod.save_secrets(user_id, build_id, urls)
+        values.update(urls)
+        await log_(f"· completé la dirección de la app ({', '.join(urls)}) con {prev.get('url')}")
     (root / ".env").write_text(deploymod.render_env(values, files)) if values and not (root / ".env").exists() else None
     # errors in the visitors' browsers come back to Tably, which hands them to the builder (see incidents.py)
     incidentsmod.inject_reporter(root, f"{public_url()}/api/app-errors/{slug}/reporter.js")
@@ -650,7 +675,7 @@ async def publish(user_id: str, build_id: str, title: str, root: Path, files: di
             res = {"ok": False, "url": None, "error": "El build no produjo archivos publicables."} if not out else (await _publish_cloudflare(out, slug, log_) if app["provider"] == "cloudflare" else await _publish_local(out, slug, log_))
         elif cls["kind"] == "server":
             if not st["server"]:
-                res = {"ok": False, "url": None, "error": "Esta app necesita un servidor y esta instalación no tiene hosting de servidores configurado (" + st["missing"]["railway"] + "). Mientras tanto podés correrla en «App real» o llevarla a Railway desde «Servicios y deploy»."}
+                res = {"ok": False, "url": None, "error": "Esta app necesita un servidor y esta instalación no tiene hosting de servidores configurado (" + st["missing"]["railway"] + "). Mientras tanto podés correrla en «App real» o llevarla a Railway desde «Servicios»."}
             elif st["server"] == "railway":
                 app["provider"] = "railway"
                 await log_(f"▶ app con servidor ({cls.get('runtime')}) · Railway · «{slug}»")
@@ -672,12 +697,15 @@ async def publish(user_id: str, build_id: str, title: str, root: Path, files: di
         _watch(user_id, build_id)
     elif app["status"] == "live":
         incidentsmod.on_live(user_id, build_id)
+        ON_LIVE and ON_LIVE(user_id, build_id)
     return app
 
 
 _WATCHING: set[tuple[str, str]] = set()
 # set by main: (user_id, build_id, keys, logs) -> whether the builder started moving the keys out of the code
 ON_LEAKS: Callable[[str, str, list, str], bool] | None = None
+# set by main: (user_id, build_id) -> the app went live (fill what only its URL could tell, e.g. APP_URL, and republish once)
+ON_LIVE: Callable[[str, str], None] | None = None
 # set by main: (user_id, build_id, reason, logs) -> whether a fix + republish was started (the app then stays «deploying»)
 ON_DEPLOY_FAILED: Callable[[str, str, str, str], bool] | None = None
 
@@ -721,6 +749,7 @@ def _watch(user_id: str, build_id: str) -> None:
                 _save(cur)
                 lessonsmod.resolve(user_id, build_id, True)
                 incidentsmod.on_live(user_id, build_id)
+                ON_LIVE and ON_LIVE(user_id, build_id)
                 return
             detail = await railway_failure_logs(token, dep) if token and dep else ""
             reason = "el build o el arranque falló en Railway" if ok is None else "la app no respondió en su URL después de 15 minutos"

@@ -18,19 +18,19 @@ const STATUS = (): Record<string, string> => ({
   cancelled: tr('cancelado', 'cancelled'),
 })
 
-const ICON: Record<string, string> = { launch: '🚀', integration: '🔌', review: '🔍', hours: '⏱️' }
+const ICON: Record<string, string> = { service_setup: '🔑', launch: '🚀', integration: '🔌', review: '🔍', hours: '⏱️' }
 
 /**
  * "Pedir un developer": fixed-price FDE packages. The request carries the project's real state as a ticket and, when
  * Stripe is configured, the order is paid on Stripe Checkout right away (the user comes back here with ?checkout=…).
  */
-export default function FdeModal({ onClose, prefill = '' }: { onClose: () => void; prefill?: string }) {
+export default function FdeModal({ onClose, prefill = '', initialPackage = 'launch' }: { onClose: () => void; prefill?: string; initialPackage?: string }) {
   const T = useT()
   const b = useBuild()
   const [packages, setPackages] = useState<FdePackage[]>([])
   const [bookingUrl, setBookingUrl] = useState<string | null>(null)
   const [stripe, setStripe] = useState<StripeStatus | null>(null)
-  const [selected, setSelected] = useState<string>('launch')
+  const [selected, setSelected] = useState<string>(initialPackage)
   const [hours, setHours] = useState(4)
   const [notes, setNotes] = useState(prefill)
   const [contact, setContact] = useState('')

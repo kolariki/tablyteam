@@ -34,4 +34,15 @@ def test_services_for_merges_brief_and_marks_missing():
     brief = "### 6.1 Cuentas\n| Servicio | Para qué | Dónde | Variable | Costo |\n|---|---|---|---|---|\n| Sentry | errores | https://sentry.io | SENTRY_DSN | Free |\n### 6.2\n"
     d = services_for(files, brief, {"DATABASE_URL"})
     assert "SENTRY_DSN" in [i["var"] for i in d["items"]]
-    assert d["missing"] == ["SENTRY_DSN"] and d["recommended_target"] == "vercel"
+    assert d["missing"] == [] and d["recommended_target"] == "vercel"  # error tracking is an improvement, not a requirement
+    tiers = {i["var"]: i["tier"] for i in d["items"]}
+    assert tiers == {"DATABASE_URL": "auto", "PORT": "auto", "SENTRY_DSN": "optional"}
+
+
+def test_services_tiers_for_a_booking_app():
+    env = "APP_URL=\nJWT_SECRET=\nMP_ACCESS_TOKEN=\nRESEND_API_KEY=\nEMAIL_FROM=\nTURNSTILE_SECRET_KEY=\nSLACK_ALERTS_WEBHOOK=\nVERCEL_TOKEN=\n"
+    d = services_for({".env.example": env}, "", set())
+    assert d["missing"] == ["MP_ACCESS_TOKEN", "RESEND_API_KEY", "EMAIL_FROM"]
+    g = {x["service"]: x for x in d["groups"]}
+    assert g["Mercado Pago"]["kind"] == "payments" and [v["var"] for v in g["Resend"]["vars"]] == ["RESEND_API_KEY", "EMAIL_FROM"]
+    assert g["Cloudflare Turnstile"]["tier"] == "optional" and g["Vercel"]["tier"] == "auto"

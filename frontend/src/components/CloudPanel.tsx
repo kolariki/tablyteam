@@ -180,10 +180,17 @@ export default function CloudPanel() {
             </div>
           )}
           {app?.status === 'error' && app.error && <div className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-[12.5px] leading-snug text-danger">{app.error}</div>}
+          {app && (app.status === 'live' || app.status === 'deploying') && !!b.servicesMissing?.count && (
+            <div className="mt-2 rounded-xl border border-gold/40 bg-gold/10 px-3 py-2.5 text-[12.5px]">
+              <div className="font-semibold text-ink">{T('Tu app está en línea, pero todavía le faltan servicios', 'Your app is online, but it still misses some services')}</div>
+              <ul className="mt-1 space-y-0.5 text-ink-2">{b.servicesMissing.impacts.map((t) => <li key={t}>· {t}</li>)}</ul>
+              <button onClick={() => useBuild.getState().set({ paneOpen: true, pane: 'deploy' })} className="mt-2 flex h-8 items-center gap-1.5 rounded-full bg-accent px-3 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110"><KeyRound size={12} /> {T('Configurar servicios', 'Set up services')}</button>
+            </div>
+          )}
           {app?.leaks?.keys?.length ? (
             <div className="mt-2 rounded-xl border border-gold/40 bg-gold/10 px-3 py-2.5 text-[12.5px]">
               <div className="flex items-center gap-1.5 font-semibold text-ink"><KeyRound size={13} className="text-gold" /> {T('Claves que estaban escritas en el código', 'Keys that were written in the code')}</div>
-              <div className="mt-0.5 text-ink-3">{app.status === 'error' ? T('Hay que pasarlas a variables de entorno para que nadie pueda verlas. Los valores ya están guardados en «Servicios y deploy»: falta que el código los lea de ahí.', 'They have to move to environment variables so nobody can see them. The values are already saved in «Services & deploy»: the code still has to read them from there.') : T('Las estamos pasando a variables de entorno (las ves en «Servicios y deploy») para que nadie pueda verlas.', 'We are moving them to environment variables (see «Services & deploy») so nobody can see them.')}</div>
+              <div className="mt-0.5 text-ink-3">{app.status === 'error' ? T('Hay que pasarlas a variables de entorno para que nadie pueda verlas. Los valores ya están guardados en «Servicios»: falta que el código los lea de ahí.', 'They have to move to environment variables so nobody can see them. The values are already saved in «Services»: the code still has to read them from there.') : T('Las estamos pasando a variables de entorno (las ves en «Servicios») para que nadie pueda verlas.', 'We are moving them to environment variables (see «Services») so nobody can see them.')}</div>
               <ul className="mt-2 space-y-1.5">
                 {app.leaks.keys.map((k) => (
                   <li key={k.env} className="flex flex-wrap items-center gap-2">
@@ -303,7 +310,7 @@ export default function CloudPanel() {
           <div className="grid gap-2 md:grid-cols-2">
             <button onClick={() => useBuild.getState().set({ pane: 'deploy' })} className="flex items-center gap-3 rounded-xl border border-line bg-paper px-3.5 py-3 text-left transition hover:border-accent hover:bg-accent-soft">
               <span className="flex -space-x-1"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-surface ring-1 ring-black/10"><ProviderLogo provider="vercel" size={12} /></span><span className="flex h-7 w-7 items-center justify-center rounded-full bg-surface ring-1 ring-black/10"><ProviderLogo provider="railway" size={14} /></span></span>
-              <span className="min-w-0 flex-1"><span className="block text-[13px] font-semibold">{T('Hosting: Vercel o Railway', 'Hosting: Vercel or Railway')}</span><span className="block text-[11.5px] text-ink-3">{T('Con tus tokens, desde «Servicios y deploy».', 'With your tokens, from "Services & deploy".')}</span></span>
+              <span className="min-w-0 flex-1"><span className="block text-[13px] font-semibold">{T('Hosting: Vercel o Railway', 'Hosting: Vercel or Railway')}</span><span className="block text-[11.5px] text-ink-3">{T('Con tus tokens, desde «Servicios».', 'With your tokens, from "Services".')}</span></span>
               <ArrowRight size={14} className="text-ink-3" />
             </button>
             <div className="rounded-xl border border-line bg-paper px-3.5 py-3">
@@ -322,7 +329,7 @@ export default function CloudPanel() {
             </div>
           </div>
           {info && info.migration.env_vars.length > 0 && (
-            <p className="mt-3 text-[11.5px] leading-snug text-ink-4">{T('Variables guardadas:', 'Saved variables:')} {info.migration.env_vars.join(', ')}. {T('Las ves y editás en «Servicios y deploy».', 'See and edit them in "Services & deploy".')}</p>
+            <p className="mt-3 text-[11.5px] leading-snug text-ink-4">{T('Variables guardadas:', 'Saved variables:')} {info.migration.env_vars.join(', ')}. {T('Las ves y editás en «Servicios».', 'See and edit them in "Services".')}</p>
           )}
         </Section>
 
