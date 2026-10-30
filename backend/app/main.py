@@ -102,11 +102,15 @@ class SecurityHeaders(BaseHTTPMiddleware):
             if run_tok in runmod.TOKENS and request.headers.get("sec-fetch-dest") == "iframe":  # Tably frames nothing but running apps
                 return Response(status_code=307, headers={"Location": f"/r/{run_tok}{path}{q}"})
         resp = await call_next(request)
-        if (resp.status_code in (404, 405) and not path.startswith("/r/") and request.cookies.get("tably_run") in runmod.TOKENS
-                and request.headers.get("sec-fetch-site") == "same-origin" and request.headers.get("sec-fetch-dest") not in (None, "empty", "document")):
-            # an image, font or script the app asked for that Tably doesn't have (its fetch/XHR calls are already sent to it by _run_shim)
+        dest, run_tok = request.headers.get("sec-fetch-dest"), request.cookies.get("tably_run")
+        if resp.status_code in (404, 405) and run_tok and not path.startswith(("/r/", "/api/", "/ws")):
             q = f"?{request.url.query}" if request.url.query else ""
-            return Response(status_code=307, headers={"Location": f"/r/{request.cookies['tably_run']}{path}{q}"})
+            if run_tok in runmod.TOKENS and (
+                    (request.headers.get("sec-fetch-site") == "same-origin" and dest not in (None, "empty", "document"))  # an image, font or script of the app
+                    or (dest == "document" and request.method == "GET")):  # a link of the app opened in a tab, pasted, or the way back from a payment
+                return Response(status_code=307, headers={"Location": f"/r/{run_tok}{path}{q}"})
+            if dest == "document" and request.method == "GET":  # a link of an app that is no longer running
+                return Response(_RUN_GONE, status_code=404, media_type="text/html")
         if path.startswith("/r/"):  # the running app is shown inside Tably's panel
             if "x-frame-options" in resp.headers:
                 del resp.headers["x-frame-options"]
@@ -2038,6 +2042,11 @@ runmod.RUN_BASE = _run_base()
 _RUN_HTTP = httpx.AsyncClient(timeout=httpx.Timeout(120, connect=5), follow_redirects=False)
 _RUN_DROP = {"content-security-policy", "content-security-policy-report-only", "x-frame-options", "referrer-policy", "content-length", "transfer-encoding", "content-encoding", "connection", "keep-alive"}
 _RUN_HOP = {"host", "connection", "keep-alive", "accept-encoding", "content-length", "x-tably-sw"}
+_RUN_GONE = ("<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>La app no está corriendo</title>"
+             "<body style='margin:0;display:grid;place-items:center;min-height:100vh;font:15px system-ui;color:#1E2622;background:#F7F5F0'>"
+             "<div style='max-width:420px;padding:24px;text-align:center'><h1 style='font-size:20px'>Este link es de una app que estabas probando en Tably</h1>"
+             "<p style='color:#55625C'>Solo funciona mientras la app está corriendo. Abrila en Tably y tocá «Correr la app»; para compartirlo con otras personas, publicala.</p>"
+             "<a href='/' style='display:inline-block;margin-top:8px;padding:10px 18px;border-radius:999px;background:#2F6B5D;color:#fff;text-decoration:none;font-weight:600'>Ir a Tably</a></div></body>")
 _RUN_WAIT = ("<!doctype html><meta charset=utf-8><meta http-equiv=refresh content=4><title>Cargando…</title>"
              "<body style='margin:0;display:grid;place-items:center;height:100vh;font:15px system-ui;color:#55625C;background:#F7F5F0'>Cargando…</body>")
 
