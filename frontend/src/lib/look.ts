@@ -1,12 +1,15 @@
 /**
- * The new identity («Equipo», with the dark «Taller» builder), being tried in development only: tablyteam.com keeps the
- * current look until it is decided. In dev a switch (bottom left) compares both; VITE_NEW_LOOK=1 turns it on in a build.
+ * Tably's identity («Equipo», with the dark «Taller» builder), live everywhere since 2026-10-30. In development a switch
+ * (bottom left) still compares it with the previous look; VITE_NEW_LOOK=0 builds the previous look.
  */
 const KEY = 'tably.look'
-export const NEW_LOOK_AVAILABLE = import.meta.env.DEV || import.meta.env.VITE_NEW_LOOK === '1'
+export const NEW_LOOK_AVAILABLE = import.meta.env.VITE_NEW_LOOK !== '0'
+/** The comparison switch is a development tool: production always shows the identity. */
+export const LOOK_SWITCH = import.meta.env.DEV
 
 export function newLookOn(): boolean {
   if (!NEW_LOOK_AVAILABLE) return false
+  if (!LOOK_SWITCH) return true
   try { return localStorage.getItem(KEY) !== 'old' } catch { return true }
 }
 

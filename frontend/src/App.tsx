@@ -30,7 +30,7 @@ import { api, auth, connect, connectBuild, replay } from './lib/api'
 import { tr, useT } from './lib/i18n'
 import { downloadBlob, requestTabStream, slug, startRecording } from './lib/recorder'
 import { setSfx, sfx, sfxEnabled } from './lib/sfx'
-import { NEW_LOOK_AVAILABLE, newLookOn, setBuilderLook, setNewLook } from './lib/look'
+import { LOOK_SWITCH, newLookOn, setBuilderLook, setNewLook } from './lib/look'
 import { setReconnectBuild, useBuild } from './buildStore'
 import { useArena } from './store'
 import type { ArenaEvent, SessionConfig } from './types'
@@ -646,10 +646,10 @@ export default function App() {
 }
 
 
-/** Development only: compare the new identity with the current one (tablyteam.com keeps the current one). */
+/** Development only: compare the identity with the previous look. */
 function LookSwitch() {
   const [on, setOn] = useState(newLookOn())
-  if (!NEW_LOOK_AVAILABLE) return null
+  if (!LOOK_SWITCH) return null
   const flip = () => {
     setNewLook(!on)
     setOn(!on)
