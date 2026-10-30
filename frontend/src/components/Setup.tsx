@@ -1,3 +1,4 @@
+import ThemeSwitch from './ThemeSwitch'
 import TeamTable from './TeamTable'
 import { loadMyPhoto, useMyPhoto } from '../lib/myPhoto'
 import { newLookOn } from '../lib/look'
@@ -574,6 +575,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
             <span className="serif text-xl">Tably <em className="text-accent">Team</em></span>
           </span>
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2 whitespace-nowrap">
+            <ThemeSwitch />
             <LangSwitch />
             <button onClick={onAudit} title={T('Subí un proyecto existente y el equipo lo revisa desde cada rol', 'Upload an existing project and the team reviews it from every role')} className="flex h-10 items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-md transition hover:brightness-110 hover:shadow-lg">
               <Gavel size={16} /> {T('Auditar un proyecto', 'Audit a project')}

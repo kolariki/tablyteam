@@ -237,3 +237,13 @@ input[type="color"] { border: 1px solid var(--color-line); padding: 2px; }
 .look-equipo.look-taller .md code.tok-hash { color: #C9B6FF; background: #2C2547; border-color: #3E3463; }
 .look-equipo.look-taller .md pre { background: #121A25; border: 1px solid #2E3A4C; }
 .look-equipo.look-taller .md code.tok-kw { background: transparent; border-color: transparent; padding-left: 0; padding-right: 0; }
+
+/* the team table's seats (home): a light and a dark version of each place */
+.seat-mint { background: #E4F1EC; }
+.seat-violet { background: #EFEAFE; }
+.seat-honey { background: #FFF3D6; }
+.seat-live { background: #17302A; }
+.look-taller .seat-mint { background: #1D3A33; }
+.look-taller .seat-violet { background: #2C2547; }
+.look-taller .seat-honey { background: #3A3322; }
+.look-taller .seat-live { background: #0F2A24; box-shadow: inset 0 0 0 1px #2F6B5D; }

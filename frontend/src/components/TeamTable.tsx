@@ -11,7 +11,7 @@ import { openTeam } from './TeamMemory'
 
 // the seat each kind of role takes at the table (product first, QA last), and the colour of its place
 const ORDER = ['ceo', 'product-manager', 'product-designer', 'head-engineering', 'cto', 'frontend', 'backend', 'fullstack', 'mobile', 'growth', 'qa', 'security']
-const SEATS = ['bg-[#E4F1EC]', 'bg-[#EFEAFE]', 'bg-surface-2', 'bg-[#FFF3D6]', 'bg-surface-2']
+const SEATS = ['seat-mint', 'seat-violet', 'bg-surface-2', 'seat-honey', 'bg-surface-2']  // index.css: a light and a dark version of each
 const BUILDS = /engineer|frontend|backend|fullstack|mobile|cto/
 
 const label = (e: Employee) => (getLang() === 'en' ? e.role_label_en : e.role_label) || e.name
@@ -72,10 +72,10 @@ export default function TeamTable() {
         {team.map((e, i) => {
           const isLive = !!live && e === builder
           return (
-            <button key={e.id} onClick={isLive ? goLive : () => open(e)} title={isLive ? undefined : T('Abrir en Mi equipo para editarlo', 'Open in My team to edit')} className={`flex flex-col items-start gap-3 rounded-[22px] p-4 text-left transition hover:-translate-y-0.5 ${isLive ? 'bg-[#17302A] text-white' : `${SEATS[i % SEATS.length]} text-ink`}`}>
+            <button key={e.id} onClick={isLive ? goLive : () => open(e)} title={isLive ? undefined : T('Abrir en Mi equipo para editarlo', 'Open in My team to edit')} className={`flex flex-col items-start gap-3 rounded-[22px] p-4 text-left transition hover:-translate-y-0.5 ${isLive ? 'seat-live text-white' : `${SEATS[i % SEATS.length]} text-ink`}`}>
               <span className="relative">
                 <AgentAvatar agent={{ name: e.name, role: e.role, provider: e.provider }} size={64} ring={false} logo={0} />
-                {isLive && <span className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5 animate-pulse rounded-full border-2 border-[#17302A] bg-[#8FD3A8]" aria-hidden />}
+                {isLive && <span className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5 animate-pulse rounded-full border-2 border-surface bg-[#8FD3A8]" aria-hidden />}
               </span>
               <span>
                 <span className="block text-[17px] font-extrabold leading-tight">{label(e)}</span>

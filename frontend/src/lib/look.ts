@@ -1,11 +1,27 @@
+import { create } from 'zustand'
+
 /**
- * Tably's identity («Equipo», with the dark «Taller» builder), live everywhere since 2026-10-30. In development a switch
- * (bottom left) still compares it with the previous look; VITE_NEW_LOOK=0 builds the previous look.
+ * Tably's identity («Equipo», with the dark «Taller» builder), live everywhere since 2026-10-30, and the theme the user picks:
+ * - light: everything light, the builder included
+ * - dark: everything dark («Taller» tokens), the home included
+ * - auto (default): the computer's setting; in light mode the home stays light and the builder is the dark «Taller»
+ * In development a switch (bottom left) still compares the identity with the previous look; VITE_NEW_LOOK=0 builds the previous look.
  */
 const KEY = 'tably.look'
+const THEME_KEY = 'tably.theme'
 export const NEW_LOOK_AVAILABLE = import.meta.env.VITE_NEW_LOOK !== '0'
 /** The comparison switch is a development tool: production always shows the identity. */
 export const LOOK_SWITCH = import.meta.env.DEV
+
+export type Theme = 'light' | 'dark' | 'auto'
+export const useTheme = create<{ theme: Theme }>(() => ({ theme: readTheme() }))
+
+function readTheme(): Theme {
+  try {
+    const t = localStorage.getItem(THEME_KEY)
+    return t === 'light' || t === 'dark' ? t : 'auto'
+  } catch { return 'auto' }
+}
 
 export function newLookOn(): boolean {
   if (!NEW_LOOK_AVAILABLE) return false
@@ -18,21 +34,44 @@ export function setNewLook(on: boolean) {
   applyLook()
 }
 
-let fontsLoaded = false
-/** Puts the identity's class on <html> (the builder's dark one is added by the builder view) and loads its typefaces once. */
-export function applyLook() {
+export function setTheme(theme: Theme) {
+  try { localStorage.setItem(THEME_KEY, theme) } catch { /* private mode */ }
+  useTheme.setState({ theme })
+  paint()
+}
+
+const systemDark = () => typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches
+let inBuilder = false
+
+/** The classes on <html>: the identity, and the dark tokens wherever this theme says dark. */
+function paint() {
   const on = newLookOn()
+  const theme = useTheme.getState().theme
+  const dark = on && (theme === 'dark' || (theme === 'auto' && (systemDark() || inBuilder)))
   document.documentElement.classList.toggle('look-equipo', on)
-  if (on && !fontsLoaded) {
+  document.documentElement.classList.toggle('look-taller', dark)
+}
+
+let fontsLoaded = false
+let watching = false
+/** Puts the identity's classes on <html>, loads its typefaces once and follows the computer's light/dark setting. */
+export function applyLook() {
+  paint()
+  if (newLookOn() && !fontsLoaded) {
     fontsLoaded = true
     const l = document.createElement('link')
     l.rel = 'stylesheet'
     l.href = 'https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400..900&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap'
     document.head.appendChild(l)
   }
+  if (!watching && typeof matchMedia === 'function') {
+    watching = true
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paint)
+  }
 }
 
-/** The builder screen in the new identity is the dark «Taller» (also for its modals, which mount on <body>). */
-export function setBuilderLook(inBuilder: boolean) {
-  document.documentElement.classList.toggle('look-taller', inBuilder && newLookOn())
+/** The builder is the dark «Taller» in the automatic theme (its modals mount on <body>, so the class goes on <html>). */
+export function setBuilderLook(builder: boolean) {
+  inBuilder = builder
+  paint()
 }

@@ -18,6 +18,7 @@ import CloudPanel from './CloudPanel'
 import LevelsPanel, { LevelBadge } from './LevelsPanel'
 import { fmtDur } from '../lib/duration'
 import AppRunner from './AppRunner'
+import ThemeSwitch from './ThemeSwitch'
 import RunModal from './RunModal'
 import VersionsPanel, { ReadinessBadge } from './VersionsPanel'
 import CouncilLaunch from './CouncilLaunch'
@@ -274,6 +275,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
         {/* actions: labels only when there is room; below 2xl the secondary ones are icon buttons with a tooltip */}
         <div className="ml-auto flex shrink-0 items-center gap-2 whitespace-nowrap">
           <button onClick={() => setRunOpen(true)} disabled={!Object.keys(b.files).length || (running && b.appRun.status === 'idle' && !b.appRun.fix)} className={HBTN_PRIMARY} title={T('Levanta la app en esta máquina y la muestra acá', 'Starts the app on this machine and shows it here')}><MonitorPlay size={14} /> {T('Correr la app', 'Run the app')}{b.appRun.status === 'running' ? <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> : null}</button>
+          <ThemeSwitch className="h-9" />
           <BuilderMenu onDownload={downloadZip} onRecord={toggleRecording} />
         </div>
       </div>
