@@ -11,7 +11,6 @@ Deliverables (all under design/ in the project):
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 from .expertise import EXPERTISE
 
@@ -27,7 +26,7 @@ ENTREGÁS EXACTAMENTE TRES ARCHIVOS, con este protocolo (sin texto fuera de las 
 <say>en 4-8 líneas: la dirección visual elegida (y por qué encaja con el producto y su usuario), referencias, y qué pantallas diseñaste</say>
 <file path="design/DESIGN.md">
 # Diseño de <producto>
-## 1. Dirección visual — concepto en 2-3 frases, referentes, tono (sobrio/cálido/técnico…), plataforma(s) y breakpoints.
+## 1. Dirección visual — de qué rubro y para quién es, concepto en 2-3 frases, referentes, tono, plataforma(s) y breakpoints; el plan (paleta con nombres, tipografías y rol, layout en una frase + esquema ASCII, 2-3 principios propios) y «Qué cambié para que no sea genérico».
 ## 2. Sistema
 - Paleta con ROLES y HEX exactos: fondo, superficie, superficie elevada, borde, texto primario/secundario/terciario, acento, acento suave, éxito, aviso, error; contraste AA verificado (indicá ratios).
 - Tipografía: familias (máx. 2, con fallback del sistema), escala modular con tamaños/pesos/interlineado por nivel (display, h1, h2, h3, body, small, mono).
@@ -75,18 +74,39 @@ navegable, responsive; tiene que verse como un producto terminado y pulido). Nad
 fuera de design/ en este paso. Al terminar, resumí en 5 líneas la dirección visual elegida y qué pantallas diseñaste."""
 
 
-# The official "frontend-design" skill (Anthropic, downloaded into the catalog): the craft notes that separate a
-# distinctive, intentional UI from the generic generated page. Injected into the designer and the builder.
-_FRONTEND_SKILL_PATH = Path(__file__).resolve().parents[1] / "data" / "skills-catalog" / "sources" / "anthropics--skills" / "skills" / "frontend-design" / "SKILL.md"
+# How to design so it does not look generated: adapted (in our words, in Spanish) from Anthropic's «frontend-design» skill,
+# Apache License 2.0 (https://github.com/anthropics/skills/tree/main/skills/frontend-design). It lives here, in the code,
+# so it reaches every designer and builder run (the skills catalog folder is not shipped to the server).
+DESIGN_CRAFT = """
+CÓMO DISEÑAR SIN QUE PAREZCA HECHO POR IA (adaptado de la guía «frontend-design» de Anthropic):
+1. Partí del rubro. Antes de elegir nada, nombrá el tema, quién lo usa y su tarea principal. Colores, tipografía, imágenes y lo primero
+   que se ve salen del mundo de ESE negocio (sus materiales, objetos, vocabulario), no de una plantilla de SaaS: una agenda de peluquería
+   no se ve como un panel financiero.
+2. Lo primero que se ve es lo más característico del rubro, en la forma que mejor le sienta: un titular, una foto, una demo real, el dato
+   que importa. El combo «número grande + etiqueta chica + degradé» solo si de verdad es lo mejor.
+3. Tipografía con personalidad: 1 o 2 familias elegidas para ESTE producto (no las que usarías en cualquiera), escala clara, pesos con
+   intención, líneas de menos de 80 caracteres. El titular es parte del diseño, no un simple contenedor de texto.
+4. Evitá los rasgos que delatan una página generada (salvo que el brief los pida): fondo crema con títulos con serifa y acento terracota;
+   fondo casi negro con un único acento ácido; todo cortado en tarjetas iguales con el mismo radio y la misma sombra gris; degradés de
+   relleno; etiquetas en MAYÚSCULAS espaciadas arriba de cada título; datos unidos con «·»; monoespaciada para datos chicos; «→» al final
+   de botones y links; una sola palabra del titular en otro color o en itálica; marcadores 01/02/03 cuando el contenido no es una secuencia.
+5. La estructura informa: bordes, numeración, separadores y etiquetas solo cuando dicen algo del contenido, nunca de adorno.
+6. Movimiento con intención: como mucho un momento orquestado al cargar. Nada de aparecer deslizando en cada sección ni hover animado en
+   cada tarjeta. Sí animá lo que responde a una acción de la persona (abrir, confirmar, expandir) para mostrar qué cambió.
+7. Proceso: primero un plan corto (4-6 colores con nombre y HEX, tipografías y su rol, el layout en una frase y un esquema ASCII, 2-3
+   principios propios del producto). Revisalo contra el brief: todo lo que sería igual para cualquier producto parecido, cambialo, y anotá
+   qué cambiaste y por qué. Recién ahí diseñás.
+8. Audacia en un solo lugar: un elemento memorable y todo lo demás sobrio y disciplinado. Antes de entregar, sacá un adorno.
+9. Piso de calidad sin anunciarlo: responsive hasta 360px, foco de teclado visible, respeta «reducir movimiento», contraste AA, paleta armónica.
+10. Textos: desde la persona que usa la app y en palabras simples («Avisos», no «webhooks»). Voz activa. El botón dice qué pasa
+   («Guardar cambios», no «Enviar») y la acción se llama igual en todo el flujo (botón «Publicar» → aviso «Publicado»). Los errores dicen
+   qué pasó y cómo seguir, sin pedir perdón ni ser vagos; un estado vacío invita a hacer algo. Mayúscula solo al inicio de la oración, sin relleno.
+"""
 
 
-def frontend_design_guide(limit: int = 9000) -> str:
-    try:
-        text = _FRONTEND_SKILL_PATH.read_text(errors="ignore")
-    except OSError:
-        return ""
-    text = re.sub(r"^---.*?---\s*", "", text, count=1, flags=re.S).strip()
-    return ("\n\nGUÍA DE DISEÑO (skill oficial frontend-design; aplicala al pie de la letra, está en inglés):\n" + text[:limit]) if text else ""
+def frontend_design_guide(limit: int = 0) -> str:
+    """The design craft notes for the designer and the builder (always the same, shipped with the code)."""
+    return DESIGN_CRAFT
 
 
 POLISH_PROMPT = """PULIDO VISUAL OBLIGATORIO (última pasada antes de entregar). La app funciona; ahora tiene que VERSE profesional. Abrí la UI que
@@ -103,7 +123,11 @@ construiste al lado de design/mockup.html y design/DESIGN.md y corregí, archivo
 5. Estados: vacío con explicación y acción, cargando con skeleton, error con reintento, todos diseñados (no texto suelto en rojo).
 6. Primer impacto: la primera pantalla tiene un elemento memorable (dato protagonista, hero, visual del dominio) y el resto queda sobrio.
    Nada de decoración gratuita, gradientes de relleno ni plantilla genérica.
+   Sacá los rasgos de página generada de la guía de diseño (etiquetas en mayúsculas espaciadas, «·» entre datos, «→» en botones, tarjetas
+   todas iguales, animaciones de entrada en cada sección, una palabra del titular resaltada) salvo que DESIGN.md los pida.
 7. Accesibilidad: contraste AA, foco visible, textos alternativos, tamaños de toque ≥ 44px.
+8. Textos: botones que dicen qué pasa, la misma palabra para la misma acción en todo el flujo, errores que dicen cómo seguir y estados
+   vacíos que invitan a actuar; palabras de la persona usuaria, nunca nombres técnicos.
 Hacé los cambios ahora mismo en el código (no me describas lo que harías). Al final listá en 5-10 líneas qué cambiaste y qué quedó
 pendiente, y dejá la checklist de DESIGN.md marcada en NOTES.md."""
 

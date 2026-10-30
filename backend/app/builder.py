@@ -709,7 +709,7 @@ class Build:
         if self.engine:
             await self._run_engine(resume_with)
             return
-        system = BUILDER_SYSTEM.format(language=self.req.language, quality_bar=quality_bar([a.get("role") for a in self.team] or None), design_rule=BUILDER_DESIGN_RULE + frontend_design_guide(5000) if self.design_html else "")
+        system = BUILDER_SYSTEM.format(language=self.req.language, quality_bar=quality_bar([a.get("role") for a in self.team] or None), design_rule=(BUILDER_DESIGN_RULE if self.design_html else "") + frontend_design_guide())
         kit = await self._seed_uikit() if resume_with is None else self._uikit_reminder()
         first = f"BRIEF.md:\n\n{self.brief}{research_context(self.research_md, bool(self.req.deep_analysis))}{design_context_for_builder(self.files)}{platform_note(self.req.platform)}{kit}{self.levels_block()}\n\n---\nEmpezá por la Etapa 1 del plan. Entregá los archivos completos."
         pending_user = resume_with or first
@@ -937,6 +937,7 @@ class Build:
                       f"Cuando termines, resumí en 5-10 líneas qué quedó construido, cómo correrlo y qué verificar.\n\n"
                       f"ESTÁNDAR DE CALIDAD (el equipo que diseñó el producto lo va a revisar con esta vara; construí para aprobarla a la primera):\n{bar}"
                       + (BUILDER_DESIGN_RULE if (self.workdir / "design" / "mockup.html").exists() else "")
+                      + frontend_design_guide()
                       + platform_note(self.req.platform)
                       + await self._seed_uikit()
                       + (self._build_ref_prompt() if (self.workdir / RESEARCH_PATH).exists() else "")
