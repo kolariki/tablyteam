@@ -304,7 +304,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
         <div className={`flex min-h-0 min-w-0 flex-1 flex-col border-r border-line transition-opacity duration-300 ${paneFull && b.paneOpen ? 'pointer-events-none opacity-0' : ''}`}>
           <div
             ref={chatRef}
-            className="flex-1 overflow-y-auto scroll-thin px-5 py-5 space-y-4"
+            className="flex-1 overflow-y-auto scroll-thin px-5 py-5 space-y-4 [&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[900px]"
             onClick={(e) => {
               const chip = (e.target as HTMLElement).closest('code[data-path]') as HTMLElement | null
               const path = chip?.getAttribute('data-path')
@@ -447,7 +447,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
             )}
             {b.status === 'completed' && !b.liveTurn && Object.keys(b.files).length > 0 && <SavingsCard />}
           </div>
-          <div className="border-t border-line bg-surface p-3">
+          <div className="border-t border-line bg-surface p-3 [&>*]:mx-auto [&>*]:max-w-[900px]">
             {/* quick actions: the full visual-polish checklist is one click (the server expands "pulido visual" into it) */}
             {b.id && !running && (
               <div className="mb-2 flex flex-wrap items-center gap-1.5">
