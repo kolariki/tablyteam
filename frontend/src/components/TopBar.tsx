@@ -18,9 +18,9 @@ export default function TopBar({ onNew, onRerun }: { onNew: () => void; onRerun?
   const primary = 'flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-sm transition hover:brightness-110'
 
   return (
-    <div className="flex h-16 shrink-0 items-center gap-3 border-b border-line bg-surface/90 px-4 backdrop-blur">
+    <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line bg-surface/90 px-2 backdrop-blur sm:h-16 sm:gap-3 sm:px-4">
       <img src="/icon.svg" alt="Tably Team" title="Tably Team" className="h-9 w-9 shrink-0 rounded-xl shadow-sm" draggable={false} />
-      <div className="flex items-center gap-2 ml-2">
+      <div className="ml-1 flex shrink-0 items-center gap-2 sm:ml-2">
         {s.recording ? null : s.status === 'paused' ? (
           <span className="flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/15 px-2.5 py-1 text-[11px] font-bold text-gold">
             <Pause size={11} /> {T('EN PAUSA', 'PAUSED')}

@@ -602,18 +602,18 @@ function AppInner() {
     <div data-capture className="relative h-full flex flex-col arena-bg overflow-hidden">
       {exporter}
       <TopBar onRerun={rerun} onNew={leave} />
-      <div className="flex-1 min-h-0 flex">
-        <div className="relative flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-h-0 flex flex-col md:flex-row">
+        <div className="relative flex-1 min-w-0 min-h-[55%] md:min-h-0 flex flex-col">
           <div className="relative flex-1 min-h-0">
             <ArenaGraph />
-            <div className="absolute top-3 left-4 w-[520px] max-w-[60%]"><StatTiles /></div>
-            <div className="absolute bottom-3 inset-x-0 px-6"><Captions big={recMode} /></div>
+            <div className="absolute left-3 right-3 top-3 md:left-4 md:right-auto md:w-[520px] md:max-w-[60%]"><StatTiles /></div>
+            <div className="absolute bottom-3 inset-x-0 px-3 md:px-6"><Captions big={recMode} /></div>
           </div>
           <div className="shrink-0 px-4 pb-3 space-y-2">
             <Timeline />
             {/* the three analytics cards stay under the graph in focus mode too (a bit shorter, so the stage keeps the room); only a recording hides them */}
             {!recMode && (
-              <div className="grid grid-cols-3 gap-2" style={{ height: focus ? Math.max(192, 80 + agentCount * 22) : Math.max(210, 84 + agentCount * 27) }}>
+              <div className="hidden md:grid grid-cols-3 gap-2" style={{ height: focus ? Math.max(192, 80 + agentCount * 22) : Math.max(210, 84 + agentCount * 27) }}>
                 <LatencyChart />
                 <TokensChart />
                 <CostChart />
@@ -622,7 +622,7 @@ function AppInner() {
           </div>
         </div>
         {/* focus mode (councils by default): the debate is the show, the transcript is a narrow side column */}
-        <div className={`${focus ? 'w-[300px]' : recMode ? 'w-[380px]' : 'w-[420px]'} shrink-0 border-l border-line bg-surface flex flex-col`}>
+        <div className={`${focus ? 'md:w-[300px]' : recMode ? 'md:w-[380px]' : 'md:w-[420px]'} h-[45%] w-full shrink-0 border-t border-line bg-surface flex flex-col md:h-auto md:border-l md:border-t-0`}>
           <div className="px-4 py-2.5 text-[11px] uppercase tracking-widest text-ink-3 border-b border-line">{T('Transcripción en vivo', 'Live transcript')}</div>
           <div className="flex-1 min-h-0"><LiveFeed compact={focus} all /></div>
         </div>

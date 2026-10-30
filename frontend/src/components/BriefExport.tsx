@@ -518,7 +518,7 @@ export default function BriefExport({ onClose, onBuild, onOpenBuild }: { onClose
                 </button>
               </div>
             </div>
-            <div ref={preview} className="flex-1 overflow-y-auto scroll-thin bg-paper/40 px-8 py-8">
+            <div ref={preview} className="flex-1 overflow-y-auto scroll-thin bg-paper/40 px-4 py-5 sm:px-8 sm:py-8">
               {busy && !visible.trim() ? (
                 <div className="flex h-full flex-col items-center justify-center text-center">
                   <div className="relative">

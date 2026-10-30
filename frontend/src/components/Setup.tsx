@@ -7,7 +7,7 @@ import { TeamMemoryButton } from './TeamMemory'
 import { EmployeePicker, employeeToAgent } from './MyTeam'
 import { useBuild, type Activity } from '../buildStore'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeftRight, BarChart3, Bookmark, Check, Eye, FolderOpen, Gavel, Globe, Loader2, LogOut, MonitorSmartphone, Play, Plus, Puzzle, Settings2, Smartphone, Store, Trash2, Users, X, Zap } from 'lucide-react'
+import { ArrowLeftRight, BarChart3, Bookmark, Check, Eye, FolderOpen, Gavel, Globe, Loader2, LogOut, Menu, MonitorSmartphone, Play, Plus, Puzzle, Settings2, Smartphone, Store, Trash2, Users, X, Zap } from 'lucide-react'
 import { toast, useConfirm, usePrompt } from './Toast'
 import SkillPicker from './SkillPicker'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
@@ -103,6 +103,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
     return () => window.removeEventListener('keydown', onKey)
   }, [chooser])
   const lang = useLang()
+  const [menuOpen, setMenuOpen] = useState(false)
   const myPhoto = useMyPhoto((s) => s.url)
   useEffect(() => { loadMyPhoto() }, [])
   const [providers, setProviders] = useState<Provider[]>(() => visibleProviders(readCache<Provider[]>('providers') ?? []))
@@ -389,12 +390,12 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
       <div key={i} className="relative isolate overflow-hidden rounded-xl border p-3" style={{ background: brandTheme(a.wanted_provider ?? a.provider).bg, borderColor: brandTheme(a.wanted_provider ?? a.provider).border }}>
         <LogoWatermark provider={a.wanted_provider ?? a.provider} opacity={0.1} />
         <div className="relative">
-        <div className="grid grid-cols-[auto_auto_1fr_1fr_1.6fr_auto] gap-2 items-center pt-3">
+        <div className="flex flex-wrap items-center gap-2 pt-3 sm:grid sm:grid-cols-[auto_auto_1fr_1fr_1.6fr_auto]">
           <ProviderLogo provider={a.wanted_provider ?? a.provider} size={26} />
           <input type="color" value={color} onChange={(e) => updateAgent(i, { color: e.target.value })} className="w-7 h-7 rounded bg-transparent cursor-pointer" title="color" />
-          <input className={input} value={a.name} onChange={(e) => updateAgent(i, { name: e.target.value, id: slug(e.target.value) })} placeholder={T('nombre', 'name')} />
+          <input className={`${input} min-w-[110px] flex-1`} value={a.name} onChange={(e) => updateAgent(i, { name: e.target.value, id: slug(e.target.value) })} placeholder={T('nombre', 'name')} />
           <select
-            className={input}
+            className={`${input} min-w-[110px] flex-1`}
             value={a.provider}
             onChange={(e) => {
               const np = providers.find((x) => x.id === e.target.value)!
@@ -419,7 +420,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
             />
           ) : (
             <>
-              <div className="relative min-w-0">
+              <div className="relative mt-3 min-w-0 flex-1 basis-[calc(100%-2.5rem)] sm:mt-0 sm:basis-auto">
                 {/* the Muse hint floats above the select, so the row's controls stay aligned */}
                 {isMuseReco(a) ? (
                   <div className="absolute -top-[15px] left-1 max-w-full truncate text-[10px] font-semibold leading-none text-[#0064E0]" title={T(museReco(a).why, museReco(a).why_en)}>✓ {T('Muse recomendado', 'Muse recommended')}{museReco(a).tool ? ` · ${museReco(a).tool}` : ''}</div>
@@ -432,7 +433,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
             </>
           )}
         </div>
-        <div className="mt-2 grid grid-cols-[230px_1fr] gap-2 items-start">
+        <div className="mt-2 grid grid-cols-1 items-start gap-2 sm:grid-cols-[230px_1fr]">
           <div>
             <select className={input} value={a.role ?? 'custom'} onChange={(e) => setRole(i, e.target.value)} title={T('Rol en el equipo', 'Role in the team')}>
               {roles.groups.map((g) => (
@@ -567,14 +568,15 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
           {error && <div className="rounded-lg border border-danger/40 bg-danger/5 px-3 py-1.5 text-[12.5px] text-danger">{error}</div>}
         </div>
       )}
-      <div className="w-full px-8 py-10 2xl:px-12">
+      <div className="w-full px-4 py-5 sm:px-8 sm:py-10 2xl:px-12">
         {/* header: brand on the left, actions on the right, all the same height */}
         <div className="-mb-2 flex items-center gap-3">
           <span className="flex items-center gap-2.5">
             <img src="/icon.svg" alt="" aria-hidden className="h-9 w-9 rounded-xl shadow-sm" draggable={false} />
             <span className="serif text-xl">Tably <em className="text-accent">Team</em></span>
           </span>
-          <div className="ml-auto flex flex-wrap items-center justify-end gap-2 whitespace-nowrap">
+          <button type="button" onClick={() => setMenuOpen((v) => !v)} aria-expanded={menuOpen} aria-label={T('Menú', 'Menu')} className="ml-auto flex h-10 w-10 items-center justify-center rounded-full border border-line bg-surface text-ink shadow-sm md:hidden">{menuOpen ? <X size={18} /> : <Menu size={18} />}</button>
+          <div onClick={(e) => { if ((e.target as HTMLElement).closest('button') && window.innerWidth < 768) setMenuOpen(false) }} className={`${menuOpen ? 'fixed inset-x-3 top-16 z-[60] flex max-h-[calc(100dvh-5rem)] flex-col items-stretch overflow-y-auto rounded-2xl border border-line bg-surface p-3 shadow-xl [&>*]:w-full [&>*]:justify-center' : 'hidden'} gap-2 whitespace-nowrap md:static md:z-auto md:ml-auto md:flex md:max-h-none md:flex-row md:flex-wrap md:items-center md:justify-end md:overflow-visible md:rounded-none md:border-0 md:bg-transparent md:p-0 md:shadow-none md:[&>*]:w-auto`}>
             <ThemeSwitch />
             <LangSwitch />
             <button onClick={onAudit} title={T('Subí un proyecto existente y el equipo lo revisa desde cada rol', 'Upload an existing project and the team reviews it from every role')} className="flex h-10 items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-md transition hover:brightness-110 hover:shadow-lg">
@@ -661,8 +663,8 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
         )}
 
         {lane !== null && (
-        <div data-lane={lane} className={`mt-8 grid gap-6 ${lane === 'direct' ? 'lg:grid-cols-1' : 'lg:grid-cols-[1fr_1.3fr]'}`}>
-          <div className="panel relative isolate flex flex-col rounded-2xl p-5">
+        <div data-lane={lane} className={`mt-8 grid grid-cols-1 gap-6 [&>*]:min-w-0 ${lane === 'direct' ? 'lg:grid-cols-1' : 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]'}`}>
+          <div className="panel relative isolate flex flex-col rounded-2xl p-4 sm:p-5">
             {/* the companies in the team as vertical brand stripes behind the brief (one per AI, its colour); the stripes and the veil carry the card's radius themselves, so the border and shadow stay intact */}
             <BrandStripes providers={cfg.agents.map((a) => a.wanted_provider ?? a.provider)} logos={false} />
             <div className="absolute inset-0 rounded-[inherit] bg-surface/35" aria-hidden />
@@ -841,8 +843,8 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
               </div>
             </div>
           </div>
-          <div ref={teamRef} className="team-only panel flex h-full flex-col rounded-2xl p-5">
-            <div className="flex items-center">
+          <div ref={teamRef} className="team-only panel flex h-full flex-col rounded-2xl p-4 sm:p-5">
+            <div className="flex flex-wrap items-center gap-y-2">
               <span className="text-xs uppercase tracking-widest text-ink-3">{T('Agentes', 'Agents')} ({cfg.agents.length}/8)</span>
               <button
                 disabled={suggesting || !cfg.topic.trim()}
@@ -904,7 +906,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
 
         {lane !== null && error && <div className="mt-4 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}
         {lane !== null && (
-        <div className="mt-6 flex items-center justify-end gap-4">
+        <div className="mt-6 flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4 [&>button]:justify-center [&>button]:whitespace-nowrap">
           {lane === 'team' && (
           <button
               type="button"

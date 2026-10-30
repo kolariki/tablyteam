@@ -50,7 +50,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
   return (
     <div className="h-full overflow-y-auto scroll-thin arena-bg">
       <AnimatePresence>{booting && <HomeLoader key="loader" caption={T('Buscando tus proveedores…', 'Looking up your providers…')} />}</AnimatePresence>
-      <div className="w-full px-8 py-8 2xl:px-12">
+      <div className="w-full px-4 py-5 sm:px-8 sm:py-8 2xl:px-12">
         <PageHeader
           onBack={onBack}
           kicker={T('Configuración', 'Settings')}
@@ -83,7 +83,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
           <h2 className="text-3xl mt-1">{MUSE_FIRST ? T('Muse, el motor de Tably', 'Muse, the engine of Tably') : T('Modelos por API, para los debates', 'API models, for the debates')}</h2>
           <p className="mt-1 text-[13px] text-ink-2">{T('Los agentes del equipo (CEO, CTO, QA…) hablan por API y cada proveedor factura por uso. Cargá solo los que quieras usar.', 'The team agents (CEO, CTO, QA…) talk through APIs and each provider bills per use. Add only the ones you want to use.')}</p>
         </div>
-        <div className="mt-4 grid gap-4 grid-cols-[repeat(auto-fill,minmax(440px,1fr))]">
+        <div className="mt-4 grid gap-4 grid-cols-[repeat(auto-fill,minmax(min(100%,440px),1fr))]">
           {items.filter((p) => !MUSE_FIRST || p.id === 'meta').map((p, i) => (
             <motion.div key={p.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
               <ProviderCard p={p} onSaved={replace} />
@@ -96,7 +96,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
               <span className="transition group-open:rotate-90">▸</span>
               {T('Otros proveedores compatibles', 'Other compatible providers')} · {items.filter((p) => p.id !== 'meta').length} · <span className="text-ink-4">Claude, GPT, Gemini, DeepSeek, Grok, Llama, Kimi, Mistral, OpenRouter, Ollama</span>
             </summary>
-            <div className="mt-4 grid gap-4 grid-cols-[repeat(auto-fill,minmax(440px,1fr))]">
+            <div className="mt-4 grid gap-4 grid-cols-[repeat(auto-fill,minmax(min(100%,440px),1fr))]">
               {items.filter((p) => p.id !== 'meta').map((p) => (
                 <div key={p.id}><ProviderCard p={p} onSaved={replace} /></div>
               ))}

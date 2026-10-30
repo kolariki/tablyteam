@@ -75,7 +75,7 @@ export default function VersionsPanel() {
   const stats = diff?.text ? { add: diff.text.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).length, del: diff.text.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---')).length } : null
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[minmax(380px,1fr)_minmax(0,1.15fr)] bg-surface">
+    <div className="grid min-h-0 flex-1 grid-cols-[minmax(min(100%,380px),1fr)_minmax(0,1.15fr)] bg-surface">
       {/* timeline */}
       <div className="min-h-0 overflow-y-auto scroll-thin border-r border-line p-5">
         <div className="text-[10.5px] uppercase tracking-[0.3em] text-accent">{T('Historial', 'History')}</div>

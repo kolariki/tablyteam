@@ -42,20 +42,20 @@ export default function RunModal({ onClose, onDownload }: { onClose: () => void;
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[120] bg-paper/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <motion.div initial={{ scale: 0.96, y: 12 }} animate={{ scale: 1, y: 0 }} className="panel rounded-3xl w-full max-w-6xl h-[92vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-3 px-5 h-14 border-b border-line shrink-0">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[120] bg-paper/70 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4" onClick={onClose}>
+      <motion.div initial={{ scale: 0.96, y: 12 }} animate={{ scale: 1, y: 0 }} className="panel flex h-[100dvh] w-full max-w-6xl flex-col overflow-hidden rounded-none sm:h-[92vh] sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-3 sm:gap-3 sm:px-5">
           <div className="min-w-0">
             <div className="text-[10px] uppercase tracking-[0.3em] text-accent">{T('App real', 'Real app')}</div>
             <div className="serif text-lg leading-tight truncate">{b.title}</div>
           </div>
           {b.versions.length > 0 && <ReadinessBadge versions={b.versions} />}
           {approved ? (
-            <span className="flex items-center gap-1.5 rounded-full border border-ok/30 bg-ok/10 px-2.5 py-1 text-[11px] font-bold text-ok"><span className="h-2 w-2 rounded-full bg-ok" /> {T('APROBADA POR EL CONSEJO', 'APPROVED BY THE COUNCIL')}</span>
+            <span className="max-sm:hidden flex items-center gap-1.5 rounded-full border border-ok/30 bg-ok/10 px-2.5 py-1 text-[11px] font-bold text-ok"><span className="h-2 w-2 rounded-full bg-ok" /> {T('APROBADA POR EL CONSEJO', 'APPROVED BY THE COUNCIL')}</span>
           ) : rounds > 0 ? (
-            <span className="rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-[11px] font-bold text-gold">{rounds} {rounds === 1 ? T('ronda', 'round') : T('rondas', 'rounds')} {T('de revisión · sin aprobar', 'of review · not approved')}</span>
+            <span className="max-sm:hidden rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-[11px] font-bold text-gold">{rounds} {rounds === 1 ? T('ronda', 'round') : T('rondas', 'rounds')} {T('de revisión · sin aprobar', 'of review · not approved')}</span>
           ) : (
-            <span className="rounded-full border border-line bg-surface-2 px-2.5 py-1 text-[11px] font-bold text-ink-3">{T('SIN REVISAR', 'NOT REVIEWED')}</span>
+            <span className="max-sm:hidden rounded-full border border-line bg-surface-2 px-2.5 py-1 text-[11px] font-bold text-ink-3">{T('SIN REVISAR', 'NOT REVIEWED')}</span>
           )}
           <button onClick={onClose} className="ml-auto rounded-full p-1.5 text-ink-3 transition hover:bg-surface-2 hover:text-ink" aria-label={T('Cerrar', 'Close')}><X size={18} strokeWidth={2.5} /></button>
         </div>
@@ -65,7 +65,7 @@ export default function RunModal({ onClose, onDownload }: { onClose: () => void;
         </div>
 
         {/* next steps */}
-        <div className="border-t border-line bg-surface px-5 py-3 shrink-0">
+        <div className="hidden shrink-0 border-t border-line bg-surface px-5 py-3 sm:block">
           <div className="text-[10px] uppercase tracking-[0.3em] text-ink-3 mb-2">{T('¿Y ahora?', 'What next?')}</div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <button onClick={onDownload} className="rounded-2xl border border-line bg-paper px-4 py-3 text-left hover:bg-surface-2">

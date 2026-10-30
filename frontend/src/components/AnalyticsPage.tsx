@@ -28,7 +28,7 @@ export default function AnalyticsPage({ onBack }: { onBack: () => void }) {
   const live = (data?.apps ?? []).reduce((n, a) => n + a.stats.live, 0)
   return (
     <div className="h-full overflow-y-auto scroll-thin arena-bg">
-      <div className="w-full px-8 py-8 2xl:px-12">
+      <div className="w-full px-4 py-5 sm:px-8 sm:py-8 2xl:px-12">
         <PageHeader onBack={onBack} kicker="Tably Analytics" title={T('Analíticas', 'Analytics')}
           subtitle={T('Visitas, eventos y errores reales de cada app que publicaste. Sin cookies ni datos personales: cada app carga el snippet /a.js y las visitas llegan acá.', 'Real visits, events and errors of every app you published. No cookies or personal data: each app loads the /a.js snippet and the visits land here.')}
           right={data && <span className="flex h-9 items-center gap-3 rounded-full border border-line bg-surface px-3.5 text-sm text-ink-2 shadow-sm"><span className="flex items-center gap-1.5"><span className={`h-2 w-2 rounded-full ${live ? 'bg-ok animate-pulse' : 'bg-ink-4'}`} /> {live} {T('en vivo', 'live')}</span><span className="h-4 w-px bg-line" /><span className="flex items-center gap-1.5"><BarChart3 size={15} /> {total} {T('visitas en total', 'visits in total')}</span></span>} />

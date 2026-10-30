@@ -89,7 +89,17 @@ function Conversation({ engine, id, onClose }: { engine: Engine; id: string; onC
   const [sending, setSending] = useState(false)
   const [pending, setPending] = useState<{ user: string; parts: AgentPart[]; text: string } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const load = () => api.agentSession(engine, id).then(setD).catch((e) => setError((e as Error).message))
+  // the engines report differently (Muse: flat cwd/branch/model and plain-text items, no usage): one shape for the screen
+  const normalize = (x: AgentSessionDetail): AgentSessionDetail => {
+    const raw = x as AgentSessionDetail & { cwd?: string | null; branch?: string | null; model?: string | null }
+    return {
+      ...x,
+      meta: x.meta ?? { cwd: raw.cwd ?? null, branch: raw.branch ?? null, model: raw.model ?? null, version: null },
+      usage: x.usage ?? { input: 0, output: 0, cache_read: 0, cache_write: 0 },
+      items: (x.items ?? []).map((it) => ({ ...it, parts: it.parts ?? ((it as { text?: string }).text ? [{ type: 'text' as const, text: (it as { text?: string }).text }] : []) })),
+    }
+  }
+  const load = () => api.agentSession(engine, id).then((x) => setD(normalize(x))).catch((e) => setError((e as Error).message))
   useEffect(() => {
     setD(null)
     setError(null)
@@ -147,12 +157,12 @@ function Conversation({ engine, id, onClose }: { engine: Engine; id: string; onC
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* header */}
-      <div className="flex items-start gap-3 border-b border-line bg-surface px-6 py-4">
+      <div className="flex flex-wrap items-start gap-3 border-b border-line bg-surface px-4 py-3 sm:flex-nowrap sm:px-6 sm:py-4">
         <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface ring-1 ring-black/10"><ProviderLogo provider={LOGO[engine]} size={18} /></span>
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[18px] leading-tight">{d.title}</h2>
+        <div className="order-3 w-full min-w-0 sm:order-none sm:w-auto sm:flex-1">
+          <h2 className="text-[18px] leading-tight sm:truncate">{d.title}</h2>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-ink-3">
-            {d.meta.cwd && <span className="inline-flex items-center gap-1 font-mono"><FolderOpen size={11} /> {d.meta.cwd}</span>}
+            {d.meta.cwd && <span className="inline-flex min-w-0 max-w-full items-center gap-1 font-mono" title={d.meta.cwd}><FolderOpen size={11} className="shrink-0" /> <span className="truncate">{d.meta.cwd}</span></span>}
             {d.meta.branch && <span className="inline-flex items-center gap-1 font-mono"><GitBranch size={11} /> {d.meta.branch}</span>}
             {d.meta.model && <span className="font-mono">{d.meta.model}</span>}
             <span>{new Date(d.created * 1000).toLocaleString()} → {ago(d.updated, T)}</span>
@@ -165,7 +175,7 @@ function Conversation({ engine, id, onClose }: { engine: Engine; id: string; onC
             {d.live && <span className="inline-flex items-center gap-1 rounded-full border border-ok/30 bg-ok/10 px-2 py-0.5 text-ok"><span className="h-1.5 w-1.5 rounded-full bg-ok animate-pulse" /> {T('activa', 'live')}</span>}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <CopyChip text={d.resume} label={T('Reanudar en terminal', 'Resume in terminal')} />
           <button onClick={onClose} className="rounded-full p-1.5 text-ink-3 transition hover:bg-surface-2 hover:text-ink md:hidden" aria-label={T('Cerrar', 'Close')}><X size={16} /></button>
         </div>

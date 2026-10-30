@@ -120,7 +120,7 @@ export default function SkillPicker({ value, onChange, compact = false, busy = f
         </div>
       )}
       {open && createPortal(
-        <div ref={popRef} style={{ position: 'fixed', top: pos.up ? undefined : pos.top, bottom: pos.up ? window.innerHeight - pos.top : undefined, left: pos.left, maxHeight: pos.up ? Math.min(460, pos.top - 12) : 460 }} className="z-[420] flex w-[420px] flex-col rounded-xl border border-line bg-paper shadow-lg text-[12.5px]">
+        <div ref={popRef} style={{ position: 'fixed', top: pos.up ? undefined : pos.top, bottom: pos.up ? window.innerHeight - pos.top : undefined, left: pos.left, maxHeight: pos.up ? Math.min(460, pos.top - 12) : 460 }} className="z-[420] flex w-[min(420px,calc(100vw-2rem))] flex-col rounded-xl border border-line bg-paper shadow-lg text-[12.5px]">
           {/* search + category filter over everything (your skills, templates and the public catalog) */}
           <div className="border-b border-line p-2">
             <div className="flex items-center gap-2 rounded-lg border border-line bg-surface px-2 py-1">

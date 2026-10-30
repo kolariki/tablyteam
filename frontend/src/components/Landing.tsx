@@ -128,7 +128,7 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
       </header>
 
       {/* hero */}
-      <section className="relative max-w-[1400px] mx-auto px-6 pt-16 pb-10 grid lg:grid-cols-[minmax(520px,1fr)_1.3fr] gap-10 items-center">
+      <section className="relative max-w-[1400px] mx-auto px-6 pt-16 pb-10 grid lg:grid-cols-[minmax(min(100%,520px),1fr)_1.3fr] gap-10 items-center">
         {/* the logos that fly in and fuse into "Tably" (positioned by lib/anim.ts) */}
         <div data-fuse-layer className="pointer-events-none absolute inset-0 z-20" aria-hidden>
           {PROVIDERS_ALL.map(([id]) => (

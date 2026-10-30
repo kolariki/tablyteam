@@ -63,16 +63,16 @@ export default function TeamTable() {
     <section aria-labelledby="team-table" className="mt-10">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 id="team-table" className="text-[34px] leading-none">{T('Tu equipo', 'Your team')}</h2>
+          <h2 id="team-table" className="text-[28px] leading-none sm:text-[34px]">{T('Tu equipo', 'Your team')}</h2>
           <p className="mt-2 max-w-[640px] text-[15px] text-ink-2">{T('Discuten tu idea, la diseñan, la programan y se revisan entre ellos. Vos les hablás como a un equipo y decidís.', 'They debate your idea, design it, code it and review each other. You talk to them like a team and you decide.')}</p>
         </div>
         <button onClick={() => open()} className="h-10 rounded-full border border-line bg-surface px-4 text-[13.5px] font-semibold text-ink transition hover:border-accent hover:text-accent">{T('Ver y editar mi equipo', 'See and edit my team')}</button>
       </div>
-      <div className="mt-5 grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(190px,1fr))]">
+      <div className="mt-5 grid grid-cols-2 gap-2.5 sm:gap-3 sm:[grid-template-columns:repeat(auto-fill,minmax(190px,1fr))]">
         {team.map((e, i) => {
           const isLive = !!live && e === builder
           return (
-            <button key={e.id} onClick={isLive ? goLive : () => open(e)} title={isLive ? undefined : T('Abrir en Mi equipo para editarlo', 'Open in My team to edit')} className={`flex flex-col items-start gap-3 rounded-[22px] p-4 text-left transition hover:-translate-y-0.5 ${isLive ? 'seat-live text-white' : `${SEATS[i % SEATS.length]} text-ink`}`}>
+            <button key={e.id} onClick={isLive ? goLive : () => open(e)} title={isLive ? undefined : T('Abrir en Mi equipo para editarlo', 'Open in My team to edit')} className={`flex flex-col items-start gap-2.5 rounded-[22px] p-3 text-left sm:gap-3 sm:p-4 transition hover:-translate-y-0.5 ${isLive ? 'seat-live text-white' : `${SEATS[i % SEATS.length]} text-ink`}`}>
               <span className="relative">
                 <AgentAvatar agent={{ name: e.name, role: e.role, provider: e.provider }} size={64} ring={false} logo={0} />
                 {isLive && <span className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5 animate-pulse rounded-full border-2 border-surface bg-[#8FD3A8]" aria-hidden />}
@@ -85,7 +85,7 @@ export default function TeamTable() {
             </button>
           )
         })}
-        <div className="flex flex-col items-start gap-3 rounded-[22px] border-2 border-dashed border-line p-4">
+        <div className="flex flex-col items-start gap-2.5 rounded-[22px] border-2 border-dashed border-line p-3 sm:gap-3 sm:p-4">
           <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(ev) => { pick(ev.target.files?.[0]); ev.target.value = '' }} />
           <span className="flex items-center gap-2">
             <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} aria-label={photo ? T('Cambiar mi foto', 'Change my photo') : T('Poner mi foto', 'Add my photo')} title={photo ? T('Cambiar mi foto', 'Change my photo') : T('Poner mi foto', 'Add my photo')}

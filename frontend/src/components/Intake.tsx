@@ -443,7 +443,7 @@ export default function Intake({ idea, onIdea, providers, onPrompt, promptActive
                 <span className="text-[12px] text-ink-3">{st.prompt.length.toLocaleString()} {T('caracteres', 'characters')}</span>
                 <button type="button" onClick={() => setFull(false)} className="ml-auto flex items-center gap-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm hover:bg-surface-2"><X size={14} />{T(' cerrar', ' close')}</button>
               </div>
-              <article className="md mx-auto w-full max-w-4xl flex-1 overflow-y-auto scroll-thin px-8 py-8 text-[15px] leading-relaxed" dangerouslySetInnerHTML={{ __html: promptHtml }} />
+              <article className="md mx-auto w-full max-w-4xl flex-1 overflow-y-auto scroll-thin px-4 py-5 sm:px-8 sm:py-8 text-[15px] leading-relaxed" dangerouslySetInnerHTML={{ __html: promptHtml }} />
             </div>,
             document.body,
           )}

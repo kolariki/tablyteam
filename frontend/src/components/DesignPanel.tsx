@@ -74,9 +74,9 @@ export default function DesignPanel() {
   ]
 
   return (
-    <div className="flex min-h-0 flex-1 bg-surface">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-surface md:flex-row md:overflow-visible">
       {/* left: the design in plain words + the request box */}
-      <div className="flex w-[420px] shrink-0 flex-col border-r border-line">
+      <div className="flex w-full shrink-0 flex-col border-b border-line md:w-[420px] md:border-b-0 md:border-r">
         <div className="min-h-0 flex-1 overflow-y-auto scroll-thin p-5">
           <BuilderBusyNotice what={T('Tu pedido de diseño se está aplicando.', 'Your design request is being applied.')} className="mb-4" />
           <div className="text-[10.5px] uppercase tracking-[0.3em] text-accent">{T('El diseño actual', 'The current design')}</div>
@@ -143,8 +143,8 @@ export default function DesignPanel() {
       </div>
 
       {/* right: the mockup */}
-      <div className="min-w-0 flex-1 p-3">
-        <div className="flex h-full flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+      <div className="flex min-h-[75vh] min-w-0 flex-1 flex-col p-3 md:min-h-0">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
           <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-line bg-surface-2/70 px-3">
             <span className="h-2 w-2 rounded-full bg-[#E6A19A]" /><span className="h-2 w-2 rounded-full bg-[#E9C97A]" /><span className="h-2 w-2 rounded-full bg-[#9FCDA8]" />
             <span className="ml-2 font-mono text-[10px] text-ink-3">design/mockup.html · {T('maqueta hi-fi del Product Designer', 'hi-fi mockup by the Product Designer')}</span>

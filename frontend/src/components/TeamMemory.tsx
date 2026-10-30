@@ -138,7 +138,7 @@ export function TeamPage({ onBack }: { onBack: () => void }) {
   useEffect(() => { load(); loadEmployees() }, [])
   return (
     <div className="h-full overflow-y-auto scroll-thin arena-bg">
-      <div className="w-full px-8 py-8 2xl:px-12">
+      <div className="w-full px-4 py-5 sm:px-8 sm:py-8 2xl:px-12">
         <PageHeader onBack={onBack} kicker={T('Tu equipo', 'Your team')} title={T('Mi equipo', 'My team')} subtitle={T(...INTRO)}
           right={<span className="flex h-9 items-center gap-2 rounded-full border border-line bg-surface px-3.5 text-sm text-ink-2 shadow-sm"><Users size={15} /> {n} {T(n === 1 ? 'empleado' : 'empleados', n === 1 ? 'employee' : 'employees')}</span>} />
         <div className="mt-8"><TeamTabs /></div>

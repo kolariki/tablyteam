@@ -227,26 +227,28 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [paneFull])
-  const paneW = wrapW ? (paneFull ? wrapW - 56 : Math.max(560, Math.min(wrapW - 56 - 400, Math.round((wrapW - 56) * 0.6)))) : 760
+  const [treeOpen, setTreeOpen] = useState(false)
+  const phone = wrapW > 0 && wrapW < 768  // on a phone a pane takes the whole width (the chat comes back when it closes)
+  const paneW = wrapW ? (paneFull || phone ? wrapW - (phone ? 48 : 56) : Math.max(560, Math.min(wrapW - 56 - 400, Math.round((wrapW - 56) * 0.6)))) : 760
 
   return (
     <div className="h-full flex flex-col bg-paper">
       {/* top bar */}
-      <div className="relative z-[60] flex h-16 shrink-0 items-center gap-3 border-b border-line bg-surface/90 px-4 backdrop-blur">
+      <div className="relative z-[60] flex h-14 shrink-0 items-center gap-2 border-b border-line bg-surface/90 px-2 backdrop-blur sm:h-16 sm:gap-3 sm:px-4">
         <button onClick={onHome ?? onBack} className="flex shrink-0 items-center rounded-lg transition hover:opacity-80" title={T('Tably Team · ir al inicio', 'Tably Team · go home')}>
-          <img src="/icon.svg" alt="Tably Team" className="h-9 w-9 rounded-xl shadow-sm" draggable={false} />
+          <img src="/icon.svg" alt="Tably Team" className="h-8 w-8 rounded-xl shadow-sm sm:h-9 sm:w-9" draggable={false} />
         </button>
-        <button onClick={onHome ?? onBack} className={`${HBTN} px-3`} title={T('Ir al inicio: tus proyectos y experimentos', 'Go home: your projects and experiments')}><Home size={14} /> {T('Inicio', 'Home')}</button>
-        <button onClick={onBack} className={`${HBTN} px-3`} title={T('Volver al consejo de este proyecto', 'Back to this project\u2019s council')}><ArrowLeft size={14} /> {T('Consejo', 'Council')}</button>
-        <span className="mx-1 h-7 w-px bg-line" />
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface shadow-sm" style={{ border: `1.5px solid ${color}` }}><ProviderLogo provider={b.provider} size={20} /></span>
+        <button onClick={onHome ?? onBack} className={`${HBTN} hidden px-3 sm:flex`} title={T('Ir al inicio: tus proyectos y experimentos', 'Go home: your projects and experiments')}><Home size={14} /> {T('Inicio', 'Home')}</button>
+        <button onClick={onBack} className={`${HBTN} px-2.5 sm:px-3`} title={T('Volver al consejo de este proyecto', 'Back to this project\u2019s council')} aria-label={T('Consejo', 'Council')}><ArrowLeft size={14} /> <span className="hidden sm:inline">{T('Consejo', 'Council')}</span></button>
+        <span className="mx-1 hidden h-7 w-px bg-line sm:block" />
+        <span className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface shadow-sm sm:flex" style={{ border: `1.5px solid ${color}` }}><ProviderLogo provider={b.provider} size={20} /></span>
         <div className="min-w-0 flex-1">
-          <div className="serif truncate text-[17px] leading-tight" title={b.title}>{b.title}</div>
+          <div className="serif truncate text-[15px] leading-tight sm:text-[17px]" title={b.title}>{b.title}</div>
           <div className="mt-0.5 flex items-center gap-2 text-[11.5px] text-ink-3">
             <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} /> <span className="font-mono">{b.model}</span></span>
           </div>
         </div>
-        <div className="ml-2 flex shrink-0 items-center gap-2 whitespace-nowrap">
+        <div className="ml-2 hidden shrink-0 items-center gap-2 whitespace-nowrap lg:flex">
           {reviewing ? (
             <span className="flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-[11px] font-bold text-gold"><span className="h-2 w-2 rounded-full bg-gold animate-pulse" /> {b.reviewMode === 'audit' ? T('AUDITANDO', 'AUDITING') : `${T('CONSEJO · ronda', 'COUNCIL · round')} ${b.reviewRound ?? b.reviews.length + 1}`}</span>
           ) : b.status === 'audited' ? (
@@ -273,9 +275,9 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
           )}
         </div>
         {/* actions: labels only when there is room; below 2xl the secondary ones are icon buttons with a tooltip */}
-        <div className="ml-auto flex shrink-0 items-center gap-2 whitespace-nowrap">
-          <button onClick={() => setRunOpen(true)} disabled={!Object.keys(b.files).length || (running && b.appRun.status === 'idle' && !b.appRun.fix)} className={HBTN_PRIMARY} title={T('Levanta la app en esta máquina y la muestra acá', 'Starts the app on this machine and shows it here')}><MonitorPlay size={14} /> {T('Correr la app', 'Run the app')}{b.appRun.status === 'running' ? <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> : null}</button>
-          <ThemeSwitch className="h-9" />
+        <div className="ml-auto flex shrink-0 items-center gap-1.5 whitespace-nowrap sm:gap-2">
+          <button onClick={() => setRunOpen(true)} disabled={!Object.keys(b.files).length || (running && b.appRun.status === 'idle' && !b.appRun.fix)} className={HBTN_PRIMARY} title={T('Levanta la app en esta máquina y la muestra acá', 'Starts the app on this machine and shows it here')}><MonitorPlay size={14} /> <span className="hidden sm:inline">{T('Correr la app', 'Run the app')}</span>{b.appRun.status === 'running' ? <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> : null}</button>
+          <ThemeSwitch className="hidden h-9 sm:flex" />
           <BuilderMenu onDownload={downloadZip} onRecord={toggleRecording} />
         </div>
       </div>
@@ -303,7 +305,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
 
       <div ref={wrapRef} className="flex min-h-0 flex-1">
         {/* chat */}
-        <div className={`flex min-h-0 min-w-0 flex-1 flex-col border-r border-line transition-opacity duration-300 ${paneFull && b.paneOpen ? 'pointer-events-none opacity-0' : ''}`}>
+        <div className={`flex min-h-0 min-w-0 flex-1 flex-col border-r border-line transition-opacity duration-300 ${(paneFull || phone) && b.paneOpen ? 'pointer-events-none opacity-0' : ''}`}>
           <div
             ref={chatRef}
             className="flex-1 overflow-y-auto scroll-thin px-5 py-5 space-y-4 [&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[900px]"
@@ -452,8 +454,8 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
           <div className="border-t border-line bg-surface p-3 [&>*]:mx-auto [&>*]:max-w-[900px]">
             {/* quick actions: the full visual-polish checklist is one click (the server expands "pulido visual" into it) */}
             {b.id && !running && (
-              <div className="mb-2 flex flex-wrap items-center gap-1.5">
-                <span className="mr-1 text-[10px] uppercase tracking-[0.25em] text-ink-3">{T('Pedidos rápidos', 'Quick requests')}</span>
+              <div className="mb-2 flex items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&>*]:shrink-0">
+                <span className="mr-1 hidden text-[10px] uppercase tracking-[0.25em] text-ink-3 sm:inline">{T('Pedidos rápidos', 'Quick requests')}</span>
                 {([
                   { icon: Sparkles, label: T('Pulido visual', 'Visual polish'), text: 'Pulido visual', tip: T('Pasada de diseño sobre toda la UI: tipografía real, tokens, layout, estados, responsive y accesibilidad, según design/DESIGN.md y el mockup.', 'Design pass over the whole UI: real typography, tokens, layout, states, responsive and accessibility, per design/DESIGN.md and the mockup.'), hot: true },
                   { icon: ShieldCheck, label: T('Accesibilidad', 'Accessibility'), text: tr('Auditá y corregí accesibilidad en toda la UI: contraste AA, foco visible, navegación por teclado, labels y roles ARIA, textos alternativos, tamaños táctiles ≥ 44 px. Verificá con lint/tests y resumí qué cambió.', 'Audit and fix accessibility across the UI: AA contrast, visible focus, keyboard navigation, ARIA labels and roles, alt texts, touch targets ≥ 44 px. Verify with lint/tests and summarise what changed.'), tip: T('Contraste, teclado, ARIA, tamaños táctiles.', 'Contrast, keyboard, ARIA, touch sizes.'), hot: false },
@@ -505,12 +507,12 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
         <motion.div initial={false} animate={{ width: b.paneOpen ? paneW : 0 }} transition={{ type: 'spring', stiffness: 230, damping: 30, mass: 0.9 }} className="relative min-h-0 shrink-0 overflow-hidden">
           <div className="absolute inset-y-0 right-0 flex min-h-0" style={{ width: paneW }}>
             {/* file tree: only next to the code, sliding in and out with the same spring */}
-            <motion.div initial={false} animate={{ width: b.pane === 'code' ? 232 : 0 }} transition={{ type: 'spring', stiffness: 230, damping: 30, mass: 0.9 }} className="min-h-0 shrink-0 overflow-hidden border-r border-line bg-surface">
+            <motion.div initial={false} animate={{ width: b.pane === 'code' && (!phone || treeOpen) ? (phone ? paneW : 232) : 0 }} transition={{ type: 'spring', stiffness: 230, damping: 30, mass: 0.9 }} className="min-h-0 shrink-0 overflow-hidden border-r border-line bg-surface">
               <div className="h-full w-[232px] overflow-y-auto scroll-thin">
                 <div className="sticky top-0 border-b border-line bg-surface px-3 py-2 text-[11px] uppercase tracking-widest text-ink-3">{T('Archivos', 'Files')}</div>
                 <div className="py-1 font-mono text-[13px]">
                   {tree.length === 0 && <div className="px-3 py-3 font-sans text-xs text-ink-4">{T('Todavía no hay archivos.', 'No files yet.')}</div>}
-                  {tree.map((n) => <TreeNode key={n.path} node={n} depth={0} selected={b.selected} live={b.liveFile?.path ?? null} onSelect={(p) => useBuild.getState().set({ selected: p })} />)}
+                  {tree.map((n) => <TreeNode key={n.path} node={n} depth={0} selected={b.selected} live={b.liveFile?.path ?? null} onSelect={(p) => { useBuild.getState().set({ selected: p }); setTreeOpen(false) }} />)}
                 </div>
               </div>
             </motion.div>
@@ -518,21 +520,22 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
             {/* the pane */}
             <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${b.pane !== 'code' ? 'bg-paper' : ''}`} style={b.pane === 'code' ? { background: codeTheme.bg } : undefined}>
               <div className={`flex h-10 shrink-0 items-center gap-2 overflow-x-auto whitespace-nowrap border-b px-3 text-[12px] ${b.pane !== 'code' ? 'border-line bg-surface' : codeDark ? 'border-white/10 text-[#B9C4BE]' : 'border-black/10 bg-black/[0.03] text-ink-2'}`}>
+                {phone && b.pane === 'code' && <button type="button" onClick={() => setTreeOpen((v) => !v)} aria-expanded={treeOpen} className={`flex shrink-0 items-center gap-1 rounded-md border px-2 py-0.5 ${codeDark ? 'border-white/15 text-white' : 'border-line text-ink'}`}><Folder size={12} /> {T('Archivos', 'Files')}</button>}
                 {(() => { const cur = PANES.find((x) => x.id === b.pane); const Icon = cur?.icon ?? FileCode2; return <span className={`flex items-center gap-1.5 font-semibold ${b.pane === 'code' ? (codeDark ? 'text-white' : 'text-ink') : 'text-ink'}`}><Icon size={14} className={b.pane === 'code' && codeDark ? 'text-[#8FD3B0]' : 'text-accent'} /> {cur ? T(cur.es, cur.en) : ''}</span> })()}
                 {b.pane === 'code' ? (
                   <span className="ml-auto text-[11px] opacity-70">{running ? T('solo lectura mientras el constructor escribe', 'read-only while the builder writes') : T('editá y guardá con ⌘S: el constructor sigue desde tu versión', 'edit and save with ⌘S: the builder continues from your version')}</span>
                 ) : b.pane === 'cloud' ? (
-                  <span className="ml-auto text-[11px] text-ink-3">{T('hosting, base de datos, git y migración', 'hosting, database, git and migration')}</span>
+                  <span className="ml-auto text-[11px] text-ink-3 max-md:hidden">{T('hosting, base de datos, git y migración', 'hosting, database, git and migration')}</span>
                 ) : b.pane === 'levels' ? (
-                  <span className="ml-auto text-[11px] text-ink-3">{T('qué nivel tiene el proyecto, qué falta para el siguiente, analytics y marketplace', 'the project level, what the next one needs, analytics and marketplace')}</span>
+                  <span className="ml-auto text-[11px] text-ink-3 max-md:hidden">{T('qué nivel tiene el proyecto, qué falta para el siguiente, analytics y marketplace', 'the project level, what the next one needs, analytics and marketplace')}</span>
                 ) : b.pane === 'deploy' ? (
-                  <span className="ml-auto text-[11px] text-ink-3">{T('lo que tu app necesita para cobrar, mandar emails y más', 'what your app needs to take payments, send email and more')}</span>
+                  <span className="ml-auto text-[11px] text-ink-3 max-md:hidden">{T('lo que tu app necesita para cobrar, mandar emails y más', 'what your app needs to take payments, send email and more')}</span>
                 ) : b.pane === 'app' ? (
-                  <span className="ml-auto text-[11px] text-ink-3">{T('corre en esta máquina, sin deploy', 'runs on this machine, no deploy')}</span>
+                  <span className="ml-auto text-[11px] text-ink-3 max-md:hidden">{T('corre en esta máquina, sin deploy', 'runs on this machine, no deploy')}</span>
                 ) : b.pane === 'versions' ? (
-                  <span className="ml-auto text-[11px] text-ink-3">{T('qué cambió en cada iteración y qué tan lista está', 'what changed in each iteration and how ready it is')}</span>
+                  <span className="ml-auto text-[11px] text-ink-3 max-md:hidden">{T('qué cambió en cada iteración y qué tan lista está', 'what changed in each iteration and how ready it is')}</span>
                 ) : b.pane === 'design' ? (
-                  <span className="ml-auto text-[11px] text-ink-3">{T('qué tiene el diseño y pedidos al diseñador', 'what the design has and requests to the designer')}</span>
+                  <span className="ml-auto text-[11px] text-ink-3 max-md:hidden">{T('qué tiene el diseño y pedidos al diseñador', 'what the design has and requests to the designer')}</span>
                 ) : b.pane === 'report' ? (
                   <div className="ml-auto flex items-center gap-1">
                     <button onClick={() => b.auditReport && downloadBlob(new Blob([b.auditReport], { type: 'text/markdown' }), `informe-auditoria-${b.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.md`)} className={PBTN}><Download size={12} /> {T('descargar .md', 'download .md')}</button>
@@ -561,7 +564,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
               ) : b.pane === 'deploy' ? (
                 <ServicesDeploy onOpenSettings={() => { useArena.getState().set({ view: 'settings' }) }} />
               ) : b.pane === 'report' && b.auditReport ? (
-                <div className="flex-1 min-h-0 overflow-y-auto scroll-thin px-8 py-6 bg-surface"><article className="md" dangerouslySetInnerHTML={{ __html: md(b.auditReport) }} /></div>
+                <div className="flex-1 min-h-0 overflow-y-auto scroll-thin px-4 py-5 sm:px-8 sm:py-6 bg-surface"><article className="md" dangerouslySetInnerHTML={{ __html: md(b.auditReport) }} /></div>
               ) : b.pane === 'preview' && b.previewHtml ? (
                 <div className="flex-1 min-h-0 p-3">
                   <div className="h-full rounded-xl border border-line bg-surface overflow-hidden shadow-sm">
@@ -599,7 +602,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
         </motion.div>
 
         {/* the rail: one tab per pane, always visible; the active one closes the panel again */}
-        <div className="flex min-h-0 w-14 shrink-0 flex-col items-center gap-1 border-l border-line bg-surface py-2">
+        <div className="flex min-h-0 w-12 shrink-0 flex-col items-center gap-1 overflow-y-auto border-l border-line bg-surface py-2 sm:w-14">
           {PANES.filter((x) => x.id !== 'report' || b.auditReport || b.mode === 'audit').map((x) => {
             const Icon = x.icon
             const disabled = x.off(b)

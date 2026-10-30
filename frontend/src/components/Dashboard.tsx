@@ -130,11 +130,11 @@ export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refres
         </div>
       </div>
 
-      <div className="mt-8 flex items-center gap-3">
+      <div className="mt-8 flex flex-wrap items-center gap-3">
         <h2 className="font-sans text-xs uppercase tracking-widest text-ink-3">{T('Mis proyectos', 'My projects')} ({rows.length})</h2>
         <div className="ml-auto flex items-center gap-2 rounded-lg border border-line bg-surface px-2.5 py-1.5">
           <Search size={14} className="text-ink-3" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={T('buscar…', 'search…')} className="bg-transparent text-sm outline-none w-44" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={T('buscar…', 'search…')} className="bg-transparent text-sm outline-none w-28 sm:w-44" />
         </div>
         <button onClick={onAudit} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm hover:bg-surface-2"><Gavel size={14} />{T(' Auditar proyecto', ' Audit project')}</button>
       </div>
@@ -196,7 +196,7 @@ export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refres
               <BrandStripes providers={providers} opacity={0.9} logos={false} />
               <div className="absolute inset-0 bg-surface/55" aria-hidden />
               <div className="relative px-4 py-3">
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap sm:gap-4">
                   {/* mini animated scene of what the project is about (same generator as the experiment cards) */}
                   <SceneThumb sessionId={s.id} />
                   <div className="min-w-0 flex-1">
@@ -232,7 +232,7 @@ export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refres
                   <div className="hidden md:block w-[34%] max-w-[420px] shrink-0 self-stretch min-h-[44px]">
                     <BrandLogoRow providers={providers} compact />
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex w-full flex-wrap items-center justify-end gap-1.5 sm:w-auto sm:shrink-0">
                     {isAudit ? (
                       <button onClick={() => go(s.id, 'builder')} disabled={!!busyAct} className={ACT_PRIMARY} title={T('Abrir el informe de auditoría', 'Open the audit report')}>{actLabel(s.id, 'builder', <HardHat size={13} />, T('Abrir', 'Open'))}</button>
                     ) : (

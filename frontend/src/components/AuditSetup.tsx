@@ -154,7 +154,7 @@ export default function AuditSetup({ onBack, onStart }: Props) {
   return (
     <div className="h-full overflow-y-auto scroll-thin arena-bg">
       <AnimatePresence>{booting && <HomeLoader key="loader" caption={T('Armando el equipo auditor…', 'Assembling the audit team…')} />}</AnimatePresence>
-      <div className="w-full px-8 py-8 2xl:px-12">
+      <div className="w-full px-4 py-5 sm:px-8 sm:py-8 2xl:px-12">
         <PageHeader onBack={onBack} kicker={T('Auditoría de proyecto', 'Project audit')} title={T('Que el equipo evalúe tu proyecto', 'Let the team evaluate your project')} subtitle={T('Subí tu código y cada rol lo revisa desde su área: qué está bien, qué hay que mejorar y propuestas concretas con prioridad. Después podés aplicar las mejoras con el constructor y que el consejo las apruebe.', 'Upload your code and each role reviews it from its own area: what is right, what needs improving and concrete, prioritised proposals. Then you can apply the improvements with the builder and have the council approve them.')} />
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_1.2fr]">

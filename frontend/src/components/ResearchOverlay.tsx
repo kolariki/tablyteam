@@ -129,7 +129,7 @@ export default function ResearchOverlay({ demo = false, hiddenDemo = false, onCl
         </div>
       )}
 
-      <motion.div className="mx-auto flex min-h-full w-full max-w-6xl flex-col px-8 py-10" animate={{ opacity: fuse ? 0 : 1, y: fuse ? 16 : 0 }} transition={{ duration: 0.5 }}>
+      <motion.div className="mx-auto flex min-h-full w-full max-w-6xl flex-col px-4 py-6 sm:px-8 sm:py-10" animate={{ opacity: fuse ? 0 : 1, y: fuse ? 16 : 0 }} transition={{ duration: 0.5 }}>
         {/* header */}
         <div className="flex flex-wrap items-end gap-4">
           <div className="min-w-0 flex-1">

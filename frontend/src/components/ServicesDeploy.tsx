@@ -173,7 +173,7 @@ export default function ServicesDeploy({ onOpenSettings }: { onOpenSettings: () 
             <Connections compact only={['google-calendar']} />
           </div>
         )}
-        {needed.length > 0 && <div className="mt-4 grid gap-3 grid-cols-[repeat(auto-fill,minmax(420px,1fr))]">{needed.map(card)}</div>}
+        {needed.length > 0 && <div className="mt-4 grid gap-3 grid-cols-[repeat(auto-fill,minmax(min(100%,420px),1fr))]">{needed.map(card)}</div>}
         {needed.length > 0 && (
           <div className="mt-4 flex items-center gap-2">
             <button disabled={!dirty || saving} onClick={save} className="flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40">
@@ -200,7 +200,7 @@ export default function ServicesDeploy({ onOpenSettings }: { onOpenSettings: () 
               <Sparkles size={15} className="text-accent" /> {T('Mejoras opcionales', 'Optional improvements')} <span className="min-w-0 truncate font-normal text-ink-3">· {T('la app funciona sin esto', 'the app works without these')} ({optional.map((g) => g.service).join(', ')})</span>
               <ChevronDown size={14} className="ml-auto shrink-0 text-ink-3 transition group-open:rotate-180" />
             </summary>
-            <div className="mt-3 grid gap-3 grid-cols-[repeat(auto-fill,minmax(420px,1fr))]">{optional.map(card)}</div>
+            <div className="mt-3 grid gap-3 grid-cols-[repeat(auto-fill,minmax(min(100%,420px),1fr))]">{optional.map(card)}</div>
             <div className="mt-3"><button disabled={!dirty || saving} onClick={save} className="flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40">{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} {T('Guardar valores', 'Save values')}</button></div>
           </details>
         )}
