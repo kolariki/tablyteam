@@ -27,6 +27,7 @@ from typing import Callable
 import httpx
 
 from .auth import _db
+from . import observe as _observe  # noqa: F401  (creates app_error_events, each occurrence's row)
 
 log = logging.getLogger("arena.incidents")
 
@@ -111,6 +112,7 @@ def record(user_id: str, build_id: str, source: str, text: str, sample: str, ts:
                    "detail": text[:600], "sample": sample[-4000:], "first_ts": ts, "last_ts": ts}
             c.execute("INSERT INTO app_errors (id, user_id, build_id, fingerprint, source, title, detail, sample, first_ts, last_ts) "
                       "VALUES (:id, :user_id, :build_id, :fingerprint, :source, :title, :detail, :sample, :first_ts, :last_ts)", row)
+            c.execute("INSERT INTO app_error_events (error_id, ts) VALUES (?, ?)", (row["id"], ts))  # its timeline (see observe.issues)
             return {**row, "status": "open", "count": 1, "attempts": 0}
         status = cur["status"]
         if status == "fixed" and ts > (cur["fixed_ts"] or 0) + 30:
@@ -119,6 +121,7 @@ def record(user_id: str, build_id: str, source: str, text: str, sample: str, ts:
         if status == "open" and _norm(text) not in {_norm(ln) for ln in keep.splitlines()}:  # another face of the same cause: the builder sees them all
             keep = (keep + "\n---\n" + sample)[-4000:]
         c.execute("UPDATE app_errors SET count = count + 1, last_ts = MAX(last_ts, ?), sample = ?, status = ? WHERE id = ?", (ts, keep, status, cur["id"]))
+        c.execute("INSERT INTO app_error_events (error_id, ts) VALUES (?, ?)", (cur["id"], ts))
         return {**dict(cur), "status": status}
 
 

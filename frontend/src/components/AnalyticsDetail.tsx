@@ -6,6 +6,7 @@ import { getLang, tr, useT } from '../lib/i18n'
 import { useArena } from '../store'
 import { toast } from './Toast'
 import { PanelLoader } from './HomeLoader'
+import { AiTab, ErrorsTab, ExperimentsTab } from './AnalyticsObserve'
 
 /** One published app, in depth: who visits, from where, on what device, what they tap and who the signed-in users are. */
 export default function AnalyticsDetail({ app, onBack }: { app: AnalyticsApp; onBack: () => void }) {
@@ -14,6 +15,7 @@ export default function AnalyticsDetail({ app, onBack }: { app: AnalyticsApp; on
   const [d, setD] = useState<Detail | null>(null)
   const [metric, setMetric] = useState<'visitors' | 'pageviews' | 'sessions'>('visitors')
   const [asking, setAsking] = useState(false)
+  const [tab, setTab] = useState<'overview' | 'errors' | 'ai' | 'ab'>('overview')
   useEffect(() => {
     let alive = true
     const load = () => { if (document.visibilityState === 'visible') api.analyticsDetail(app.slug, days).then((x) => alive && setD(x)).catch(() => {}) }
@@ -51,7 +53,14 @@ export default function AnalyticsDetail({ app, onBack }: { app: AnalyticsApp; on
         </div>
       </div>
 
-      {!d ? <div className="mt-10 min-h-[420px]"><PanelLoader caption={T('Leyendo las visitas…', 'Reading the visits…')} /></div> : (
+      <div role="tablist" className="mt-5 flex flex-wrap gap-1 border-b border-line">
+        {([['overview', T('Resumen', 'Overview')], ['errors', T('Errores', 'Errors')], ['ai', T('IA y costos', 'AI & costs')], ['ab', T('Experimentos A/B', 'A/B experiments')]] as const).map(([id, label]) => (
+          <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)} className={`-mb-px flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-[13px] font-medium transition ${tab === id ? 'border-accent text-accent' : 'border-transparent text-ink-3 hover:text-ink'}`}>
+            {label}{id === 'errors' && !!d?.kpis.errors && <span className="rounded-full bg-danger/10 px-1.5 text-[10.5px] font-semibold text-danger">{d.kpis.errors}</span>}
+          </button>
+        ))}
+      </div>
+      {tab === 'errors' ? <ErrorsTab app={app} days={days} /> : tab === 'ai' ? <AiTab app={app} days={days} /> : tab === 'ab' ? <ExperimentsTab app={app} days={days} /> : !d ? <div className="mt-10 min-h-[420px]"><PanelLoader caption={T('Leyendo las visitas…', 'Reading the visits…')} /></div> : (
         <>
           {k && k.identified === 0 && d.people.length > 0 && app.session_id && (
             <div className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border border-accent/30 bg-accent-soft/40 px-4 py-3 text-[13px] text-ink-2">
@@ -96,7 +105,7 @@ export default function AnalyticsDetail({ app, onBack }: { app: AnalyticsApp; on
   )
 }
 
-function Tile({ label, value, warn }: { label: string; value: number; warn?: boolean }) {
+export function Tile({ label, value, warn }: { label: string; value: number | string; warn?: boolean }) {
   return (
     <div className="rounded-xl border border-line bg-surface px-3 py-2.5">
       <div className="truncate text-[11.5px] text-ink-3">{label}</div>
@@ -138,7 +147,7 @@ function BarList({ title, rows, render, mono, empty }: { title: string; rows: An
 }
 
 /** Single-series daily trend: area + 2px line, recessive grid, crosshair with tooltip on hover. */
-function TrendChart({ points }: { points: { x: string; y: number }[] }) {
+export function TrendChart({ points }: { points: { x: string; y: number }[] }) {
   const [hover, setHover] = useState<number | null>(null)
   const W = 800, H = 180, P = { l: 32, r: 8, t: 10, b: 22 }
   const max = Math.max(1, ...points.map((p) => p.y))

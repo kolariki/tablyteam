@@ -331,11 +331,16 @@ document.addEventListener('visibilitychange',function(){if(document.visibilitySt
 page();})();"""
 
 
+from .observe import VARIANT_JS  # noqa: E402  experiments live inside the same snippet (they use its visitor id and sender)
+
+SNIPPET_JS = SNIPPET_JS.replace("page();})();", VARIANT_JS + "\npage();})();")
+
+
 def record_hit(site: str, body: dict, ua: str | None) -> None:
     from . import analytics as an
 
     kind = str(body.get("k") or "pageview")[:16]
-    if kind not in ("pageview", "event", "error", "ping", "click", "identify"):
+    if kind not in ("pageview", "event", "error", "ping", "click", "identify", "exp"):
         return
     sid = str(body.get("s") or "")[:16] or None
     x = an.enrich(body, ua)

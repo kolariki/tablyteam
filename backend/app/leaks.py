@@ -88,7 +88,8 @@ async def _betterleaks(root: Path, validate: bool) -> list[dict]:
 
 def _own_values(root: Path, values: dict[str, str]) -> list[dict]:
     """The user's own saved secrets (Railway, Meta, the database…) written literally in a file of the code."""
-    vals = {k: v for k, v in values.items() if isinstance(v, str) and len(v) >= 12 and not re.fullmatch(r"(true|false|\d+|https?://[^:@/]+/?)", v, re.I)}
+    vals = {k: v for k, v in values.items() if isinstance(v, str) and len(v) >= 12 and k not in ("TABLY_SITE", "TABLY_URL")  # public by design (data-site="…")
+            and not re.fullmatch(r"(true|false|\d+|https?://[^:@/]+/?)", v, re.I)}
     if not vals:
         return []
     hits = []

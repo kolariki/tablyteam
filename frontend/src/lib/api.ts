@@ -177,6 +177,10 @@ export const api = {
     return { blob: await r.blob(), code: r.headers.get('x-tably-code') ?? '', name, summary: JSON.parse(r.headers.get('x-tably-summary') ?? '{}') as { session_files: number; project_files: number; rows: Record<string, number> } }
   },
   accountImport: (file: File, code: string) => { const form = new FormData(); form.append('file', file, file.name); form.append('code', code); return j<{ ok: boolean; files: number; skipped_files: number; rows: Record<string, number> }>(authed('/api/account/import', { method: 'POST', body: form })) },
+  analyticsErrors: (slug: string, days: number) => j<{ issues: ErrorIssue[]; build_id: string }>(authed(`/api/analytics/${slug}/errors?days=${days}`)),
+  analyticsAi: (slug: string, days: number) => j<AiSummary>(authed(`/api/analytics/${slug}/ai?days=${days}`)),
+  analyticsExperiments: (slug: string, days: number, goals: Record<string, string>) => j<Experiments>(authed(`/api/analytics/${slug}/experiments?days=${days}&goals=${encodeURIComponent(JSON.stringify(goals))}`)),
+  analyticsAsk: (slug: string, kind: 'ab' | 'ai', text = '') => j<{ ok: boolean; build_id: string; session_id: string }>(post(`/api/analytics/${slug}/ask`, { kind, text })),
   analyticsDetail: (slug: string, days: number) => j<AnalyticsDetail>(authed(`/api/analytics/${slug}?days=${days}`)),
   analytics: () => j<{ apps: AnalyticsApp[]; collector: string; collector_public: boolean }>(authed('/api/analytics')),
   teamScores: () => j<{ roles: RoleScore[] }>(authed('/api/team/scores')),
@@ -852,3 +856,20 @@ export type AppError = {
 }
 export type AppErrors = { errors: AppError[]; summary: { fixed: number; open: number; needs_approval: number; stuck: number }; limit_reached: boolean }
 export type DeployFailures = { groups: DeployFailureGroup[]; total: number; fixed: number; days: number }
+
+export interface ErrorIssue {
+  id: string; source: 'server' | 'browser' | 'run' | string; title: string; detail: string | null; sample: string | null; count: number
+  first_ts: number; last_ts: number; status: string; attempts: number; what: string | null; fix: string | null; impact: string | null
+  series: number[]; in_period: number
+}
+export interface AiRow { key: string; calls: number; cost: number; tokens: number; latency: number; errors: number }
+export interface AiSummary {
+  kpis: { calls: number; input_tokens: number; output_tokens: number; cost: number; latency: number; errors: number; cost_per_call: number }
+  series: { day: string; calls: number; cost: number }[]
+  models: AiRow[]; features: AiRow[]
+  recent: { ts: number; provider: string | null; model: string | null; name: string | null; input_tokens: number; output_tokens: number; cost_usd: number; latency_ms: number | null; status: string; error: string | null; user: string | null; input: string | null; output: string | null }[]
+}
+export interface Experiments {
+  experiments: { name: string; goal: string | null; visitors: number; winner: string | null; variants: { variant: string; visitors: number; conversions: number; rate: number; lift?: number | null; p?: number | null }[] }[]
+  goals: string[]
+}

@@ -61,6 +61,7 @@ from . import runner as runmod
 from . import skills as skillmod
 from . import cloud as cloudmod
 from . import incidents as incidentsmod
+from . import observe as observemod
 from . import leaks as leaksmod
 from . import lessons as lessonsmod
 from . import levels as levelsmod
@@ -3019,6 +3020,89 @@ def analytics_detail(slug: str, days: int = 30, user: User = CurrentUser):
         raise HTTPException(404)
     own = urlparse(app_.get("url") or "").hostname
     return analyticsmod.detail(slug, max(1, min(int(days), 365)), own)
+
+
+def _my_app(user: User, slug: str) -> dict:
+    app_ = next((a for a in cloudmod.list_apps(user.id) if a["slug"] == slug), None)
+    if not app_:
+        raise HTTPException(404)
+    return app_
+
+
+@app.get("/api/analytics/{slug}/errors")
+def analytics_errors(slug: str, days: int = 30, user: User = CurrentUser):
+    """The app's errors grouped by cause (like Sentry), each with its timeline, status and what Tably did about it."""
+    app_ = _my_app(user, slug)
+    rows = incidentsmod.list_for(user.id, app_["build_id"])
+    return {"issues": observemod.issues(rows, max(1, min(int(days), 90))), "build_id": app_["build_id"]}
+
+
+@app.get("/api/analytics/{slug}/ai")
+def analytics_ai(slug: str, days: int = 30, user: User = CurrentUser):
+    """The app's AI calls (like Langfuse): cost, tokens, latency and errors per day, model and feature."""
+    _my_app(user, slug)
+    return observemod.llm_summary(slug, max(1, min(int(days), 365)))
+
+
+@app.get("/api/analytics/{slug}/experiments")
+def analytics_experiments(slug: str, days: int = 30, goals: str = "", user: User = CurrentUser):
+    """A/B experiments: each variant's visitors and conversions to the chosen goal event. `goals`: JSON {experiment: event}."""
+    _my_app(user, slug)
+    try:
+        g = json.loads(goals) if goals else {}
+    except ValueError:
+        g = {}
+    return observemod.experiments(slug, max(1, min(int(days), 365)), g if isinstance(g, dict) else {})
+
+
+@app.post("/api/analytics/{slug}/ask")
+def analytics_ask(slug: str, body: dict, user: User = CurrentUser):
+    """One click from Analytics: the builder sets up an A/B test or the AI-call reporting in the app."""
+    app_ = _my_app(user, slug)
+    found = next(iter(auth.user_dir(user.id).glob(f"*.build.{app_['build_id']}.json")), None)
+    if not found:
+        raise HTTPException(404, "No encontré el proyecto de esta app")
+    b = _build(user, app_["build_id"], found.name.split(".build.")[0])
+    kind, what = str(body.get("kind") or ""), str(body.get("text") or "").strip()[:800]
+    if kind == "ab":
+        if not what:
+            raise HTTPException(400, "Contá qué querés probar")
+        text = (f"EXPERIMENTO A/B pedido por el usuario: {what}\n"
+                "Armalo con Tably Analytics (el snippet /a.js ya está en la app): const v = window.tably && window.tably.variant ? window.tably.variant('nombre-corto-del-experimento', ['a', 'b']) : 'a'; "
+                "mostrá la versión A (la actual) o la B según v, y marcá el objetivo con tably.track('nombre-del-objetivo') (o data-track) en la acción que mide si funcionó (registrarse, reservar, pagar…). "
+                "La variante es estable por visitante. No cambies nada más. Al terminar emití <done> y decí el nombre del experimento y del objetivo.")
+    elif kind == "ai":
+        text = AI_REPORT_RULE + "\nAplicalo ahora a TODAS las llamadas a modelos de IA de la app. No cambies nada más. Al terminar emití <done>."
+    else:
+        raise HTTPException(400, "pedido inválido")
+    if b.status in ("running", "reviewing", "design_review"):
+        b.say(text)
+    else:
+        b.chat.append({"role": "user", "text": text, "ts": time.time()})
+        b.resume(text)
+    return {"ok": True, "build_id": b.id, "session_id": b.req.session_id}
+
+
+@app.post("/api/llm/{site}")
+async def llm_ingest(site: str, request: Request):
+    """A published app reports one AI call (Authorization: Bearer TABLY_TOKEN)."""
+    if not observemod.SLUG.fullmatch(site) or not observemod.check_token(site, request.headers.get("authorization")):
+        raise HTTPException(401, "token inválido")
+    try:
+        body = json.loads((await request.body())[:20000] or b"{}")
+    except ValueError:
+        raise HTTPException(400, "JSON inválido")
+    items = body if isinstance(body, list) else [body]
+    kept = sum(1 for x in items[:50] if isinstance(x, dict) and observemod.record_llm(site, x))
+    return {"ok": True, "kept": kept}
+
+
+AI_REPORT_RULE = ("REPORTE DE LLAMADAS A IA A TABLY: después de cada llamada a un modelo (OpenAI, Anthropic, Gemini…), en el servidor y sin esperar la respuesta "
+                  "(fire-and-forget, sin romper nada si falla), mandá un POST a `${process.env.TABLY_URL}/api/llm/${process.env.TABLY_SITE}` con el header "
+                  "`Authorization: Bearer ${process.env.TABLY_TOKEN}` y el JSON {provider, model, name (la función de la app: «resumen», «chat», «clasificar»…), "
+                  "input_tokens, output_tokens, latency_ms, status ('ok' | 'error'), error (si falló)}; los tokens salen del campo usage de la respuesta. "
+                  "Hacelo en un helper único (por ejemplo `reportAI`) que se llama desde todas las llamadas. Si TABLY_URL no está definida, no hagas nada. "
+                  "Nunca mandes claves; el texto del prompt y la respuesta solo recortados a 500 caracteres en input/output y nunca con datos personales.")
 
 
 @app.post("/api/a/{site}")

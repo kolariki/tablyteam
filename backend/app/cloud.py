@@ -31,6 +31,7 @@ from .auth import _db
 from .config import DATA_DIR, env
 from . import deploy as deploymod
 from . import identity as identitymod
+from . import observe as observemod
 from . import incidents as incidentsmod
 from . import leaks as leaksmod
 from . import lessons as lessonsmod
@@ -637,6 +638,8 @@ async def publish(user_id: str, build_id: str, title: str, root: Path, files: di
         deploymod.save_secrets(user_id, build_id, gen)
         values.update(gen)
         await log_(f"· generé {len(gen)} secreto(s) propio(s) de la app ({', '.join(gen)}); quedan guardados en «Servicios»")
+    # what the app uses to report to Tably (AI calls, see observe.py): never written into the code, set on every publish
+    values.update({"TABLY_URL": public_url(), "TABLY_SITE": slug, "TABLY_TOKEN": observemod.app_token(slug)})
     urls = url_values([p.read_text(errors="replace") for p in [root / ".env.example", *root.glob("*/.env.example")][:6] if p.exists()], values, prev.get("url"))
     if urls:  # the app's own address: Tably knows it, the user never has to look it up
         deploymod.save_secrets(user_id, build_id, urls)
