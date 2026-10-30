@@ -95,10 +95,18 @@ class SecurityHeaders(BaseHTTPMiddleware):
         path = request.url.path
         if not path.startswith("/r/"):  # an absolute path asked by an app running at /r/<token>/ (/assets/x.js, /api/…): into it
             ref = re.search(r"^https?://([^/]+)/r/([\w-]{16,})/", request.headers.get("referer") or "")
+            q = f"?{request.url.query}" if request.url.query else ""
             if ref and ref.group(2) in runmod.TOKENS:  # the run's token is the check (proxies in front may rewrite Host)
-                q = f"?{request.url.query}" if request.url.query else ""
                 return Response(status_code=307, headers={"Location": f"/r/{ref.group(2)}{path}{q}"})
+            run_tok = request.cookies.get("tably_run")
+            if run_tok in runmod.TOKENS and request.headers.get("sec-fetch-dest") == "iframe":  # Tably frames nothing but running apps
+                return Response(status_code=307, headers={"Location": f"/r/{run_tok}{path}{q}"})
         resp = await call_next(request)
+        if (resp.status_code in (404, 405) and not path.startswith("/r/") and request.cookies.get("tably_run") in runmod.TOKENS
+                and request.headers.get("sec-fetch-site") == "same-origin" and request.headers.get("sec-fetch-dest") not in (None, "empty", "document")):
+            # an image, font or script the app asked for that Tably doesn't have (its fetch/XHR calls are already sent to it by _run_shim)
+            q = f"?{request.url.query}" if request.url.query else ""
+            return Response(status_code=307, headers={"Location": f"/r/{request.cookies['tably_run']}{path}{q}"})
         if path.startswith("/r/"):  # the running app is shown inside Tably's panel
             if "x-frame-options" in resp.headers:
                 del resp.headers["x-frame-options"]
@@ -2034,6 +2042,27 @@ _RUN_WAIT = ("<!doctype html><meta charset=utf-8><meta http-equiv=refresh conten
              "<body style='margin:0;display:grid;place-items:center;height:100vh;font:15px system-ui;color:#55625C;background:#F7F5F0'>Cargando…</body>")
 
 
+def _run_shim(prefix: str) -> str:
+    """First script of the app's page when it runs at /r/<token>/: the app sees itself at «/» (its router finds its pages) and
+    every absolute path it asks for (/api/…, /img/…) goes to the app, not to Tably. Navigations that still leave
+    (location.href = "/x", a plain link) come back through the tably_run cookie (see SecurityHeaders)."""
+    return ("(function(){if(window.__tablyRun)return;var P=" + json.dumps(prefix) + ",O=location.origin;window.__tablyRun=P;"
+            "function fix(u){try{var s=u instanceof URL?u.href:u;if(typeof s!=='string')return u;"
+            "if(s.indexOf(O+'/')===0)s=s.slice(O.length);else if(/^[a-z][a-z0-9+.-]*:|^\\/\\//i.test(s))return u;"
+            "if(s.charAt(0)==='/'&&s!==P&&s.indexOf(P+'/')!==0)return P+s;return u}catch(e){return u}}"
+            "if(location.pathname.indexOf(P)===0)history.replaceState(history.state,'',(location.pathname.slice(P.length)||'/')+location.search+location.hash);"
+            "var F=window.fetch;if(F)window.fetch=function(i,o){try{if(i instanceof Request){var n=fix(i.url);if(n!==i.url)i=new Request(n,i)}else i=fix(i)}catch(e){}return F.call(this,i,o)};"
+            "var X=window.XMLHttpRequest;if(X){var op=X.prototype.open;X.prototype.open=function(m,u){arguments[1]=fix(u);return op.apply(this,arguments)}}"
+            "if(window.EventSource){var E=window.EventSource;window.EventSource=function(u,c){return new E(fix(u),c)};window.EventSource.prototype=E.prototype}"
+            "if(navigator.sendBeacon){var B=navigator.sendBeacon.bind(navigator);navigator.sendBeacon=function(u,d){return B(fix(u),d)}}"
+            "var A={IMG:'src',SCRIPT:'src',IFRAME:'src',VIDEO:'src',AUDIO:'src',SOURCE:'src',LINK:'href',FORM:'action'};"
+            "function el(n){var a=n&&A[n.tagName];if(!a)return;var v=n.getAttribute(a);if(v){var w=fix(v);if(w!==v)n.setAttribute(a,w)}}"
+            "function all(r){if(!r||!r.querySelectorAll)return;el(r);r.querySelectorAll('img,script,iframe,video,audio,source,link,form').forEach(el)}"
+            "new MutationObserver(function(ms){ms.forEach(function(m){if(m.type==='attributes')el(m.target);else m.addedNodes.forEach(all)})})"
+            ".observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['src','href','action']});"
+            "})();")
+
+
 @app.api_route("/r/{token}/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"], include_in_schema=False)
 async def run_proxy(token: str, path: str, request: Request):
     r = runmod.TOKENS.get(token)
@@ -2078,9 +2107,10 @@ async def run_proxy(token: str, path: str, request: Request):
     if "text/html" in ctype:  # the page reports its own errors back (uncaught exceptions, rejected promises)
         html = (await resp.aread()).decode(resp.encoding or "utf-8", "replace")
         await resp.aclose()
-        tag = f"<script>{incidentsmod.reporter_js(prefix + '/__tably/errors')}</script>"
+        tag = f"<script>{_run_shim(prefix)}</script><script>{incidentsmod.reporter_js(prefix + '/__tably/errors')}</script>"
         m = re.search(r"<head[^>]*>", html, re.I)  # first thing in the page, so it sees the app's own errors
         html = html[:m.end()] + tag + html[m.end():] if m else tag + html
+        out.append(("set-cookie", f"tably_run={token}; Path=/; Max-Age=86400; SameSite=Lax; HttpOnly" + ("; Secure" if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https" else "")))
         return _run_response(html.encode(), resp.status_code, out)
 
     async def stream():
