@@ -236,3 +236,4 @@ input[type="color"] { border: 1px solid var(--color-line); padding: 2px; }
 .look-equipo.look-taller .md code.tok-num { color: #F5C46B; background: #3A3322; border-color: #4A4026; }
 .look-equipo.look-taller .md code.tok-hash { color: #C9B6FF; background: #2C2547; border-color: #3E3463; }
 .look-equipo.look-taller .md pre { background: #121A25; border: 1px solid #2E3A4C; }
+.look-equipo.look-taller .md code.tok-kw { background: transparent; border-color: transparent; padding-left: 0; padding-right: 0; }
