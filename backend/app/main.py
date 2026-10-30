@@ -3323,11 +3323,13 @@ def on_app_errors(user_id: str, build_id: str) -> None:
         _start_error_fix(user, b, rows)
 
 
-def _note(b, text: str) -> None:
-    """A line from Tably in the build's chat (live too)."""
+def _note(b, text: str, tone: str = "", detail: str = "", run: bool = False) -> None:
+    """A line from Tably in the build's chat (live too). With a tone (working/done/attention) it is a card, not a faint line:
+    the user has to see what is happening with their app; `detail` is the technical error, `run` adds «Ver la app»."""
     ts = time.time()
-    b.chat.append({"role": "system", "text": text, "ts": ts})
-    b.emit("notice", text=text)
+    item = {"role": "system", "text": text, "ts": ts, **({"tone": tone} if tone else {}), **({"detail": detail[:400]} if detail else {}), **({"run": True} if run else {})}
+    b.chat.append(item)
+    b.emit("notice", **{k: v for k, v in item.items() if k not in ("role", "ts")})
     b._save()
 
 
@@ -3381,8 +3383,9 @@ def _start_error_fix(user: User, b, rows: list[dict], approved: dict | None = No
     b._pending_trigger = "runtime"
     if on_run:
         _run_fix(b, "fixing", id=rows[0]["id"])
-    _note(b, b.tx(f"Tably encontró un error {'al correr la app' if on_run else 'en la app publicada'} ({rows[0]['title'].lower()}) y el constructor lo está arreglando.",
-                  f"Tably found an error {'running the app' if on_run else 'in the published app'} ({rows[0]['title'].lower()}) and the builder is fixing it."))
+    _note(b, b.tx(f"La app tuvo un error {'al correrla' if on_run else 'en producción'} y ya lo estamos arreglando." + (" Cuando termine, se vuelve a abrir sola." if on_run else " Cuando termine, se publica sola."),
+                  f"The app hit an error {'while running' if on_run else 'in production'} and we are already fixing it." + (" When it's done it opens again by itself." if on_run else " When it's done it publishes by itself.")),
+          tone="working", detail=rows[0]["title"], run=on_run)
 
     async def finish() -> None:
         try:
@@ -3403,7 +3406,8 @@ def _start_error_fix(user: User, b, rows: list[dict], approved: dict | None = No
             if on_run:
                 _run_fix(b, "needs_approval", id=ids[0], what=plan["what"] or rows[0]["title"], fix=plan["fix"], impact=plan["impact"], applied=bool(changed))
             _note(b, b.tx(f"Para arreglar este error hace falta un cambio grande y necesita tu OK: {plan['what'] or rows[0]['title']}" + ("" if on_run else ". Revisalo en «Publicar»."),
-                          f"Fixing this error needs a big change and your OK: {plan['what'] or rows[0]['title']}" + ("" if on_run else ". Review it in «Publish».")))
+                          f"Fixing this error needs a big change and your OK: {plan['what'] or rows[0]['title']}" + ("" if on_run else ". Review it in «Publish».")),
+                  tone="attention", run=on_run)
             return
         if b.status == "error" or not changed:
             incidentsmod.update(ids, status="open", **fields)  # next round, or «stuck» after the attempts
@@ -3414,7 +3418,8 @@ def _start_error_fix(user: User, b, rows: list[dict], approved: dict | None = No
             lessonsmod.note_fix(user.id, b.id, v.get("summary") or plan["fix"], changed)
         incidentsmod.update(ids, status="deploying", size=plan["size"] or "small", applied=1, **fields)
         _note(b, b.tx(f"Arreglado: {plan['what'] or rows[0]['title']}" + (f" {plan['fix']}" if plan["fix"] else "") + (" Volviendo a correr la app…" if on_run else "") + (" Publicando la corrección…" if _published(user.id, b.id) else ""),
-                      f"Fixed: {plan['what'] or rows[0]['title']}" + (f" {plan['fix']}" if plan["fix"] else "") + (" Running the app again…" if on_run else "") + (" Publishing the fix…" if _published(user.id, b.id) else "")))
+                      f"Fixed: {plan['what'] or rows[0]['title']}" + (f" {plan['fix']}" if plan["fix"] else "") + (" Running the app again…" if on_run else "") + (" Publishing the fix…" if _published(user.id, b.id) else "")),
+              tone="done", run=on_run)
         if on_run:
             await _restart_run(user, b)
         if _published(user.id, b.id):
@@ -3441,7 +3446,8 @@ def _kick_run_errors(user_id: str, build_id: str) -> None:
         incidentsmod.update([r["id"] for r in stuck], status="stuck")
         _run_fix(b, "stuck", id=stuck[0]["id"], what=stuck[0]["what"] or stuck[0]["title"], fix=stuck[0]["fix"], impact=stuck[0]["impact"])
         _note(b, b.tx(f"Lo intentamos arreglar dos veces y la app sigue fallando ({stuck[0]['title'].lower()}). Hace falta que lo mires: tenés el detalle en «App real».",
-                      f"We tried to fix it twice and the app keeps failing ({stuck[0]['title'].lower()}). It needs your look: details in «Real app»."))
+                      f"We tried to fix it twice and the app keeps failing ({stuck[0]['title'].lower()}). It needs your look: details in «Real app»."),
+              tone="attention", run=True)
         return
     if _busy(b):
         _run_fix(b, "manual", id=rows[0]["id"], what=rows[0]["title"], reason="busy")

@@ -54,6 +54,7 @@ FRIENDLY: list[tuple[str, str]] = [
     (r"password authentication failed|DATABASE_URL|database .* does not exist", "La app no puede entrar a su base de datos"),
     (r"ECONNREFUSED|ETIMEDOUT|ENOTFOUND|Connection refused|getaddrinfo", "La app no logra conectarse a otro servicio que necesita"),
     (r"heap out of memory|MemoryError|OOMKilled", "La app se queda sin memoria"),
+    (r"Minified React error|Invalid hook call|Rendered (more|fewer) hooks", "Una pantalla de la app se rompe por cómo está armada por dentro (React)"),
     (r"Cannot read propert|undefined is not|is not a function|of undefined|of null|TypeError|AttributeError|KeyError",
      "Una parte de la app se rompe porque un dato no llega como esperaba"),
     (r"→ 5\d\d$", "Un pedido de la app a su servidor falla"),

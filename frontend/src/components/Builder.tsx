@@ -2,7 +2,7 @@ import DOMPurify from 'dompurify'
 import { openTeam } from './TeamMemory'
 import { srv } from '../lib/serverText'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, CheckCircle2, Trophy, FlaskConical, Gauge, Home, ListChecks, Search, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2, CloudUpload, Clock3, Menu, Users, Languages } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Trophy, FlaskConical, Gauge, Home, ListChecks, Search, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2, CloudUpload, Clock3, Menu, Users, Languages } from 'lucide-react'
 import { marked } from 'marked'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { reconnectBuild, useBuild, type Activity, type ChatItem, type Todo } from '../buildStore'
@@ -97,7 +97,8 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
   const rec = useRef<Recording | null>(null)
   const [picked, setPicked] = useState<Record<string, boolean>>({})
   const [applyRounds, setApplyRounds] = useState(2)
-  const [runOpen, setRunOpen] = useState(false)
+  const runOpen = b.runOpen
+  const setRunOpen = (v: boolean) => useBuild.getState().set({ runOpen: v })
   const [councilOpen, setCouncilOpen] = useState<false | 'launch' | 'edit'>(false)
   const [fdeOpen, setFdeOpen] = useState<string | null>(null)
   useEffect(() => {
@@ -268,7 +269,7 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
         </div>
         {/* actions: labels only when there is room; below 2xl the secondary ones are icon buttons with a tooltip */}
         <div className="ml-auto flex shrink-0 items-center gap-2 whitespace-nowrap">
-          <button onClick={() => setRunOpen(true)} disabled={!Object.keys(b.files).length || running} className={HBTN_PRIMARY} title={T('Levanta la app en esta máquina y la muestra acá', 'Starts the app on this machine and shows it here')}><MonitorPlay size={14} /> {T('Correr la app', 'Run the app')}{b.appRun.status === 'running' ? <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> : null}</button>
+          <button onClick={() => setRunOpen(true)} disabled={!Object.keys(b.files).length || (running && b.appRun.status === 'idle' && !b.appRun.fix)} className={HBTN_PRIMARY} title={T('Levanta la app en esta máquina y la muestra acá', 'Starts the app on this machine and shows it here')}><MonitorPlay size={14} /> {T('Correr la app', 'Run the app')}{b.appRun.status === 'running' ? <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> : null}</button>
           <BuilderMenu onDownload={downloadZip} onRecord={toggleRecording} />
         </div>
       </div>
@@ -836,8 +837,31 @@ function LiveStatusBar() {
   )
 }
 
+/** What Tably is doing with the app (an error found, being fixed, fixed, needs you): a card the user can't miss, with «Ver la app». */
+function AppNotice({ c }: { c: ChatItem }) {
+  const T = useT()
+  const [more, setMore] = useState(false)
+  const tone = c.tone === 'done' ? { box: 'border-ok/40 bg-ok/10', icon: <CheckCircle2 size={18} className="text-ok" />, label: T('Arreglado', 'Fixed') }
+    : c.tone === 'attention' ? { box: 'border-gold/50 bg-gold/10', icon: <AlertTriangle size={18} className="text-gold" />, label: T('Necesita tu atención', 'Needs your attention') }
+    : { box: 'border-accent/40 bg-accent-soft/60', icon: <Loader2 size={18} className="animate-spin text-accent" />, label: T('Arreglando la app', 'Fixing the app') }
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`mx-auto flex w-full max-w-3xl gap-3 rounded-2xl border-2 px-4 py-3 ${tone.box}`}>
+      <span className="mt-0.5 shrink-0">{tone.icon}</span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[10.5px] font-bold uppercase tracking-[0.2em] text-ink-3">Tably · {tone.label}</div>
+        <div className="mt-0.5 text-[14.5px] font-medium text-ink">{c.text}</div>
+        {c.detail && (more
+          ? <div className="mt-1.5 break-words rounded-lg border border-line bg-paper px-2.5 py-1.5 font-mono text-[11px] text-ink-3">{c.detail}</div>
+          : <button onClick={() => setMore(true)} className="mt-1 text-[11.5px] text-ink-3 underline-offset-2 hover:underline">{T('Ver el detalle técnico', 'See the technical detail')}</button>)}
+      </div>
+      {c.run && <button onClick={() => useBuild.getState().set({ runOpen: true })} className="flex h-9 shrink-0 items-center gap-1.5 self-center rounded-full bg-accent px-3.5 text-[12.5px] font-semibold text-white shadow-sm transition hover:brightness-110"><MonitorPlay size={13} /> {T('Ver la app', 'See the app')}</button>}
+    </motion.div>
+  )
+}
+
 function Bubble({ c, color, provider, onOpen }: { c: ChatItem; color: string; provider: string | null; onOpen: (p: string) => void }) {
   const T = useT()
+  if (c.role === 'system' && c.tone) return <AppNotice c={c} />
   if (c.role === 'system') {
     return <div className="text-center text-[12px] text-ink-3"><span className="rounded-full bg-surface-2 border border-line px-3 py-1">{c.text}</span></div>
   }

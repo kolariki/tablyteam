@@ -91,6 +91,9 @@ export interface ChatItem {
   turn?: number
   phase?: 'build' | 'preview' | 'design'
   seconds?: number  // wall-clock of that turn
+  tone?: 'working' | 'done' | 'attention'  // a Tably notice about the app: a card, not a faint line
+  detail?: string  // the technical error under that notice
+  run?: boolean  // the notice offers «Ver la app»
   ts: number
 }
 
@@ -133,6 +136,7 @@ interface BuildState {
   pane: 'code' | 'preview' | 'report' | 'deploy' | 'app' | 'versions' | 'design' | 'cloud' | 'levels'
   levels: LevelsInfo | null  // growth level of the project (ladder, next step's checks, %), from the snapshot and the levels endpoint
   fdePrefill: string | null  // open "Pedir un developer" with this text once the builder is shown
+  runOpen: boolean  // the «Correr la app» window: in the store so nothing but the user closes it while Tably fixes the app
   paneOpen: boolean  // right drawer (code/preview/…) closed by default: the agent's work is the show
   deploying: boolean
   deployLogs: string[]
@@ -215,6 +219,7 @@ const empty = {
   auditReport: null,
   pane: 'code' as const,
   paneOpen: false,
+  runOpen: false,
   fdePrefill: null as string | null,
   recording: false,
   liveRaw: '',
@@ -317,7 +322,7 @@ export const useBuild = create<BuildState>((set, get) => ({
         break
       }
       case 'notice':
-        set({ chat: [...s.chat, { role: 'system', text: ev.text, ts: ev.ts }] })
+        set({ chat: [...s.chat, { role: 'system', text: ev.text, tone: ev.tone, detail: ev.detail, run: ev.run, ts: ev.ts }] })
         break
       case 'build.version': {
         const { type: _t, seq: _s, ts, ...v } = ev
