@@ -59,6 +59,7 @@ from . import providers as provmod
 from . import runner as runmod
 from . import skills as skillmod
 from . import cloud as cloudmod
+from . import incidents as incidentsmod
 from . import lessons as lessonsmod
 from . import levels as levelsmod
 from . import tickets as ticketsmod
@@ -2314,6 +2315,7 @@ async def _startup():
 
     start_runner()
     cloudmod.resume_watchers()  # Tably Cloud apps still deploying on Railway get their «is it up yet?» watcher back
+    spawn(incidentsmod.monitor())  # published apps: their errors go to the builder, fixed and published again
 
 
 # ================================================================================================ Tably Cloud · git propio, publicar, base de datos, migrar
@@ -3080,8 +3082,8 @@ def auto_publish(b) -> bool:
     app_ = cloudmod.get_app(b.user.id, b.id)
     if not app_ or not (app_.get("status") in ("live", "deploying") or (app_.get("status") == "error" and app_.get("url"))):
         return False  # never published (the first publish is the user's decision)
-    if getattr(b, "publishing", False) or getattr(b, "_deploy_fix", False) or b.status in ("running", "reviewing", "design_review"):
-        return False  # a deploy fix publishes by itself when the builder is done (see on_deploy_failed)
+    if _busy(b):
+        return False  # a deploy or error fix publishes by itself when the builder is done (see on_deploy_failed, on_app_errors)
     checks = {c["id"]: c["ok"] for lv in b.levels_eval().get("levels") or [] for c in lv["checks"]}
     if not checks.get("approved"):
         return False  # new work the council has not approved stays unpublished until it is
@@ -3093,6 +3095,24 @@ def auto_publish(b) -> bool:
 DEPLOY_FIX_ATTEMPTS = 3
 
 
+def _owner_build(user_id: str, build_id: str):
+    """(user, build) for work that starts without a request (watchers, monitors); (None, None) when it no longer exists."""
+    with auth._db() as c:
+        row = c.execute("SELECT id, email, name FROM users WHERE id = ?", (user_id,)).fetchone()
+    found = next(iter(auth.user_dir(user_id).glob(f"*.build.{build_id}.json")), None)
+    if not row or not found:
+        return None, None
+    user = User(**dict(row))
+    try:
+        return user, _build(user, build_id, found.name.split(".build.")[0])
+    except HTTPException:
+        return None, None
+
+
+def _busy(b) -> bool:
+    return b.status in ("running", "reviewing", "design_review") or getattr(b, "publishing", False) or getattr(b, "_deploy_fix", False) or getattr(b, "_error_fix", False)
+
+
 def on_deploy_failed(user_id: str, build_id: str, reason: str, logs: str) -> bool:
     """Railway could not build or start the app: the builder gets the logs, fixes the project and it is published again,
     without the user having to step in (up to DEPLOY_FIX_ATTEMPTS times). Returns whether the fix started."""
@@ -3101,17 +3121,8 @@ def on_deploy_failed(user_id: str, build_id: str, reason: str, logs: str) -> boo
     attempt = int(rmeta.get("fix_attempts") or 0) + 1
     if attempt > DEPLOY_FIX_ATTEMPTS:
         return False
-    with auth._db() as c:
-        row = c.execute("SELECT id, email, name FROM users WHERE id = ?", (user_id,)).fetchone()
-    found = next(iter(auth.user_dir(user_id).glob(f"*.build.{build_id}.json")), None)
-    if not row or not found:
-        return False
-    user = User(**dict(row))
-    try:
-        b = _build(user, build_id, found.name.split(".build.")[0])
-    except HTTPException:
-        return False
-    if b.status in ("running", "reviewing", "design_review") or getattr(b, "publishing", False):
+    user, b = _owner_build(user_id, build_id)
+    if not b or _busy(b):
         return False
     app_.setdefault("db", {}).setdefault("railway", {})["fix_attempts"] = attempt
     cloudmod._save(app_)
@@ -3148,6 +3159,186 @@ def on_deploy_failed(user_id: str, build_id: str, reason: str, logs: str) -> boo
 
 
 cloudmod.ON_DEPLOY_FAILED = on_deploy_failed
+
+
+# ------------------------------------------------------------------------------------------------ errors of the published app
+
+ERROR_FIX_PER_DAY = 4  # automatic fix passes per app per day (each one is a builder run)
+ERROR_FIX_ATTEMPTS = 2  # the same error fixed this many times and still happening → the user decides
+BIG_FIX_FILES, BIG_FIX_LINES = 10, 500  # a «small» fix that changes more than this waits for the user anyway
+
+
+def _project_write(b, rel: str, text: str | None) -> None:
+    """A file of the project, on disk (engine builds) and in the build's files (what versions and publishing use)."""
+    if text is None:
+        b.files.pop(rel, None)
+    else:
+        b.files[rel] = text
+    if b.workdir:
+        p = b.workdir / rel
+        if text is None:
+            p.unlink(missing_ok=True)
+        else:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(text)
+
+
+def _project_read(b, rel: str) -> str | None:
+    if b.workdir and (b.workdir / rel).exists():
+        return (b.workdir / rel).read_text(errors="replace")
+    return b.files.get(rel)
+
+
+def _fix_plan(b) -> dict:
+    """The builder's verdict in .tably/arreglo.json: size, whether it applied the fix, and the plain-words explanation."""
+    raw = _project_read(b, incidentsmod.FIX_FILE) or ""
+    m = re.search(r"\{.*\}", raw, re.S)
+    try:
+        d = json.loads(m.group(0)) if m else {}
+    except ValueError:
+        d = {}
+    size = str(d.get("tamano") or d.get("tamaño") or d.get("size") or "").lower()
+    return {"size": "big" if size.startswith(("gran", "big", "large")) else "small" if size else "", "applied": bool(d.get("aplicado", d.get("applied"))),
+            "what": str(d.get("que_paso") or d.get("what") or "")[:600], "fix": str(d.get("como_se_arregla") or d.get("fix") or "")[:800],
+            "impact": str(d.get("que_cambia") or d.get("impact") or "")[:500]}
+
+
+def on_app_errors(user_id: str, build_id: str) -> None:
+    """The published app has open errors (incidents.tick): the builder fixes them and the fix is published again, unless it
+    is big (then it waits for the user's approval). Errors fixed twice that keep happening also wait for the user."""
+    rows = incidentsmod.with_status(user_id, build_id, "open")
+    stuck = [r["id"] for r in rows if r["attempts"] >= ERROR_FIX_ATTEMPTS]
+    incidentsmod.update(stuck, status="stuck")
+    rows = [r for r in rows if r["id"] not in stuck]
+    if not rows or incidentsmod.fixes_today(user_id, build_id) >= ERROR_FIX_PER_DAY:
+        return  # stays open: the panel offers «Arreglar ahora»
+    user, b = _owner_build(user_id, build_id)
+    if b and not _busy(b):
+        _start_error_fix(user, b, rows)
+
+
+def _start_error_fix(user: User, b, rows: list[dict], approved: dict | None = None) -> None:
+    """One builder pass over these errors. `approved`: a big fix the user said yes to (it is applied and published)."""
+    ids = [r["id"] for r in rows]
+    app_ = cloudmod.get_app(user.id, b.id) or {}
+    _project_write(b, incidentsmod.ERRORS_FILE, incidentsmod.render_md(incidentsmod.list_for(user.id, b.id)))
+    _project_write(b, incidentsmod.FIX_FILE, None)
+    before = len(b.versions)
+    plain = ("En .tably/arreglo.json escribí un JSON: {\"tamano\": \"chico\"|\"grande\", \"aplicado\": true|false, \"que_paso\": \"…\", \"como_se_arregla\": \"…\", \"que_cambia\": \"…\"}. "
+             f"Las tres explicaciones en {b.req.language or 'español'} simple, para alguien que no sabe programar: una o dos frases cada una, sin jerga técnica "
+             "(nada de «migración», «endpoint», «stack», «500»; por ejemplo: «la base de datos no tenía armadas las tablas donde se guardan los turnos, así que la agenda no podía cargar»). "
+             "«que_cambia» dice qué va a notar la persona que usa la app. Al terminar emití <done>.")
+    errors = "\n\n".join(f"- {r['title']} ({r['count']} vez/veces, {'servidor' if r['source'] == 'server' else 'navegador'})\n{(r['sample'] or r['detail'] or '')[-1800:]}" for r in rows)
+    if approved:
+        text = (f"EL USUARIO APROBÓ ESTE ARREGLO de la app publicada ({app_.get('url')}).\nProblema: {approved.get('what')}\nArreglo aprobado: {approved.get('fix')}\n"
+                "Aplicalo completo, verificá que compila (build/typecheck) y que los tests pasan. Los errores están en .tably/errores.md.\n" + plain.replace("\"tamano\": \"chico\"|\"grande\"", "\"tamano\": \"grande\"") + "\n\nERRORES:\n" + errors)
+    else:
+        text = (f"LA APP PUBLICADA ({app_.get('url')}) ESTÁ TENIENDO ERRORES MIENTRAS LA USAN. Tably los detectó en el log del servidor o en el navegador de los usuarios; "
+                "están abajo y en .tably/errores.md. Encontrá la causa raíz de cada uno.\n"
+                "Primero decidí el tamaño del arreglo:\n"
+                "- CHICO: corregir un bug acotado, hacer que las tablas/migraciones se creen solas al arrancar, una validación, el manejo de un error, configuración. "
+                "No borra ni transforma datos existentes y no cambia lo que la app hace ni cómo se ve.\n"
+                f"- GRANDE: rehacer partes de la app, cambiar el modelo de datos transformando o borrando datos existentes, cambiar lo que la app hace o cómo se ve, sumar un servicio externo o un cobro, o tocar más de {BIG_FIX_FILES - 2} archivos.\n"
+                "Si es CHICO: aplicalo y verificá que compila (build/typecheck) y que los tests pasan. Si es GRANDE: NO cambies código, solo explicá la propuesta.\n"
+                + plain + "\n\nERRORES:\n" + errors)
+    incidentsmod.bump_attempts(ids)
+    lessonsmod.record(user.id, b.id, "runtime", "error en producción", "\n".join(r["detail"] or "" for r in rows))
+    b._error_fix = True
+    b.resume(text)
+    b._pending_requests = [{"severity": "bloqueante", "role": "Tably Cloud", "text": f"Error en producción: {r['title']}"[:300]} for r in rows]
+    b._pending_trigger = "runtime"
+
+    async def finish() -> None:
+        try:
+            while b.status in ("running", "reviewing", "design_review"):
+                await asyncio.sleep(10)
+        finally:
+            b._error_fix = False
+        plan = _fix_plan(b)
+        v = b.versions[-1] if len(b.versions) > before else None
+        st = (v or {}).get("stats") or {}
+        changed = [*st.get("added", []), *st.get("modified", []), *st.get("deleted", [])]
+        changed = [p for p in changed if not p.startswith(".tably/")]
+        fields = {k: plan[k] for k in ("what", "fix", "impact") if plan[k]}
+        if b.status == "error":
+            incidentsmod.update(ids, status="open", **fields)
+            return
+        big = len(changed) > BIG_FIX_FILES or int(st.get("insertions") or 0) + int(st.get("deletions") or 0) > BIG_FIX_LINES
+        if not approved and (plan["size"] == "big" or big):
+            # nothing goes out without the user's yes; what was already changed stays unpublished until then
+            incidentsmod.update(ids, status="needs_approval", size="big", applied=int(bool(changed)), **fields)
+            b.chat.append({"role": "system", "text": b.tx(f"Tably encontró un error en la app publicada que necesita tu OK para arreglarse: {plan['what'] or rows[0]['title']}. Revisalo en «Publicar».",
+                                                           f"Tably found an error in the published app that needs your OK to be fixed: {plan['what'] or rows[0]['title']}. Review it in «Publish»."), "ts": time.time()})
+            b._save()
+            return
+        if not changed:
+            incidentsmod.update(ids, status="open", **fields)  # nothing changed: next round (or «stuck» after the attempts)
+            return
+        if v:
+            lessonsmod.note_fix(user.id, b.id, v.get("summary") or plan["fix"], changed)
+        incidentsmod.update(ids, status="deploying", size=plan["size"] or "small", applied=1, **fields)
+        b.chat.append({"role": "system", "text": b.tx(f"Tably detectó un error en la app publicada y lo arregló solo: {plan['what'] or rows[0]['title']}. Publicando la corrección…",
+                                                       f"Tably detected an error in the published app and fixed it by itself: {plan['what'] or rows[0]['title']}. Publishing the fix…"), "ts": time.time()})
+        _start_publish(user, b)
+
+    spawn(finish())
+
+
+incidentsmod.ON_ERRORS = on_app_errors
+
+
+def _errors_payload(user: User, build_id: str) -> dict:
+    rows = incidentsmod.list_for(user.id, build_id)
+    keep = ("id", "source", "title", "detail", "count", "first_ts", "last_ts", "status", "attempts", "size", "applied", "what", "fix", "impact", "fixed_ts")
+    return {"errors": [{k: r[k] for k in keep} for r in rows], "summary": incidentsmod.summary(rows), "limit_reached": incidentsmod.fixes_today(user.id, build_id) >= ERROR_FIX_PER_DAY}
+
+
+@app.get("/api/sessions/{session_id}/builds/{build_id}/app-errors")
+def build_app_errors(session_id: str, build_id: str, user: User = CurrentUser):
+    _build_any(user, session_id, build_id)
+    return _errors_payload(user, build_id)
+
+
+@app.post("/api/sessions/{session_id}/builds/{build_id}/app-errors/{eid}/{action}")
+async def build_app_error_action(session_id: str, build_id: str, eid: str, action: str, user: User = CurrentUser):
+    """approve: apply/publish the big fix the builder proposed · fix: fix it now (also after «stuck» or the daily limit) · dismiss: leave it."""
+    b = _build_any(user, session_id, build_id)
+    r = incidentsmod.get(user.id, eid)
+    if not r or r["build_id"] != build_id:
+        raise HTTPException(404)
+    if action == "dismiss":
+        incidentsmod.update([eid], status="ignored")
+        return _errors_payload(user, build_id)
+    if action not in ("approve", "fix"):
+        raise HTTPException(400)
+    if _busy(b):
+        raise HTTPException(409, "El constructor está trabajando: probá en un rato")
+    if action == "approve" and r["status"] == "needs_approval" and r["applied"]:
+        incidentsmod.update([eid], status="deploying")  # the fix is already in the code: it only needed the yes to go out
+        _start_publish(user, b)
+    elif action == "approve" and r["status"] == "needs_approval":
+        _start_error_fix(user, b, [r], approved=r)
+    else:
+        incidentsmod.update([eid], status="open", attempts=0)
+        _start_error_fix(user, b, [incidentsmod.get(user.id, eid)])
+    return _errors_payload(user, build_id)
+
+
+@app.get("/api/app-errors/{slug}/reporter.js")
+def app_errors_reporter(slug: str):
+    js = incidentsmod.reporter_js(f"{cloudmod.public_url()}/api/app-errors/{slug}")
+    return Response(js, media_type="application/javascript", headers={"Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*"})
+
+
+@app.post("/api/app-errors/{slug}")
+async def app_errors_report(slug: str, request: Request):
+    """Public: a visitor's browser reports an error of a published app (sendBeacon, text/plain JSON). Rate-limited per app."""
+    try:
+        body = json.loads((await request.body())[:8000] or b"{}")
+    except ValueError:
+        body = {}
+    kept = incidentsmod.report_browser(slug, body if isinstance(body, dict) else {})
+    return Response(status_code=204 if kept else 202, headers={"Access-Control-Allow-Origin": "*"})
 
 
 @app.get("/api/admin/deploy-failures")

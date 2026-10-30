@@ -30,6 +30,7 @@ import httpx
 from .auth import _db
 from .config import DATA_DIR, env
 from . import deploy as deploymod
+from . import incidents as incidentsmod
 from . import lessons as lessonsmod
 from . import runner as runmod
 
@@ -614,6 +615,8 @@ async def publish(user_id: str, build_id: str, title: str, root: Path, files: di
         values.update(gen)
         await log_(f"· generé {len(gen)} secreto(s) propio(s) de la app ({', '.join(gen)}); quedan guardados en «Servicios y deploy»")
     (root / ".env").write_text(deploymod.render_env(values, files)) if values and not (root / ".env").exists() else None
+    # errors in the visitors' browsers come back to Tably, which hands them to the builder (see incidents.py)
+    incidentsmod.inject_reporter(root, f"{public_url()}/api/app-errors/{slug}/reporter.js")
     cls = classify(root)
     app["kind"] = cls["kind"]
     try:
@@ -644,6 +647,8 @@ async def publish(user_id: str, build_id: str, title: str, root: Path, files: di
     _save(app)
     if app["status"] == "deploying":
         _watch(user_id, build_id)
+    elif app["status"] == "live":
+        incidentsmod.on_live(user_id, build_id)
     return app
 
 
@@ -690,6 +695,7 @@ def _watch(user_id: str, build_id: str) -> None:
                 cur.setdefault("db", {}).setdefault("railway", {})["fix_attempts"] = 0
                 _save(cur)
                 lessonsmod.resolve(user_id, build_id, True)
+                incidentsmod.on_live(user_id, build_id)
                 return
             detail = await railway_failure_logs(token, dep) if token and dep else ""
             reason = "el build o el arranque falló en Railway" if ok is None else "la app no respondió en su URL después de 15 minutos"

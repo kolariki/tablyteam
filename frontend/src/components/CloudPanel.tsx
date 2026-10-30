@@ -8,6 +8,7 @@ import { useArena } from '../store'
 import ProviderLogo from './ProviderLogo'
 import { toast } from './Toast'
 import BlockedNotice, { BuilderBusyNotice } from './BlockedNotice'
+import AppErrorsSection from './AppErrorsSection'
 
 const PILL = 'flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-[13px] text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent disabled:opacity-40 disabled:hover:border-line disabled:hover:bg-surface disabled:hover:text-ink-2'
 const PRIMARY = 'flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40'
@@ -194,6 +195,8 @@ export default function CloudPanel() {
           {!live && !publishing && st && !st.server && <p className="mt-2 text-[12px] leading-snug text-ink-4">{T('Las apps con servidor propio necesitan', 'Apps with their own server need')} {st.missing.railway ?? st.missing.fly}. {T('Mientras tanto corrélas en «App real» o llevalas a Railway.', 'Meanwhile run them in "Real app" or take them to Railway.')}</p>}
           <Terminal lines={b.cloudLogs.length ? b.cloudLogs : info?.app?.log ?? app?.log ?? []} open={logOpen} onToggle={() => setLogOpen((v) => !v)} live={publishing} />
         </Section>
+
+        {app && b.sessionId && b.id && <AppErrorsSection sessionId={b.sessionId} buildId={b.id} live={live} />}
 
         {/* -------- database & auth */}
         <Section icon={<Database size={17} />} title={T('Base de datos y auth', 'Database and auth')} hint={T('Se crean con un clic y las variables quedan guardadas en los secretos de esta construcción (y en el .env al correr o publicar).', 'Created in one click; the variables are stored in this build\'s secrets (and in the .env when running or publishing).')}>

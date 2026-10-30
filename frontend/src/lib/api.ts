@@ -305,6 +305,8 @@ export const api = {
   market: () => j<{ listings: MarketListing[]; levels: LevelDef[] }>(authed('/api/market')),
   marketTransfer: (listingId: string, email: string) => j<{ ok: boolean; to: { name: string; email: string } }>(post(`/api/market/${listingId}/transfer`, { email })),
   cloudPublish: (sessionId: string, id: string) => j(post(`/api/sessions/${sessionId}/builds/${id}/cloud/publish`, {})),
+  appErrors: (sessionId: string, id: string) => j<AppErrors>(authed(`/api/sessions/${sessionId}/builds/${id}/app-errors`)),
+  appErrorAction: (sessionId: string, id: string, eid: string, action: 'approve' | 'fix' | 'dismiss') => j<AppErrors>(post(`/api/sessions/${sessionId}/builds/${id}/app-errors/${eid}/${action}`, {})),
   cloudUnpublish: (sessionId: string, id: string) => j<{ ok: boolean; app: CloudApp | null }>(authed(`/api/sessions/${sessionId}/builds/${id}/cloud/publish`, { method: 'DELETE' })),
   cloudDb: (sessionId: string, id: string, provider: 'neon' | 'supabase') => j<{ ok: boolean; provider: string; host: string; vars: string[] }>(post(`/api/sessions/${sessionId}/builds/${id}/cloud/db`, { provider })),
   gitSync: (sessionId: string, id: string) => j<{ ok: boolean; head: string; committed: boolean; git: GitInfo }>(post(`/api/sessions/${sessionId}/builds/${id}/cloud/git/sync`, {})),
@@ -826,4 +828,10 @@ export function replay(events: ArenaEvent[], speed: () => number, onEvent: (e: A
 }
 
 export type DeployFailureGroup = { signature: string; label: string; rule: string | null; prevented: boolean; count: number; fixed: number; unfixed: number; open: number; apps: number; last_ts: number; excerpt: string; fix_summary: string | null }
+export type AppError = {
+  id: string; source: 'server' | 'browser'; title: string; detail: string | null; count: number; first_ts: number; last_ts: number
+  status: 'open' | 'fixing' | 'deploying' | 'fixed' | 'needs_approval' | 'stuck' | 'ignored'; attempts: number; size: string | null; applied: number
+  what: string | null; fix: string | null; impact: string | null; fixed_ts: number | null
+}
+export type AppErrors = { errors: AppError[]; summary: { fixed: number; open: number; needs_approval: number; stuck: number }; limit_reached: boolean }
 export type DeployFailures = { groups: DeployFailureGroup[]; total: number; fixed: number; days: number }

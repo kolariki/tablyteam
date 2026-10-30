@@ -12,6 +12,7 @@ const TRIGGER = (): Record<string, string> => ({
   audit: tr('Mejoras de la auditoría', 'Audit improvements'),
   user: tr('Pedido del usuario', 'User request'),
   deploy: tr('Ajuste para publicar', 'Publishing fix'),
+  runtime: tr('Arreglo de un error de la app publicada', 'Fix of an error in the published app'),
 })
 
 export function readinessColor(p: number | null) {

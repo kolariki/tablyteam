@@ -31,6 +31,9 @@ CATALOG: list[tuple[str, str, str, str, bool]] = [
     ("workspace-protocol", r'Unsupported URL Type "workspace:"|EUNSUPPORTEDPROTOCOL',
      "Monorepo con dependencias workspace:* instalado con npm",
      "En un monorepo usá pnpm: `pnpm-workspace.yaml` en la raíz, `\"packageManager\": \"pnpm@9\"` en el package.json raíz y `pnpm-lock.yaml` commiteado.", True),
+    ("missing-tables", r'relation "?[\w.]+"? does not exist|no such table|ER_NO_SUCH_TABLE',
+     "La base de datos no tiene las tablas (las migraciones no corrieron)",
+     "Las migraciones (o el CREATE TABLE inicial) corren solas al arrancar el servidor, antes de escuchar el puerto, y se pueden correr muchas veces sin romper nada; nunca dependas de correrlas a mano.", False),
     ("lockfile-out-of-sync", r"ERR_PNPM_OUTDATED_LOCKFILE|`npm ci` can only install|package-lock\.json.*(not in sync|out of sync)|lockfile needs to be updated",
      "El lockfile no coincide con package.json",
      "Cada vez que cambies dependencias en package.json actualizá también el lockfile (pnpm-lock.yaml / package-lock.json) en el mismo cambio.", True),
@@ -133,7 +136,7 @@ def block(user_id: str | None = None, limit: int = 8) -> str:
     rules = [f"- {_BY_SIG[r['signature']][2]} ({r['n']} vez/veces): {_BY_SIG[r['signature']][3]}" for r in rows if r["signature"] in _BY_SIG][:limit]
     if not rules:
         return ""
-    return ("\n\nLECCIONES DE DESPLIEGUE (fallas que ya pasaron publicando apps en Tably Cloud; dejá el proyecto listo para que no le pasen a este):\n"
+    return ("\n\nLECCIONES DE PRODUCCIÓN (fallas que ya pasaron publicando o usando apps en Tably Cloud; dejá el proyecto listo para que no le pasen a este):\n"
             + "\n".join(rules))
 
 
