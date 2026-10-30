@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, ExternalLink, FlaskConical, HardHat, Loader2, RefreshCw, Save, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, Copy, ExternalLink, FlaskConical, HardHat, Loader2, RefreshCw, Save, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useBuild } from '../buildStore'
@@ -11,6 +11,42 @@ type Group = ServicesInfo['groups'][number]
 // guides already fetched in this tab: reopening one is instant (the server keeps them in its database too)
 const guideCache = new Map<string, ServiceGuideData>()
 const guideKey = (g: Group, lang: string) => `${g.service}|${g.vars.map((v) => v.var).sort().join(',')}|${lang}`
+
+/** One value to copy (an address, a host, an event name): bold, with a one-click copy button next to it. */
+function CopyValue({ text }: { text: string }) {
+  const T = useT()
+  const [done, setDone] = useState(false)
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1400) } catch { /* the user can still select it */ }
+  }
+  return (
+    <span className="inline-flex max-w-full items-center gap-1 rounded-md border border-accent/30 bg-accent-soft/50 py-0.5 pl-1.5 pr-0.5 align-baseline">
+      <b className="break-all font-mono text-[12.5px] text-ink">{text}</b>
+      <button type="button" onClick={copy} title={T('Copiar', 'Copy')} aria-label={T('Copiar', 'Copy')} className={`flex h-5 w-5 shrink-0 items-center justify-center rounded transition ${done ? 'text-ok' : 'text-accent hover:bg-accent/10'}`}>
+        {done ? <Check size={12} strokeWidth={3} /> : <Copy size={12} />}
+      </button>
+    </span>
+  )
+}
+
+/** A tutorial step: «menus and buttons» in bold; addresses and `values to paste` in bold with a copy button. */
+function GuideText({ text }: { text: string }) {
+  const parts = text.split(/(«[^»]+»|`[^`]+`|https?:\/\/[^\s,;)»]+)/g)
+  return (
+    <>
+      {parts.map((p, k) => {
+        if (!p) return null
+        if (p.startsWith('«')) return <b key={k} className="font-semibold text-ink">{p.slice(1, -1)}</b>
+        if (p.startsWith('`')) return <CopyValue key={k} text={p.slice(1, -1)} />
+        if (/^https?:\/\//.test(p)) {
+          const url = p.replace(/[.:]+$/, '')
+          return <span key={k}><CopyValue text={url} />{p.slice(url.length)}</span>
+        }
+        return <span key={k}>{p}</span>
+      })}
+    </>
+  )
+}
 
 /**
  * "How do I get this?": a guided walkthrough for one external service. The steps come from a model (cached per
@@ -118,7 +154,7 @@ export default function ServiceGuide({ group, sessionId, buildId, onClose, onSav
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-[15px] font-bold text-white shadow-sm">{i + 1}</span>
                     <div className="min-w-0 flex-1">
                       <h4 className="text-lg font-semibold leading-snug">{steps[i].title}</h4>
-                      <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{steps[i].detail}</p>
+                      <p className="mt-2 text-[14px] leading-loose text-ink-2"><GuideText text={steps[i].detail} /></p>
                       {steps[i].url && (
                         <a href={steps[i].url!} target="_blank" rel="noreferrer" className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-full border border-accent/40 bg-surface px-4 text-sm font-medium text-accent shadow-sm transition hover:bg-accent/5">
                           <ExternalLink size={14} /> {T('Abrir la página de este paso', 'Open this step’s page')}
@@ -155,7 +191,7 @@ export default function ServiceGuide({ group, sessionId, buildId, onClose, onSav
                       </div>
                       {data.test && (
                         <div className="mt-4 flex gap-2 rounded-xl border border-accent/30 bg-accent-soft/40 px-3 py-2.5 text-[12.5px] leading-snug text-ink-2">
-                          <FlaskConical size={15} className="mt-0.5 shrink-0 text-accent" /> <span><b className="text-ink">{T('Para probar sin riesgo', 'To try it safely')}:</b> {data.test}</span>
+                          <FlaskConical size={15} className="mt-0.5 shrink-0 text-accent" /> <span><b className="text-ink">{T('Para probar sin riesgo', 'To try it safely')}:</b> <GuideText text={data.test} /></span>
                         </div>
                       )}
                       {error && <div className="mt-3 text-sm text-danger">{error}</div>}
