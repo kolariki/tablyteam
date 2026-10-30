@@ -252,3 +252,14 @@ input[type="color"] { border: 1px solid var(--color-line); padding: 2px; }
 @media (max-width: 640px) {
   input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]), textarea, select { font-size: 16px !important; }
 }
+
+/* dark theme: the light fills written by hand in a few components follow it too */
+.look-taller .bg-white\/95, .look-taller .bg-white\/90, .look-taller .bg-white\/80, .look-taller .bg-white\/70, .look-taller .bg-white\/60, .look-taller .bg-white\/50 { background-color: color-mix(in srgb, var(--color-surface) 82%, transparent); }
+.look-taller .bg-\[\#EEF5FF\] { background-color: #18304D; }
+.look-taller .border-\[\#BBD5FA\] { border-color: #2B4C78; }
+.look-taller .text-\[\#0064E0\] { color: #7DB3FF; }
+.look-taller .bg-\[\#FFF6DF\] { background-color: #3A3322; }
+.look-taller .bg-\[\#F3F7FB\], .look-taller .bg-\[\#EEF1EC\], .look-taller .bg-\[\#E4ECF7\] { background-color: var(--color-surface-2); }
+.look-taller .text-\[\#1E2622\] { color: var(--color-ink); }
+.look-taller .text-\[\#0B2E66\] { color: #A9C8F5; }
+.look-taller .text-\[\#5E6B65\] { color: var(--color-ink-3); }

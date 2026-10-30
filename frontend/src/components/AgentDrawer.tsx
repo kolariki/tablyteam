@@ -145,7 +145,7 @@ export default function AgentDrawer() {
           </div>
         )}
         {/* header in the company's colours */}
-        <div className="relative shrink-0 border-b px-5 py-5" style={{ borderColor: `${theme.accent}55` }}>
+        <div className="relative shrink-0 border-b px-5 py-5" style={{ borderColor: `color-mix(in srgb, ${theme.accent} 33%, transparent)` }}>
           <div className="flex items-center gap-3 pr-12">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-surface leading-none" style={{ border: `2px solid ${color}` }}><ProviderLogo provider={agent.wanted_provider ?? agent.provider} size={24} /></div>
             <div className="min-w-0 flex-1">
@@ -184,17 +184,17 @@ export default function AgentDrawer() {
           {running && <div className="mb-2 rounded-lg border border-gold/40 bg-gold/10 px-2.5 py-1.5 text-[11.5px] text-ink-2">{T('Debate en curso: ahora podés cambiar el modelo y las skills; nombre, rol y prompt se editan cuando termine.', 'Debate running: you can change the model and skills now; name, role and prompt are editable once it ends.')}</div>}
           <div className="space-y-2">
             <label className="block"><span className="text-[10px] uppercase tracking-widest text-ink-3">{T('Nombre', 'Name')}</span>
-              <input className={`${input} mt-0.5`} style={{ borderColor: `${theme.accent}88` }} value={draft.name} disabled={running} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>
+              <input className={`${input} mt-0.5`} style={{ borderColor: `color-mix(in srgb, ${theme.accent} 53%, transparent)` }} value={draft.name} disabled={running} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>
             <div className="grid grid-cols-2 gap-2">
               <label className="block"><span className="text-[10px] uppercase tracking-widest text-ink-3">{T('Empresa', 'Company')}</span>
-                <select className={`${input} mt-0.5`} style={{ borderColor: `${theme.accent}88` }} value={draft.provider} onChange={(e) => { const np = providers.find((x) => x.id === e.target.value); if (np) setDraft({ ...draft, provider: np.id, model: np.default_model, wanted_provider: undefined }) }}>
+                <select className={`${input} mt-0.5`} style={{ borderColor: `color-mix(in srgb, ${theme.accent} 53%, transparent)` }} value={draft.provider} onChange={(e) => { const np = providers.find((x) => x.id === e.target.value); if (np) setDraft({ ...draft, provider: np.id, model: np.default_model, wanted_provider: undefined }) }}>
                   {providers.map((x) => <option key={x.id} value={x.id} disabled={!x.configured && x.id !== 'mock'}>{x.id === 'mock' ? T('Simulado (sin API)', 'Simulated (no API)') : x.label}{x.configured || x.id === 'mock' ? '' : T(' (sin key)', ' (no key)')}</option>)}
                 </select></label>
               <label className="block"><span className="text-[10px] uppercase tracking-widest text-ink-3">{T('Modelo', 'Model')}</span>
                 <div className="mt-0.5"><ModelSelect provider={draft.provider} value={draft.model} onChange={(m) => setDraft({ ...draft, model: m })} enabled={!!providers.find((x) => x.id === draft.provider)?.configured} className="text-[12px] py-1.5" /></div></label>
             </div>
             <label className="block"><span className="text-[10px] uppercase tracking-widest text-ink-3">{T('Rol', 'Role')}</span>
-              <select className={`${input} mt-0.5`} style={{ borderColor: `${theme.accent}88` }} value={draft.role ?? 'custom'} disabled={running} onChange={(e) => { const r = roles?.roles.find((x) => x.id === e.target.value); setDraft({ ...draft, role: e.target.value, persona: r && r.id !== 'custom' && !draft.persona ? pick(r, 'persona') : draft.persona }) }}>
+              <select className={`${input} mt-0.5`} style={{ borderColor: `color-mix(in srgb, ${theme.accent} 53%, transparent)` }} value={draft.role ?? 'custom'} disabled={running} onChange={(e) => { const r = roles?.roles.find((x) => x.id === e.target.value); setDraft({ ...draft, role: e.target.value, persona: r && r.id !== 'custom' && !draft.persona ? pick(r, 'persona') : draft.persona }) }}>
                 {(roles?.groups ?? []).map((g, gi) => (
                   <optgroup key={g} label={lang === 'en' ? roles?.groups_en?.[gi] ?? g : g}>
                     {roles?.roles.filter((r) => r.group === g).map((r) => <option key={r.id} value={r.id}>{pick(r, 'label')}</option>)}
@@ -202,13 +202,13 @@ export default function AgentDrawer() {
                 ))}
               </select></label>
             <div><span className="text-[10px] uppercase tracking-widest text-ink-3">{T('Prompt / personalidad', 'Prompt / personality')}</span>
-              <div className={running ? 'pointer-events-none opacity-60' : ''}><PersonaField className="mt-0.5" value={draft.persona} onChange={(v) => setDraft({ ...draft, persona: v })} roleLabel={draft.name} inputStyle={{ borderColor: `${theme.accent}88` }} /></div></div>
+              <div className={running ? 'pointer-events-none opacity-60' : ''}><PersonaField className="mt-0.5" value={draft.persona} onChange={(v) => setDraft({ ...draft, persona: v })} roleLabel={draft.name} inputStyle={{ borderColor: `color-mix(in srgb, ${theme.accent} 53%, transparent)` }} /></div></div>
             <div><span className="text-[10px] uppercase tracking-widest text-ink-3">Skills</span>
-              <div className="mt-0.5 rounded-lg border bg-surface p-1" style={{ borderColor: `${theme.accent}88` }}><SkillPicker value={draft.skills ?? []} onChange={(ids) => setDraft({ ...draft, skills: ids })} /></div></div>
+              <div className="mt-0.5 rounded-lg border bg-surface p-1" style={{ borderColor: `color-mix(in srgb, ${theme.accent} 53%, transparent)` }}><SkillPicker value={draft.skills ?? []} onChange={(ids) => setDraft({ ...draft, skills: ids })} /></div></div>
           </div>
         </div>
 
-        <div className="relative flex shrink-0 items-center gap-2 border-t bg-surface/70 px-5 py-3.5 backdrop-blur-sm" style={{ borderColor: `${theme.accent}55` }}>
+        <div className="relative flex shrink-0 items-center gap-2 border-t bg-surface/70 px-5 py-3.5 backdrop-blur-sm" style={{ borderColor: `color-mix(in srgb, ${theme.accent} 33%, transparent)` }}>
           <button type="button" onClick={save} disabled={!dirty || saving} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-40" style={{ background: theme.accent }}>{saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {T('Guardar', 'Save')}</button>
           <button type="button" onClick={() => setDraft({ ...agent, skills: [...(agent.skills ?? [])] })} disabled={!dirty || saving} className="rounded-lg border border-line px-3 py-1.5 text-[12.5px] disabled:opacity-40">{T('Descartar', 'Discard')}</button>
           <span className="ml-auto text-[10.5px] text-ink-4">{T('Aplica a la próxima ronda, build o repetición.', 'Applies to the next round, build or rerun.')}</span>

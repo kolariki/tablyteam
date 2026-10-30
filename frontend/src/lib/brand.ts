@@ -94,4 +94,24 @@ export const BRAND_THEME: Record<string, { tint: string; bg: string; border: str
   railway: { tint: '#E6E3F3', bg: 'linear-gradient(135deg, #F4F2FB 0%, #E8E4F6 100%)', border: '#D3CCEC', accent: '#7B3FE4', ink: '#2A1F4E' },
   langfuse: { tint: '#E3EAF6', bg: 'linear-gradient(135deg, #F3F6FC 0%, #E6ECF8 100%)', border: '#CFDAF0', accent: '#0A60B5', ink: '#1C2E4A' },
 }
-export const brandTheme = (provider?: string | null) => BRAND_THEME[provider ?? ''] ?? BRAND_THEME.mock
+// ---- dark theme: every brand colour also has a dark version, picked by the browser with CSS light-dark() (the «Taller»
+// theme sets color-scheme: dark), so the cards follow a theme change without re-rendering
+const hex = (h: string) => { const v = h.replace('#', ''); const f = v.length === 3 ? v.split('').map((c) => c + c).join('') : v; return [0, 2, 4].map((i) => parseInt(f.slice(i, i + 2), 16)) }
+const toHex = (rgb: number[]) => '#' + rgb.map((x) => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, '0')).join('')
+const mix = (a: string, w: number, b: string) => { const x = hex(a), y = hex(b); return toHex(x.map((v, i) => v * w + y[i] * (1 - w))) }
+const lum = (h: string) => { const [r, g, b] = hex(h); return (0.299 * r + 0.587 * g + 0.114 * b) / 255 }
+const DARK_SURFACE = '#1E2938', DARK_LINE = '#2E3A4C', DARK_INK = '#E9EDF2'
+
+function withDark(t: { tint: string; bg: string; border: string; accent: string; ink: string }) {
+  const accent = lum(t.accent) < 0.22 ? '#C9D2DC' : t.accent  // near-black brands would vanish on the dark ground
+  const ld = (light: string, dark: string) => `light-dark(${light}, ${dark})`
+  return {
+    tint: ld(t.tint, mix(accent, 0.2, DARK_SURFACE)),
+    bg: t.bg.replace(/#[0-9A-Fa-f]{6}\b/g, (c) => ld(c, mix(accent, 0.1 + (1 - lum(c)) * 0.5, DARK_SURFACE))),
+    border: ld(t.border, mix(accent, 0.35, DARK_LINE)),
+    accent: ld(t.accent, accent),
+    ink: ld(t.ink, mix(accent, 0.18, DARK_INK)),
+  }
+}
+const THEMED: Record<string, ReturnType<typeof withDark>> = Object.fromEntries(Object.entries(BRAND_THEME).map(([k, v]) => [k, withDark(v)]))
+export const brandTheme = (provider?: string | null) => THEMED[provider ?? ''] ?? THEMED.mock
