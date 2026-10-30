@@ -305,6 +305,10 @@ class AppRun:
         s = self.service
         cwd = self.root / s["dir"]
         env = {**os.environ, "PORT": str(self.port), "HOST": "127.0.0.1", "BROWSER": "none", "CI": "1", "NO_COLOR": "1", "FORCE_COLOR": "0", "PYTHONUNBUFFERED": "1"}
+        # where the app keeps its data while it is tried without DATABASE_URL: inside the project, on Tably's volume, so a restart loses nothing
+        data_dir = self.root / ".data"
+        data_dir.mkdir(exist_ok=True)
+        env.setdefault("TABLY_DATA_DIR", str(data_dir))
         # the saved service values → .env (never overwrite one the agent/user already wrote)
         values = load_secrets(self.user_id, self.build_id)
         for d in {self.root, cwd}:

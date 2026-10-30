@@ -3594,6 +3594,26 @@ def on_run_status(run) -> None:
         run.fix = None
     elif run.status == "error":
         _run_failed(run, run.error or "La app no arrancó")
+    if run.status == "running" and not run.fix:
+        _check_memory_db(run)
+
+
+# the app keeps its data only in memory when it runs without DATABASE_URL: what the user creates while trying it is lost on every restart
+_MEMORY_DB = re.compile(r'\b(in-memory|in memory|pg-mem|en memoria|:memory:)\b|"?(engine|db|database|store|storage)"?\s*[:=]\s*"?(memory|mem|in-?memory|pg-?mem)\b', re.I)
+
+
+def _check_memory_db(run) -> None:
+    hit = next((ln for ln in run.logs[-200:] if _MEMORY_DB.search(ln) and not re.search(r"out of memory|heap|MemoryError", ln, re.I)), None)
+    if not hit:
+        return
+    title = "Lo que se crea al probar la app se borra cuando se reinicia (guarda los datos solo en memoria)"
+    row = incidentsmod.record(run.user_id, run.build_id, "run", title,
+                              f"{title}\nLínea del log: {hit.strip()[:300]}\n"
+                              "Sin DATABASE_URL la app tiene que guardar en disco, en la carpeta de la variable TABLY_DATA_DIR (o .data/ si no existe): "
+                              "PGlite con dataDir, o SQLite en un archivo, con las mismas migraciones que en Postgres, y el seed de ejemplo solo si la base está vacía. "
+                              "Agregá .data/ a .gitignore y .dockerignore. Con DATABASE_URL (publicada) sigue usando Postgres como ahora.")
+    if row.get("status") == "open" and (row.get("attempts") or 0) < ERROR_FIX_ATTEMPTS:
+        spawn(_kick_async(run.user_id, run.build_id))
 
 
 def _run_failed(run, what: str) -> None:
