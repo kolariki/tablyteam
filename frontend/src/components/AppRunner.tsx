@@ -1,4 +1,4 @@
-import { AlertTriangle, ChevronDown, ExternalLink, Loader2, Maximize2, Minimize2, MonitorPlay, Play, RefreshCw, Square, Wrench } from 'lucide-react'
+import { AlertTriangle, ChevronDown, Send, ExternalLink, Loader2, Maximize2, Minimize2, MonitorPlay, Play, RefreshCw, Square, Wrench } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useEffect, useRef, useState } from 'react'
 import { reconnectBuild, useBuild, type RunFix } from '../buildStore'
@@ -122,6 +122,28 @@ function DeviceView({ target, sessionId, buildId }: { target: 'ios' | 'android';
   )
 }
 
+/** What the user is looking at inside the app (same origin when it runs through Tably): the visible text, the error messages
+ *  on screen, the page's last failed requests and errors (kept by Tably's reporter) and a screenshot of the visible part. */
+async function captureFrame(f: HTMLIFrameElement | null) {
+  const out = { page: '', text: '', alerts: [] as string[], log: [] as unknown[], screenshot: '' }
+  type FrameWin = Window & { __tably?: { log: unknown[] } }
+  let doc: Document | null = null
+  let win: FrameWin | null = null
+  try { doc = f?.contentDocument ?? null; win = (f?.contentWindow as FrameWin | null) ?? null } catch { return out }
+  if (!f || !doc?.body || !win) return out
+  try { out.page = win.location.pathname + win.location.search } catch { /* cross-origin */ }
+  out.text = (doc.body.innerText || '').slice(0, 2500)
+  const sel = '[role=alert],[aria-live=assertive],[class*="error" i],[class*="danger" i],[class*="destructive" i],[class*="alert" i]'
+  out.alerts = [...new Set([...doc.querySelectorAll<HTMLElement>(sel)].map((e) => (e.innerText || '').trim().replace(/\s+/g, ' ')).filter((t) => t && t.length < 400))].slice(0, 6)
+  out.log = win.__tably?.log ?? []
+  try {
+    const { toJpeg } = await import('html-to-image')
+    const w = f.clientWidth, h = f.clientHeight, sx = win.scrollX, sy = win.scrollY
+    out.screenshot = await toJpeg(doc.documentElement, { quality: 0.75, pixelRatio: 1, width: w, height: h, backgroundColor: '#ffffff', style: { transform: `translate(${-sx}px, ${-sy}px)`, width: `${w}px` } })
+  } catch { /* no screenshot: the text and the log still go */ }
+  return out
+}
+
 /** "App real": run the built product on this machine and show it live (instead of the static prototype). */
 export default function AppRunner({ autoStart = false }: { autoStart?: boolean }) {
   const T = useT()
@@ -206,6 +228,31 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
     reconnectBuild(b.id)
   }
 
+  const frameRef = useRef<HTMLIFrameElement>(null)
+  const fullRef = useRef<HTMLIFrameElement>(null)
+  const [sending, setSending] = useState(false)
+  // «Enviar al constructor»: what the user is seeing right now (screenshot, error on screen, failed requests, server log)
+  const report = async () => {
+    if (!b.sessionId || !b.id || sending) return
+    setSending(true)
+    try {
+      const cap = await captureFrame(fullRef.current ?? frameRef.current)
+      const r = await api.runReport(b.sessionId, b.id, cap)
+      toast.info(tr('Enviado al constructor', 'Sent to the builder'), r.queued ? tr('Lo toma apenas termine lo que está haciendo.', 'It picks it up as soon as it finishes what it is doing.') : tr('Está buscando dónde está el error; cuando lo arregle, la app vuelve a abrirse sola.', 'It is looking for where the error is; once fixed, the app opens again by itself.'))
+      setFull(false)
+      load()
+    } catch (e) {
+      toast.error(tr('No se pudo enviar', 'Could not send'), (e as Error).message)
+    } finally {
+      setSending(false)
+    }
+  }
+  const reportBtn = (small = false) => (
+    <button onClick={report} disabled={sending} className={`flex ${small ? 'h-7 text-[11.5px]' : 'h-8 text-[12px]'} items-center gap-1.5 rounded-full bg-accent px-3 font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-60`} title={T('Mandale al constructor lo que estás viendo (con captura y el error exacto) para que lo arregle', 'Send the builder what you are seeing (with a screenshot and the exact error) so it fixes it')}>
+      {sending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />} {sending ? T('Enviando…', 'Sending…') : T('Enviar al constructor', 'Send to the builder')}
+    </button>
+  )
+
   const active = run.status === 'installing' || run.status === 'starting' || run.status === 'running'
   // Tably fixing the app by itself: a loader, never the dead app; a card only when it needs the user
   const fixWait = !!run.fix && (run.fix.state === 'fixing' || run.fix.state === 'restarting')
@@ -245,6 +292,7 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
             </span>
             {run.status === 'running' && run.url && !fixWait && (
               <div className="ml-auto flex items-center gap-1.5">
+                {!sel?.device && reportBtn()}
                 <button onClick={() => setFrameKey((k) => k + 1)} className="flex h-8 items-center gap-1 rounded-full border border-line bg-paper px-2.5 text-[12px] text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent" title={T('Recargar la app', 'Reload the app')}><RefreshCw size={12} /> {T('recargar', 'reload')}</button>
                 <a href={run.url} target="_blank" rel="noreferrer" className="flex h-8 items-center gap-1 rounded-full border border-line bg-paper px-2.5 text-[12px] text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent" title={T('Abrir en una pestaña nueva', 'Open in a new tab')}><ExternalLink size={12} /> {T('pestaña', 'tab')}</a>
                 <button onClick={() => setFull(true)} className="flex h-8 w-8 items-center justify-center rounded-full border border-line bg-paper text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent" title={T('Ver la app a pantalla completa', 'View the app full screen')}><Maximize2 size={13} /></button>
@@ -287,7 +335,7 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
                 <span className="ml-2 text-[10.5px] text-ink-3">{/\/r\//.test(run.url) ? T('la app real, corriendo en Tably', 'the real app, running on Tably') : T('la app real, corriendo en esta máquina', 'the real app, running on this machine')}</span>
                 <button onClick={() => setFull(true)} className="ml-auto flex h-6 w-6 items-center justify-center rounded-md text-ink-3 transition hover:bg-surface hover:text-accent" title={T('Pantalla completa', 'Full screen')}><Maximize2 size={13} /></button>
               </div>
-              {!full && <iframe key={frameKey} title={T('App corriendo', 'App running')} src={run.embedUrl ?? run.url} className="min-h-0 w-full flex-1 bg-white" />}
+              {!full && <iframe ref={frameRef} key={frameKey} title={T('App corriendo', 'App running')} src={run.embedUrl ?? run.url} className="min-h-0 w-full flex-1 bg-white" />}
               {full && <div className="flex flex-1 items-center justify-center text-[12.5px] text-ink-3">{T('La app está a pantalla completa.', 'The app is in full screen.')}</div>}
             </div>
           </div>
@@ -330,10 +378,11 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
               <span className="h-2.5 w-2.5 rounded-full bg-[#E6A19A]" /><span className="h-2.5 w-2.5 rounded-full bg-[#E9C97A]" /><span className="h-2.5 w-2.5 rounded-full bg-[#9FCDA8]" />
               <span className="ml-3 flex h-6 items-center rounded-md border border-line bg-paper px-2 font-mono text-[11px] text-ink-2">{run.url}</span>
               <span className="ml-2 text-[11px] text-ink-3">{T('App real · pantalla completa · Esc para volver', 'Real app · full screen · Esc to go back')}</span>
-              <button onClick={() => setFrameKey((k) => k + 1)} className="ml-auto flex h-7 items-center gap-1 rounded-full border border-line bg-paper px-2.5 text-[11.5px] text-ink-2 transition hover:border-accent hover:text-accent"><RefreshCw size={12} /> {T('recargar', 'reload')}</button>
+              <span className="ml-auto">{reportBtn(true)}</span>
+              <button onClick={() => setFrameKey((k) => k + 1)} className="flex h-7 items-center gap-1 rounded-full border border-line bg-paper px-2.5 text-[11.5px] text-ink-2 transition hover:border-accent hover:text-accent"><RefreshCw size={12} /> {T('recargar', 'reload')}</button>
               <button onClick={() => setFull(false)} className="flex h-7 items-center gap-1 rounded-full bg-accent px-3 text-[11.5px] font-semibold text-white transition hover:brightness-110"><Minimize2 size={12} /> {T('Volver', 'Back')}</button>
             </div>
-            <iframe key={`full-${frameKey}`} title={T('App corriendo', 'App running')} src={run.embedUrl ?? run.url} className="min-h-0 w-full flex-1 bg-white" />
+            <iframe ref={fullRef} key={`full-${frameKey}`} title={T('App corriendo', 'App running')} src={run.embedUrl ?? run.url} className="min-h-0 w-full flex-1 bg-white" />
           </div>,
           document.body,
         )}

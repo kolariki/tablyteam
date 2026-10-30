@@ -837,6 +837,8 @@ function LiveStatusBar() {
   )
 }
 
+const NOTICE_BTN = 'flex h-9 items-center justify-center gap-1.5 rounded-full bg-accent px-3.5 text-[12.5px] font-semibold text-white shadow-sm transition hover:brightness-110'
+
 /** What Tably is doing with the app (an error found, being fixed, fixed, needs you): a card the user can't miss, with «Ver la app». */
 function AppNotice({ c }: { c: ChatItem }) {
   const T = useT()
@@ -854,7 +856,13 @@ function AppNotice({ c }: { c: ChatItem }) {
           ? <div className="mt-1.5 break-words rounded-lg border border-line bg-paper px-2.5 py-1.5 font-mono text-[11px] text-ink-3">{c.detail}</div>
           : <button onClick={() => setMore(true)} className="mt-1 text-[11.5px] text-ink-3 underline-offset-2 hover:underline">{T('Ver el detalle técnico', 'See the technical detail')}</button>)}
       </div>
-      {c.run && <button onClick={() => useBuild.getState().set({ runOpen: true })} className="flex h-9 shrink-0 items-center gap-1.5 self-center rounded-full bg-accent px-3.5 text-[12.5px] font-semibold text-white shadow-sm transition hover:brightness-110"><MonitorPlay size={13} /> {T('Ver la app', 'See the app')}</button>}
+      {(c.run || c.link || c.go) && (
+        <div className="flex shrink-0 flex-col items-stretch gap-1.5 self-center">
+          {c.link && <a href={c.link.url} target="_blank" rel="noreferrer" className={NOTICE_BTN}><ExternalLink size={13} /> {c.link.label}</a>}
+          {c.go && <button onClick={() => useBuild.getState().set({ paneOpen: true, pane: c.go! })} className={NOTICE_BTN}><CloudUpload size={13} /> {c.go === 'cloud' ? T('Ir a Publicar', 'Go to Publish') : T('Abrir', 'Open')}</button>}
+          {c.run && <button onClick={() => useBuild.getState().set({ runOpen: true })} className={NOTICE_BTN}><MonitorPlay size={13} /> {T('Ver la app', 'See the app')}</button>}
+        </div>
+      )}
     </motion.div>
   )
 }

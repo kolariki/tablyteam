@@ -60,6 +60,7 @@ from . import runner as runmod
 from . import skills as skillmod
 from . import cloud as cloudmod
 from . import incidents as incidentsmod
+from . import leaks as leaksmod
 from . import lessons as lessonsmod
 from . import levels as levelsmod
 from . import tickets as ticketsmod
@@ -94,7 +95,7 @@ class SecurityHeaders(BaseHTTPMiddleware):
         path = request.url.path
         if not path.startswith("/r/"):  # an absolute path asked by an app running at /r/<token>/ (/assets/x.js, /api/…): into it
             ref = re.search(r"^https?://([^/]+)/r/([\w-]{16,})/", request.headers.get("referer") or "")
-            if ref and ref.group(2) in runmod.TOKENS and ref.group(1) == request.headers.get("host"):
+            if ref and ref.group(2) in runmod.TOKENS:  # the run's token is the check (proxies in front may rewrite Host)
                 q = f"?{request.url.query}" if request.url.query else ""
                 return Response(status_code=307, headers={"Location": f"/r/{ref.group(2)}{path}{q}"})
         resp = await call_next(request)
@@ -3267,6 +3268,74 @@ def on_deploy_failed(user_id: str, build_id: str, reason: str, logs: str) -> boo
 cloudmod.ON_DEPLOY_FAILED = on_deploy_failed
 
 
+LEAK_FIX_ATTEMPTS = 2
+
+
+def on_leaks(user_id: str, build_id: str, keys: list[dict], logs: str) -> bool:
+    """Keys written in the app's code (found before publishing): each value is saved as one of the app's secrets, the builder
+    reads them from environment variables instead, and the app is published again by itself. A key that still works also
+    gets a card to change it (it was in the code). Returns whether the fix started."""
+    user, b = _owner_build(user_id, build_id)
+    if not b:
+        return False
+    app_ = cloudmod.get_app(user_id, build_id) or {}
+    meta = (app_.get("db") or {}).get("leaks") or {}
+    services = ", ".join(sorted({k["service"] for k in keys}))
+    lessonsmod.record(user_id, build_id, app_.get("provider") or "", f"{leaksmod.MARK}: {services}", logs)
+    for k in keys if not meta.get("attempts") else []:  # once per round of fixes, not on every retry
+        if k["live"]:
+            _note(b, b.tx(f"Tu clave de {k['service']} estaba escrita en el código de la app y todavía funciona. La sacamos del código, pero conviene cambiarla por una nueva: alguien pudo haberla visto.",
+                          f"Your {k['service']} key was written in the app's code and still works. We took it out of the code, but it is safer to replace it with a new one: someone may have seen it."),
+                  tone="attention", link={"label": b.tx(f"Cambiar la clave de {k['service']}", f"Change the {k['service']} key"), "url": k["url"]} if k["url"] else None)
+    attempt = int(meta.get("attempts") or 0) + 1
+    busy = b.status in ("running", "reviewing", "design_review") or getattr(b, "_deploy_fix", False) or getattr(b, "_error_fix", False)  # called from inside the publish itself
+    if attempt > LEAK_FIX_ATTEMPTS or busy:
+        _note(b, b.tx(f"No publicamos la app porque tiene claves escritas en el código ({services}) y no pudimos sacarlas solos. Pedile al constructor que las pase a variables de entorno, o tocá «Publicar» para intentarlo de nuevo.",
+                      f"We didn't publish the app because it has keys written in its code ({services}) and we couldn't remove them on our own. Ask the builder to move them to environment variables, or press «Publish» to try again."),
+              tone="attention", go="cloud")
+        if attempt > LEAK_FIX_ATTEMPTS:
+            meta["attempts"] = 0  # a «Publicar» by hand starts over
+            app_.setdefault("db", {})["leaks"] = meta
+            cloudmod._save(app_)
+        return False
+    meta["attempts"] = attempt
+    app_.setdefault("db", {})["leaks"] = meta
+    cloudmod._save(app_)
+    deploymod.save_secrets(user_id, build_id, {k["env"]: k["secret"] for k in keys if not k["own"]})  # the app keeps working with the same value
+    _note(b, b.tx(f"Antes de publicar encontramos claves escritas en el código de la app ({services}). Las estamos pasando a un lugar seguro para que nadie pueda verlas; después se publica sola.",
+                  f"Before publishing we found keys written in the app's code ({services}). We are moving them somewhere safe so nobody can see them; then it publishes by itself."),
+          tone="working", detail=", ".join(f"{k['env']} ← {k['files'][0]}" for k in keys))
+    b._deploy_fix = True
+    b.resume(
+        "HAY CLAVES ESCRITAS EN EL CÓDIGO y no se puede publicar así (cualquiera que vea el código o el navegador las ve). Sacalas del código y leelas de variables "
+        "de entorno, sin cambiar lo que hace la app. Tably ya guardó cada valor como secreto de la app con el nombre indicado, así que en producción la variable existe:\n"
+        + leaksmod.report(keys) + "\n\nPara cada una: reemplazá el valor por la lectura de la variable (process.env.X / os.environ[\"X\"]; en el frontend, solo si es "
+        "una clave pública, con el prefijo que use el bundler, p. ej. VITE_X, y si es secreta movela al servidor), agregala a .env.example con un valor de ejemplo, "
+        "y si estaba en un archivo de configuración o de datos de ejemplo, dejá un placeholder. No escribas los valores en ningún otro archivo. Al terminar emití <done>.")
+    b._pending_requests, b._pending_trigger = [{"severity": "bloqueante", "role": "Tably Cloud", "text": f"Claves en el código: {services}"}], "deploy"
+
+    async def republish() -> None:
+        try:
+            while b.status in ("running", "reviewing", "design_review"):
+                await asyncio.sleep(10)
+        finally:
+            b._deploy_fix = False
+        if b.status != "error" and not getattr(b, "publishing", False):
+            _start_publish(user, b)
+            return
+        cur = cloudmod.get_app(user_id, build_id) or {}
+        if cur.get("status") == "deploying":
+            cur.update(status="error", error="No publicamos la app: tiene claves escritas en el código y el constructor no terminó de sacarlas. Tocá «Publicar» de nuevo.")
+            cloudmod._save(cur)
+            b.emit("cloud.status", app=cloudmod.public(cur))
+
+    spawn(republish())
+    return True
+
+
+cloudmod.ON_LEAKS = on_leaks
+
+
 # ------------------------------------------------------------------------------------------------ errors of the published app
 
 ERROR_FIX_PER_DAY = 4  # automatic fix passes per app per day (each one is a builder run)
@@ -3323,11 +3392,11 @@ def on_app_errors(user_id: str, build_id: str) -> None:
         _start_error_fix(user, b, rows)
 
 
-def _note(b, text: str, tone: str = "", detail: str = "", run: bool = False) -> None:
+def _note(b, text: str, tone: str = "", detail: str = "", run: bool = False, link: dict | None = None, go: str = "") -> None:
     """A line from Tably in the build's chat (live too). With a tone (working/done/attention) it is a card, not a faint line:
     the user has to see what is happening with their app; `detail` is the technical error, `run` adds «Ver la app»."""
     ts = time.time()
-    item = {"role": "system", "text": text, "ts": ts, **({"tone": tone} if tone else {}), **({"detail": detail[:400]} if detail else {}), **({"run": True} if run else {})}
+    item = {"role": "system", "text": text, "ts": ts, **({"tone": tone} if tone else {}), **({"detail": detail[:400]} if detail else {}), **({"run": True} if run else {}), **({"link": link} if link else {}), **({"go": go} if go else {})}
     b.chat.append(item)
     b.emit("notice", **{k: v for k, v in item.items() if k not in ("role", "ts")})
     b._save()
@@ -3347,7 +3416,7 @@ def _published(user_id: str, build_id: str) -> bool:
     return a.get("status") in ("live", "deploying") or (a.get("status") == "error" and bool(a.get("url")))
 
 
-def _start_error_fix(user: User, b, rows: list[dict], approved: dict | None = None) -> None:
+def _start_error_fix(user: User, b, rows: list[dict], approved: dict | None = None, extra: str = "") -> None:
     """One builder pass over these errors. `approved`: a big fix the user said yes to (it is applied and published).
     Errors of «Correr la app» (source run) end with the app running again; the published app gets the fix too."""
     ids = [r["id"] for r in rows]
@@ -3374,7 +3443,7 @@ def _start_error_fix(user: User, b, rows: list[dict], approved: dict | None = No
                 "No borra ni transforma datos existentes y no cambia lo que la app hace ni cómo se ve.\n"
                 f"- GRANDE: rehacer partes de la app, cambiar el modelo de datos transformando o borrando datos existentes, cambiar lo que la app hace o cómo se ve, sumar un servicio externo o un cobro, o tocar más de {BIG_FIX_FILES - 2} archivos.\n"
                 "Si es CHICO: aplicalo y verificá que compila (build/typecheck) y que los tests pasan. Si es GRANDE: NO cambies código, solo explicá la propuesta.\n"
-                + plain + "\n\nERRORES:\n" + errors)
+                + plain + "\n\nERRORES:\n" + errors + (f"\n\nLO QUE MANDÓ EL USUARIO DESDE LA APP:\n{extra}" if extra else ""))
     incidentsmod.bump_attempts(ids)
     lessonsmod.record(user.id, b.id, "runtime", "error en producción", "\n".join(r["detail"] or "" for r in rows))
     b._error_fix = True
@@ -3555,6 +3624,60 @@ async def build_app_error_action(session_id: str, build_id: str, eid: str, actio
         incidentsmod.update([eid], status="open", attempts=0)
         _start_error_fix(user, b, [incidentsmod.get(user.id, eid)])
     return _errors_payload(user, build_id)
+
+
+@app.post("/api/sessions/{session_id}/builds/{build_id}/app-run/report")
+async def build_run_report(session_id: str, build_id: str, body: dict, user: User = CurrentUser):
+    """«Enviar al constructor» from «App real»: what the user sees (screenshot, text on screen), the page's failed requests and
+    errors, and the server log go to the builder, which finds exactly where it breaks, fixes it and the app runs again."""
+    import base64
+
+    b = _build_any(user, session_id, build_id)
+    run = runmod.RUNS.get(b.id)
+    shot = ""
+    m = re.match(r"^data:image/(jpeg|png);base64,(.+)$", str(body.get("screenshot") or ""), re.S)
+    if m and b.workdir:
+        try:
+            data = base64.b64decode(m.group(2))[:6_000_000]
+            rel = f".tably/capturas/{time.strftime('%Y%m%d-%H%M%S')}.{'jpg' if m.group(1) == 'jpeg' else 'png'}"
+            (b.workdir / rel).parent.mkdir(parents=True, exist_ok=True)
+            (b.workdir / rel).write_bytes(data)
+            shot = rel
+        except Exception:  # noqa: BLE001
+            log.exception("run report screenshot")
+    entries = [e for e in (body.get("log") or []) if isinstance(e, dict)][-25:]
+    http = [e for e in entries if e.get("kind") == "http"]
+    fails = "\n".join(f"- {e.get('method') or 'GET'} {str(e.get('url'))[:200]} → {e.get('status')}\n  respuesta: {str(e.get('body') or '')[:600]}" for e in http) or "(ningún pedido falló en esta página)"
+    errs = "\n".join(f"- [{e.get('kind')}] {str(e.get('message'))[:600]}" + (f"\n  {str(e.get('stack'))[:800]}" if e.get("stack") else "") for e in entries if e.get("kind") != "http") or "(ninguno)"
+    screen = str(body.get("text") or "").strip()[:2500]
+    alerts = [str(a).strip()[:300] for a in (body.get("alerts") or []) if str(a).strip()][:6]
+    note = str(body.get("note") or "").strip()[:1000]
+    tail = "\n".join([ln for ln in (run.logs if run else []) if ln.strip()][-60:]) or "(sin log)"
+    head = (f"{http[-1].get('method') or 'GET'} {str(http[-1].get('url')).split('?')[0]} → {http[-1].get('status')}" if http
+            else alerts[0] if alerts else "Error que el usuario vio al usar la app")
+    sample = (
+        "EL USUARIO ESTABA USANDO LA APP («Correr la app») Y SE ENCONTRÓ CON ESTE ERROR. Mandó lo que estaba viendo.\n"
+        + (f"Lo que dice el usuario: {note}\n" if note else "")
+        + f"Página: {str(body.get('page') or '')[:300]}\n"
+        + (f"Captura de pantalla: {shot} (abrila y miralo antes de tocar nada)\n" if shot else "")
+        + ("Mensajes de error en pantalla:\n" + "\n".join(f"- {a}" for a in alerts) + "\n" if alerts else "")
+        + f"\nPedidos a la API que fallaron (del navegador):\n{fails}\n\nErrores del navegador:\n{errs}\n"
+        + f"\nTexto visible en la pantalla:\n{screen}\n\nÚltimas líneas del log del servidor:\n{tail}\n\n"
+        "Seguí el flujo que estaba haciendo el usuario desde la pantalla hasta la API y la base de datos, y encontrá EXACTAMENTE dónde está el error "
+        "(archivo y línea, y por qué falla). Arreglá la causa (no escondas el mensaje), probalo reproduciendo el mismo pedido (un test o un curl contra la API) "
+        "y, si el mensaje de error de la pantalla no explica nada, hacelo claro para quien usa la app.")
+    row = incidentsmod.record(user.id, b.id, "run", head, head + ("\n" + "\n".join(alerts) if alerts else ""))
+    if row.get("status") != "open":
+        incidentsmod.update([row["id"]], status="open")
+        row = incidentsmod.get(user.id, row["id"]) or row
+    if b.status in ("running", "reviewing", "design_review") or _busy(b):  # the builder is on something else: it reads it next
+        if b.status == "running":
+            b.say(sample[:6000])
+        _note(b, b.tx("Le mandamos al constructor lo que viste en la app (con la captura). Lo toma apenas termine lo que está haciendo.",
+                      "We sent the builder what you saw in the app (with the screenshot). It picks it up as soon as it finishes what it is doing."), tone="working", detail=head)
+        return {"ok": True, "queued": True}
+    _start_error_fix(user, b, [row], extra=sample)
+    return {"ok": True, "queued": False}
 
 
 @app.get("/api/app-errors/{slug}/reporter.js")

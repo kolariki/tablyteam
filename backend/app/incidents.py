@@ -332,15 +332,24 @@ _RATE: dict[str, deque] = {}
 
 
 def reporter_js(endpoint: str) -> str:
-    """Reports uncaught errors, rejected promises and API calls answered with 5xx (at most 20 per page view, no repeats)."""
+    """Reports uncaught errors, rejected promises and API calls answered with 5xx (at most 20 per page view, no repeats).
+    It also keeps the page's last failures in window.__tably.log (requests answered 4xx/5xx with their body, console.error),
+    which «Enviar al constructor» reads from the «App real» pane."""
     return ("(function(){var U=" + json.dumps(endpoint) + ",n=0,seen={};"
-            "function send(k,m,s){m=String(m||'');if(!m||n>=20||seen[k+m])return;seen[k+m]=1;n++;"
+            "var L=window.__tably=window.__tably||{log:[]};function keep(e){try{e.t=Date.now();L.log.push(e);if(L.log.length>40)L.log.shift()}catch(x){}}"
+            "function path(u){return String(u||'').replace(location.origin,'')}"
+            "function send(k,m,s){m=String(m||'');keep({kind:k,message:m.slice(0,500),stack:String(s||'').slice(0,1500)});if(!m||n>=20||seen[k+m])return;seen[k+m]=1;n++;"
             "try{var b=JSON.stringify({kind:k,message:m.slice(0,500),stack:String(s||'').slice(0,2000),page:location.pathname});"
             "if(navigator.sendBeacon)navigator.sendBeacon(U,new Blob([b],{type:'text/plain'}));else fetch(U,{method:'POST',body:b,keepalive:true,mode:'no-cors'})}catch(e){}}"
             "window.addEventListener('error',function(e){if(e.message)send('error',e.message,e.error&&e.error.stack)});"
             "window.addEventListener('unhandledrejection',function(e){var r=e.reason;send('promise',r&&r.message||r,r&&r.stack)});"
-            "var f=window.fetch;if(f)window.fetch=function(i,o){return f.apply(this,arguments).then(function(r){try{if(r.status>=500){"
-            "var u=typeof i==='string'?i:(i&&i.url)||'';send('http',((o&&o.method)||'GET')+' '+u.replace(location.origin,'').split('?')[0]+' \\u2192 '+r.status)}}catch(e){}return r})};"
+            "var ce=console.error;console.error=function(){try{keep({kind:'console',message:[].map.call(arguments,function(a){try{return a&&a.stack||(typeof a==='object'?JSON.stringify(a):String(a))}catch(x){return String(a)}}).join(' ').slice(0,800)})}catch(x){}return ce.apply(this,arguments)};"
+            "var f=window.fetch;if(f)window.fetch=function(i,o){var m=(o&&o.method)||(i&&i.method)||'GET',u=typeof i==='string'?i:(i&&i.url)||String(i);"
+            "return f.apply(this,arguments).then(function(r){try{if(r.status>=400){r.clone().text().then(function(t){keep({kind:'http',method:m,url:path(u),status:r.status,body:String(t).slice(0,800)})},function(){});"
+            "if(r.status>=500)send('http',m+' '+path(u).split('?')[0]+' \\u2192 '+r.status)}}catch(e){}return r},function(e){keep({kind:'http',method:m,url:path(u),status:0,body:String(e&&e.message||e)});throw e})};"
+            "var X=window.XMLHttpRequest;if(X){var op=X.prototype.open,sd=X.prototype.send;X.prototype.open=function(m,u){this.__t=[m,u];return op.apply(this,arguments)};"
+            "X.prototype.send=function(){var x=this;x.addEventListener('loadend',function(){try{if(x.status>=400||x.status===0){var t='';try{t=x.responseType===''||x.responseType==='text'?x.responseText:''}catch(e){}"
+            "keep({kind:'http',method:(x.__t||[])[0],url:path((x.__t||[])[1]),status:x.status,body:String(t).slice(0,800)})}}catch(e){}});return sd.apply(this,arguments)}}"
             "})();")
 
 

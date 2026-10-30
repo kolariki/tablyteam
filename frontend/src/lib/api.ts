@@ -307,6 +307,8 @@ export const api = {
   marketTransfer: (listingId: string, email: string) => j<{ ok: boolean; to: { name: string; email: string } }>(post(`/api/market/${listingId}/transfer`, { email })),
   cloudPublish: (sessionId: string, id: string) => j(post(`/api/sessions/${sessionId}/builds/${id}/cloud/publish`, {})),
   appErrors: (sessionId: string, id: string) => j<AppErrors>(authed(`/api/sessions/${sessionId}/builds/${id}/app-errors`)),
+  runReport: (sessionId: string, id: string, body: { page: string; text: string; alerts: string[]; log: unknown[]; screenshot: string; note?: string }) =>
+    j<{ ok: boolean; queued: boolean }>(post(`/api/sessions/${sessionId}/builds/${id}/app-run/report`, body)),
   appErrorAction: (sessionId: string, id: string, eid: string, action: 'approve' | 'fix' | 'dismiss') => j<AppErrors>(post(`/api/sessions/${sessionId}/builds/${id}/app-errors/${eid}/${action}`, {})),
   cloudUnpublish: (sessionId: string, id: string) => j<{ ok: boolean; app: CloudApp | null }>(authed(`/api/sessions/${sessionId}/builds/${id}/cloud/publish`, { method: 'DELETE' })),
   cloudDb: (sessionId: string, id: string, provider: 'neon' | 'supabase') => j<{ ok: boolean; provider: string; host: string; vars: string[] }>(post(`/api/sessions/${sessionId}/builds/${id}/cloud/db`, { provider })),
@@ -469,6 +471,7 @@ export interface AnalyticsDetail {
 }
 export interface LevelsPayload { levels: LevelsInfo; analytics: AnalyticsStats; app: CloudApp | null; listing: MarketListing | null; snippet: string }
 export interface CloudDb { provider: string; ok: boolean; vars: string[]; host: string | null; ts: number }
+export interface CloudLeak { service: string; url: string; env: string; files: string[]; live: boolean; own: boolean; preview: string }
 export interface CloudApp {
   build_id: string
   slug: string
@@ -481,6 +484,7 @@ export interface CloudApp {
   error: string | null
   log: string[]
   db: Partial<Record<'database' | 'auth', CloudDb>>
+  leaks?: { ts: number; attempts: number; keys: CloudLeak[] } | null  // keys found in the code before publishing (never the key itself)
   created: number
   updated: number
 }

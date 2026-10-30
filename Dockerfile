@@ -16,6 +16,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
     && npm install -g @anthropic-ai/claude-code @openai/codex pnpm @railway/cli \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# betterleaks: before publishing, Tably looks for keys written in the apps' code (see app/leaks.py); pinned and checked
+ARG BETTERLEAKS=1.9.0
+ARG BETTERLEAKS_SHA256=f8b185a39ffcece2a1ca82bf3a4e7435cd81963ffd16b7a9128daf75f35f6de7
+RUN curl -fsSL -o /tmp/bl.tgz https://github.com/betterleaks/betterleaks/releases/download/v${BETTERLEAKS}/betterleaks_${BETTERLEAKS}_linux_x64.tar.gz \
+    && echo "${BETTERLEAKS_SHA256}  /tmp/bl.tgz" | sha256sum -c - && tar -xzf /tmp/bl.tgz -C /usr/local/bin betterleaks && rm /tmp/bl.tgz && betterleaks version
 WORKDIR /app/backend
 COPY backend/pyproject.toml backend/uv.lock* ./
 RUN uv sync --no-dev --frozen 2>/dev/null || uv sync --no-dev

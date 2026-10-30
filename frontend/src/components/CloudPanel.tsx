@@ -180,6 +180,22 @@ export default function CloudPanel() {
             </div>
           )}
           {app?.status === 'error' && app.error && <div className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-[12.5px] leading-snug text-danger">{app.error}</div>}
+          {app?.leaks?.keys?.length ? (
+            <div className="mt-2 rounded-xl border border-gold/40 bg-gold/10 px-3 py-2.5 text-[12.5px]">
+              <div className="flex items-center gap-1.5 font-semibold text-ink"><KeyRound size={13} className="text-gold" /> {T('Claves que estaban escritas en el código', 'Keys that were written in the code')}</div>
+              <div className="mt-0.5 text-ink-3">{app.status === 'error' ? T('Hay que pasarlas a variables de entorno para que nadie pueda verlas. Los valores ya están guardados en «Servicios y deploy»: falta que el código los lea de ahí.', 'They have to move to environment variables so nobody can see them. The values are already saved in «Services & deploy»: the code still has to read them from there.') : T('Las estamos pasando a variables de entorno (las ves en «Servicios y deploy») para que nadie pueda verlas.', 'We are moving them to environment variables (see «Services & deploy») so nobody can see them.')}</div>
+              <ul className="mt-2 space-y-1.5">
+                {app.leaks.keys.map((k) => (
+                  <li key={k.env} className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-ink">{k.service}</span>
+                    <span className="font-mono text-[11px] text-ink-3">{k.env} · {k.files[0]}</span>
+                    {k.live && <span className="rounded-full bg-danger/10 px-2 py-0.5 text-[10.5px] font-semibold text-danger">{T('sigue activa', 'still active')}</span>}
+                    {k.live && k.url && <a href={k.url} target="_blank" rel="noreferrer" className="ml-auto flex items-center gap-1 rounded-full bg-accent px-2.5 py-1 text-[11.5px] font-semibold text-white hover:brightness-110"><ExternalLink size={11} /> {T('Cambiarla', 'Change it')}</a>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button disabled={publishing || deploying || !finished || Object.keys(b.files).length === 0} onClick={() => act('publish', () => api.cloudPublish(b.sessionId!, b.id!))} className={PRIMARY} title={!finished ? T('Esperá a que el constructor termine', 'Wait for the builder to finish') : undefined}>
               {publishing ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} {publishing ? T('Publicando…', 'Publishing…') : live ? T('Republicar', 'Republish') + (info && app && info.version !== app.version ? ` · v${info.version}` : '') : T('Publicar ahora', 'Publish now')}

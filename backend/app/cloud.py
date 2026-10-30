@@ -31,6 +31,7 @@ from .auth import _db
 from .config import DATA_DIR, env
 from . import deploy as deploymod
 from . import incidents as incidentsmod
+from . import leaks as leaksmod
 from . import lessons as lessonsmod
 from . import runner as runmod
 
@@ -124,7 +125,8 @@ def public(app: dict | None) -> dict | None:
         return None
     db = app.get("db") or {}
     return {**app, "deploy_logs": (db.get("railway") or {}).get("logs"),
-            "db": {k: {"provider": v.get("provider"), "ok": v.get("ok"), "vars": v.get("vars", []), "host": v.get("host"), "ts": v.get("ts")} for k, v in db.items() if k != "railway"}}
+            "leaks": db.get("leaks"),
+            "db": {k: {"provider": v.get("provider"), "ok": v.get("ok"), "vars": v.get("vars", []), "host": v.get("host"), "ts": v.get("ts")} for k, v in db.items() if k not in ("railway", "leaks")}}
 
 
 def slug_for(user_id: str, build_id: str, title: str) -> str:
@@ -617,6 +619,27 @@ async def publish(user_id: str, build_id: str, title: str, root: Path, files: di
     (root / ".env").write_text(deploymod.render_env(values, files)) if values and not (root / ".env").exists() else None
     # errors in the visitors' browsers come back to Tably, which hands them to the builder (see incidents.py)
     incidentsmod.inject_reporter(root, f"{public_url()}/api/app-errors/{slug}/reporter.js")
+    # nothing with a key written in its code goes out: the builder moves it to a variable and it is published again by itself
+    keys = await leaksmod.scan(root, values)
+    if keys:
+        await log_(f"■ Frené la publicación: la app tiene {len(keys)} clave(s) escrita(s) en el código")
+        for ln in leaksmod.report(keys).splitlines():
+            await log_(ln)
+        db = app.setdefault("db", {})
+        # only what the panel shows: never the key itself
+        db["leaks"] = {"ts": time.time(), "attempts": int((db.get("leaks") or {}).get("attempts") or 0),
+                       "keys": [{k: x[k] for k in ("service", "url", "env", "files", "live", "own", "preview")} for x in keys]}
+        app.update(status="error", error=f"La app tiene claves escritas en el código ({', '.join(sorted({k['service'] for k in keys}))}). Para que nadie las vea, hay que pasarlas a variables de entorno antes de publicar.", updated=time.time())
+        _save(app)
+        started = bool(ON_LEAKS and ON_LEAKS(user_id, build_id, keys, "\n".join(lines)))
+        app["db"] = (get_app(user_id, build_id) or app).get("db") or app["db"]  # the attempts the hook counted
+        if started:
+            app.update(status="deploying", error=None)
+            await log_("· el constructor las está pasando a variables de entorno; después se publica sola")
+            _save(app)
+        return app
+    (prev.get("db") or {}).pop("leaks", None)
+    app.get("db", {}).pop("leaks", None)
     cls = classify(root)
     app["kind"] = cls["kind"]
     try:
@@ -653,6 +676,8 @@ async def publish(user_id: str, build_id: str, title: str, root: Path, files: di
 
 
 _WATCHING: set[tuple[str, str]] = set()
+# set by main: (user_id, build_id, keys, logs) -> whether the builder started moving the keys out of the code
+ON_LEAKS: Callable[[str, str, list, str], bool] | None = None
 # set by main: (user_id, build_id, reason, logs) -> whether a fix + republish was started (the app then stays «deploying»)
 ON_DEPLOY_FAILED: Callable[[str, str, str, str], bool] | None = None
 
