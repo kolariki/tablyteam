@@ -1,6 +1,7 @@
 import { AnimatePresence } from 'framer-motion'
 import { BookOpen, CheckCircle2, ChevronDown, ExternalLink, HardHat, Loader2, Rocket, Save, Sparkles, XCircle } from 'lucide-react'
 import ServiceGuide from './ServiceGuide'
+import Connections from './Connections'
 import { BuilderBusyNotice } from './BlockedNotice'
 import ProviderLogo, { logoUrl } from './ProviderLogo'
 import { useEffect, useRef, useState } from 'react'
@@ -67,6 +68,7 @@ export default function ServicesDeploy({ onOpenSettings }: { onOpenSettings: () 
       setSaving(false)
     }
   }
+  const usesCalendar = Object.entries(b.files).some(([p, f]) => !p.startsWith('preview/') && /\/api\/connect\/|google-calendar/.test((f as { content?: string }).content ?? '')) || /google calendar|mi agenda|calendario de google/i.test(b.title)
   const needed = info.groups.filter((g) => (g.tier ?? 'needed') === 'needed')
   const optional = info.groups.filter((g) => g.tier === 'optional')
   const auto = info.groups.filter((g) => g.tier === 'auto').flatMap((g) => g.vars)
@@ -163,6 +165,12 @@ export default function ServicesDeploy({ onOpenSettings }: { onOpenSettings: () 
             <button disabled={republishing} onClick={republish} className="flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-[12.5px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-50">
               {republishing ? <Loader2 size={13} className="animate-spin" /> : <Rocket size={13} />} {T('Republicar ahora', 'Republish now')}
             </button>
+          </div>
+        )}
+        {usesCalendar && (
+          <div className="mt-4">
+            <div className="mb-2 text-[13px] font-semibold text-ink">{T('Tus cuentas que usa esta app', 'Your accounts this app uses')}</div>
+            <Connections compact only={['google-calendar']} />
           </div>
         )}
         {needed.length > 0 && <div className="mt-4 grid gap-3 grid-cols-[repeat(auto-fill,minmax(420px,1fr))]">{needed.map(card)}</div>}

@@ -290,6 +290,12 @@ export const api = {
   cloud: (sessionId: string, id: string) => j<CloudInfo>(authed(`/api/sessions/${sessionId}/builds/${id}/cloud`)),
   notionStatus: () => j<{ set: boolean; last4: string | null; me: { name: string; workspace: string | null } | null; error: string | null; oauth?: boolean }>(authed('/api/notion/status')),
   deployFailures: (days = 90) => j<DeployFailures>(authed(`/api/admin/deploy-failures?days=${days}`)),
+  connections: () => j<{ connections: Connection[]; google_ready: boolean; redirect_uri: string }>(authed('/api/connections')),
+  connectionStart: (provider: string) => j<{ url: string }>(post(`/api/connections/${provider}/start`, {})),
+  connectionDelete: (provider: string) => j<{ ok: boolean; connections: Connection[] }>(authed(`/api/connections/${provider}`, { method: 'DELETE' })),
+  googleApp: () => j<{ admin: boolean; client_id: string | null; has_secret: boolean; configured: boolean; redirect_uri: string; origin: string; from_env: boolean }>(authed('/api/settings/google-app')),
+  saveGoogleApp: (body: { client_id?: string; client_secret?: string; clear?: boolean }) =>
+    j<{ admin: boolean; client_id: string | null; has_secret: boolean; configured: boolean; redirect_uri: string; origin: string; from_env: boolean }>(authed('/api/settings/google-app', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })),
   notionApp: () => j<{ admin: boolean; client_id: string | null; has_secret: boolean; configured: boolean; redirect_uri: string; from_env: boolean }>(authed('/api/settings/notion-app')),
   saveNotionApp: (body: { client_id?: string; client_secret?: string; clear?: boolean }) =>
     j<{ admin: boolean; client_id: string | null; has_secret: boolean; configured: boolean; redirect_uri: string; from_env: boolean }>(authed('/api/settings/notion-app', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })),
@@ -873,3 +879,5 @@ export interface Experiments {
   experiments: { name: string; goal: string | null; visitors: number; winner: string | null; variants: { variant: string; visitors: number; conversions: number; rate: number; lift?: number | null; p?: number | null }[] }[]
   goals: string[]
 }
+
+export interface Connection { id: string; label: string; what: string; what_en: string; connected: boolean; account: string | null; since: number | null; ready: boolean }

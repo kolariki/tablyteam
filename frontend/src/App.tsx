@@ -493,6 +493,14 @@ function AppInner() {
   // deep links: #replay=<id> / #live=<id>  (handy for re-recording a take)
   useEffect(() => {
     if (!user) return
+    const cm = location.hash.match(/^#(connected|connect_error)=(.*)$/)
+    if (cm) {  // back from Google's consent screen: say how it went and return to where the user started (usually a build)
+      let back = ''
+      try { back = sessionStorage.getItem('tably.returnHash') ?? ''; sessionStorage.removeItem('tably.returnHash') } catch { /* private mode */ }
+      history.replaceState(null, '', location.pathname + (back.startsWith('#build=') ? back : ''))
+      if (cm[1] === 'connected') toast.ok(tr('Cuenta conectada', 'Account connected'), tr('Tus apps ya pueden leerla a través de Tably.', 'Your apps can now read it through Tably.'))
+      else toast.error(tr('No se pudo conectar la cuenta', 'Could not connect the account'), decodeURIComponent(cm[2] || ''))
+    }
     if (TICKETS_ENABLED && location.hash.startsWith('#tickets')) {  // back from Notion's OAuth consent: straight to the tickets screen
       const failed = location.hash === '#tickets=error'
       history.replaceState(null, '', location.pathname)

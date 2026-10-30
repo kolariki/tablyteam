@@ -309,6 +309,13 @@ class AppRun:
         data_dir = self.root / ".data"
         data_dir.mkdir(exist_ok=True)
         env.setdefault("TABLY_DATA_DIR", str(data_dir))
+        if RUN_BASE or os.environ.get("TABLY_CLOUD_URL"):  # connected accounts (Google Calendar…) and AI-call reports, read/sent through Tably
+            from .cloud import public_url
+            from .observe import app_token
+
+            env.setdefault("TABLY_URL", public_url())
+            env.setdefault("TABLY_SITE", f"run-{self.build_id}")
+            env.setdefault("TABLY_TOKEN", app_token(f"run-{self.build_id}"))
         for var, val in (("PGLITE_DIR", data_dir / "pglite"), ("PGLITE_DATA_DIR", data_dir / "pglite"), ("DATA_DIR", data_dir), ("SQLITE_PATH", data_dir / "app.db"), ("DB_PATH", data_dir / "app.db")):
             env.setdefault(var, str(val))  # the names apps use most for a local database folder or file
         # the saved service values → .env (never overwrite one the agent/user already wrote)

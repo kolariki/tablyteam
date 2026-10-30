@@ -26,7 +26,21 @@ def _p(id_: str, title: str, topic: str, refs: list[str], *, platform: str = "we
             "references": refs, "agents": [dict(a) for a in (team or (_TEAM_MOBILE if platform == "mobile" else _TEAM_WEB))]}
 
 
+_TEAM_PERSONAL = [
+    {"id": "pm", "role": "product-manager", "name": "Product", "provider": "meta", "persona": "Piensa en el día a día de UNA persona: qué necesita ver a primera hora, qué la distrae, qué automatizar. Alcance chico y útil desde el primer día."},
+    {"id": "design", "role": "product-designer", "name": "Diseño", "provider": "meta", "persona": "Un panel que se lee en 5 segundos: jerarquía clara, lo urgente arriba, estados vacíos amables, móvil primero."},
+    {"id": "head-eng", "role": "head-engineering", "name": "Head of Eng", "provider": "meta", "persona": "Datos de las cuentas del usuario siempre a través de Tably (nunca OAuth propio), caché, tareas programadas y cero claves en el navegador."},
+    {"id": "qa", "role": "qa", "name": "QA", "provider": "meta", "persona": "Privacidad y fallas: cuenta sin conectar, token vencido, días sin eventos, zonas horarias; nada se rompe ni expone datos."},
+]
+
 PRESETS = [
+    _p("personal-panel", "Mi panel personal: agenda, prioridades y automatizaciones",
+       "Construyamos MI panel personal: una app privada para mí que junta lo de mi día a día. Primera versión: mi agenda de Google Calendar (hoy y los próximos 7 días, "
+       "con los huecos libres y lo que se superpone), un resumen de «qué tengo hoy» arriba de todo, tareas/pendientes propios y un resumen diario a la mañana. "
+       "Los datos de mis cuentas los lee de Tably (Google Calendar ya conectado en Tably), sin OAuth propio. Solo yo entro (login con mi email). "
+       "Después vamos sumando conexiones (email, etc.) y automatizaciones que yo pida. "
+       "Decidan alcance del MVP, pantallas, stack, arquitectura y plan por etapas; que se lea en 5 segundos y funcione perfecto en el celular.",
+       ["https://www.sunsama.com", "https://www.usemotion.com", "https://akiflow.com"], team=_TEAM_PERSONAL, emoji="🗂️"),
     _p("link-in-bio", "Link in bio: página de creador con plan Pro",
        "Construyamos una página «link in bio» para creadores: perfil con foto, bio y lista de links/botones ordenables, temas de color, analytics de clics y una URL pública propia (tably.app/@usuario). "
        "Monetización: plan gratis con marca de agua y plan Pro (USD 5/mes, Stripe) con dominio propio, temas premium y analytics completos. "

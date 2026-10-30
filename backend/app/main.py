@@ -31,7 +31,7 @@ import secrets
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse, Response, StreamingResponse
@@ -62,6 +62,7 @@ from . import skills as skillmod
 from . import cloud as cloudmod
 from . import incidents as incidentsmod
 from . import observe as observemod
+from . import connections as connectionsmod
 from . import leaks as leaksmod
 from . import lessons as lessonsmod
 from . import levels as levelsmod
@@ -3081,6 +3082,107 @@ def analytics_ask(slug: str, body: dict, user: User = CurrentUser):
         b.chat.append({"role": "user", "text": text, "ts": time.time()})
         b.resume(text)
     return {"ok": True, "build_id": b.id, "session_id": b.req.session_id}
+
+
+@app.get("/api/settings/google-app")
+def google_app_get(user: User = CurrentUser):
+    """The install's Google OAuth client (for «Conectar Google Calendar»): set once by the admin, never sent to other browsers."""
+    from .tickets import _setting
+
+    cid, sec = connectionsmod.google_creds()
+    return {"admin": _is_admin(user), "client_id": cid if _is_admin(user) else None, "has_secret": bool(sec), "configured": bool(cid and sec),
+            "redirect_uri": connectionsmod.redirect_uri(cloudmod.public_url()), "origin": cloudmod.public_url().rstrip("/"),
+            "from_env": bool(env("GOOGLE_OAUTH_CLIENT_ID")) and not _setting("google_client_id")}
+
+
+@app.put("/api/settings/google-app")
+def google_app_set(body: dict, user: User = CurrentUser):
+    if not _is_admin(user):
+        raise HTTPException(403, "Solo quien administra esta instalación puede cargar la conexión de Google.")
+    if body.get("clear"):
+        ticketsmod.set_setting("google_client_id", None)
+        ticketsmod.set_setting("google_client_secret", None)
+        return google_app_get(user)
+    cid, sec = str(body.get("client_id") or "").strip(), str(body.get("client_secret") or "").strip()
+    if cid:
+        ticketsmod.set_setting("google_client_id", cid)
+    if sec:
+        ticketsmod.set_setting("google_client_secret", sec)
+    return google_app_get(user)
+
+
+@app.get("/api/connections")
+def connections_list(user: User = CurrentUser):
+    """The user's accounts connected to Tably (their apps read them through Tably) and whether this install can connect them."""
+    return {"connections": connectionsmod.listing(user.id), "google_ready": connectionsmod.google_ready(),
+            "redirect_uri": connectionsmod.redirect_uri(cloudmod.public_url())}
+
+
+@app.post("/api/connections/{provider}/start")
+def connections_start(provider: str, user: User = CurrentUser):
+    if provider not in connectionsmod.PROVIDERS:
+        raise HTTPException(404)
+    if not connectionsmod.google_ready():
+        raise HTTPException(400, "Falta configurar la conexión con Google en esta instalación de Tably (Configuración → Conexión de Google).")
+    return {"url": connectionsmod.start(user.id, provider, cloudmod.public_url())}
+
+
+@app.get("/api/connections/google/callback", include_in_schema=False)
+async def connections_google_callback(code: str = "", state: str = "", error: str = ""):
+    """Google sends the user back here after the consent screen; Tably keeps the tokens and returns to the app."""
+    from urllib.parse import quote
+
+    from fastapi.responses import RedirectResponse
+
+    front = (env("TABLY_APP_URL") or env("TABLY_CLOUD_URL") or "http://localhost:5173").rstrip("/")
+    if error or not code:
+        return RedirectResponse(f"{front}/#connect_error={quote(error or 'cancelado')}", status_code=302)
+    try:
+        _uid, provider = await connectionsmod.finish(code, state, cloudmod.public_url())
+    except ValueError as e:
+        return RedirectResponse(f"{front}/#connect_error={quote(str(e)[:200])}", status_code=302)
+    return RedirectResponse(f"{front}/#connected={provider}", status_code=302)
+
+
+@app.delete("/api/connections/{provider}")
+async def connections_delete(provider: str, user: User = CurrentUser):
+    await connectionsmod.disconnect(user.id, provider)
+    return {"ok": True, "connections": connectionsmod.listing(user.id)}
+
+
+def _site_owner(site: str) -> str | None:
+    """Whose data an app may read: the user who owns the published app (or the run being tried in Tably)."""
+    if site.startswith("run-"):
+        r = runmod.RUNS.get(site[4:])
+        return r.user_id if r else None
+    with auth._db() as c:
+        row = c.execute("SELECT user_id FROM cloud_apps WHERE slug = ?", (site,)).fetchone()
+    return row["user_id"] if row else None
+
+
+@app.get("/api/connect/{site}/google-calendar/events")
+async def connect_calendar_events(site: str, request: Request, start: str = Query("", alias="from"), end: str = Query("", alias="to"), limit: int = 250):
+    """An app reads its owner's Google Calendar through Tably (Authorization: Bearer TABLY_TOKEN). Default: today and the next 7 days."""
+    import datetime as _dt
+
+    if not re.fullmatch(r"[a-z0-9-]{1,90}", site) or not observemod.check_token(site, request.headers.get("authorization")):
+        raise HTTPException(401, "token inválido")
+    owner = _site_owner(site)
+    if not owner:
+        raise HTTPException(404, "app desconocida")
+    today = _dt.datetime.now(_dt.timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    def iso(v: str, dflt: _dt.datetime) -> str:
+        try:
+            d = _dt.datetime.fromisoformat(v.replace("Z", "+00:00")) if v else dflt
+        except ValueError:
+            d = dflt
+        return (d if d.tzinfo else d.replace(tzinfo=_dt.timezone.utc)).isoformat()
+
+    try:
+        return await connectionsmod.calendar_events(owner, iso(start, today), iso(end, today + _dt.timedelta(days=7)), max(1, min(int(limit), 500)))
+    except httpx.HTTPError:
+        raise HTTPException(502, "Google Calendar no respondió; probá de nuevo en un rato")
 
 
 @app.post("/api/llm/{site}")

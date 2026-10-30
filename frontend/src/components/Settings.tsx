@@ -13,6 +13,7 @@ import { brandTheme } from '../lib/brand'
 import SubscriptionPanel from './SubscriptionPanel'
 import AccountTransfer from './AccountTransfer'
 import DeployLessons from './DeployLessons'
+import Connections, { GoogleAppSettings } from './Connections'
 
 const KEY_URL: Record<string, string> = {
   anthropic: 'https://console.anthropic.com/settings/keys',
@@ -104,6 +105,12 @@ export default function Settings({ onBack }: { onBack: () => void }) {
         )}
         <TablyCloudSettings />
         {TICKETS_ENABLED && <NotionAppSettings />}
+        <section className="mt-8">
+          <h2 className="text-2xl">{T('Tus cuentas conectadas', 'Your connected accounts')}</h2>
+          <p className="mt-1 mb-3 text-[13px] text-ink-2">{T('Tus apps leen estos datos a través de Tably (por ejemplo tu panel personal con tu agenda), nunca con tu contraseña. Podés desconectarlas cuando quieras.', 'Your apps read this data through Tably (for example your personal panel with your calendar), never with your password. Disconnect them anytime.')}</p>
+          <Connections />
+          <GoogleAppSettings />
+        </section>
         <DeploySettings />
         <DeployLessons />
         <LangfuseSettings />
