@@ -77,6 +77,7 @@ REGLAS:
 - Código real, completo, que compila y corre. Nada de pseudocódigo, TODOs vacíos ni placeholders.
 - Primera etapa: estructura del proyecto, README.md (setup), .env.example con TODAS las variables del brief, dependencias y config base.
 - Publicable con un clic (Tably Cloud): si es frontend, `npm run build` tiene que dejar un `dist/` (o `build/`/`out/`) estático que funcione servido desde cualquier ruta (assets relativos o `base` configurable por `--base`); si tiene servidor, tiene que arrancar con la variable `PORT` y escuchar en `0.0.0.0`, con un `Dockerfile` si no es Node o Python estándar. Postgres solo por `DATABASE_URL`; sin `DATABASE_URL` (al probarla en Tably) los datos se guardan en disco en la carpeta de `TABLY_DATA_DIR` (o `.data/`, ignorada en git y Docker): PGlite con dataDir o SQLite, nunca solo en memoria, y el seed de ejemplo solo si la base está vacía, así lo que se crea al probar no se pierde; auth y storage por Supabase (`SUPABASE_URL`, `SUPABASE_ANON_KEY`).
+- Identidad propia (apps web): un logo diseñado para esta app en SVG (`public/logo.svg`: símbolo + nombre, para el header) y su ícono (`public/icon.svg`: el símbolo solo, cuadrado, legible a 16 px) con los colores del diseño; el header usa el logo, nunca un ícono genérico de librería, y el HTML de entrada enlaza `<link rel="icon" href="/icon.svg" type="image/svg+xml">` y `<link rel="apple-touch-icon" href="/apple-touch-icon.png">` (los PNG los genera Tably al publicar).
 - Respetá el stack, el modelo de datos, los contratos y las pantallas del brief. Si algo falta, decidilo y anotalo en NOTES.md.
 - Cada archivo se entrega una sola vez por turno. Un archivo por <file>. Rutas sin "./" inicial.
 - MÁXIMO 4 archivos por turno (o menos si son largos): tu salida tiene un límite y un archivo cortado no sirve. Si una etapa
@@ -660,6 +661,7 @@ class Build:
                 if resume_with is None and self.req.design and self.status == "completed" and self.files and not self._stop.is_set():
                     self.chat.append({"role": "system", "text": self.tx("Pulido visual: el constructor ajusta la UI al diseño antes de entregar.", "Visual polish: the builder matches the UI to the design before delivering."), "ts": time.time()})
                     await self.run(POLISH_PROMPT)
+                await self._ensure_identity()
                 if self.status == "completed" and self.files:
                     self.snapshot_version()
             plan = self.review_plan
@@ -1438,6 +1440,20 @@ class Build:
         if getattr(self, "_auto_publish_after_save", False):
             self._auto_publish_after_save = False
             self._auto_publish()
+
+    async def _ensure_identity(self) -> None:
+        """A web app ends with its own logo and tab icon: if they are missing, the builder designs them (once per run)."""
+        from . import identity
+
+        if self.status != "completed" or not self.files or self._stop.is_set() or getattr(self, "_identity_asked", False):
+            return
+        if getattr(self, "_error_fix", False) or getattr(self, "_deploy_fix", False):
+            return  # a fix stays a fix: the identity comes with the next regular turn
+        if not identity.gaps(self.files):
+            return
+        self._identity_asked = True
+        self.chat.append({"role": "system", "text": self.tx("Identidad visual: el constructor diseña el logo y el ícono de la pestaña de la app.", "Visual identity: the builder designs the app's logo and tab icon."), "ts": time.time()})
+        await self.run(identity.prompt(self.files, self.title))
 
     def _auto_publish(self) -> None:
         """An app already online is republished when new approved work lands (main.auto_publish decides; never blocks)."""

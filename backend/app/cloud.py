@@ -30,6 +30,7 @@ import httpx
 from .auth import _db
 from .config import DATA_DIR, env
 from . import deploy as deploymod
+from . import identity as identitymod
 from . import incidents as incidentsmod
 from . import leaks as leaksmod
 from . import lessons as lessonsmod
@@ -644,6 +645,9 @@ async def publish(user_id: str, build_id: str, title: str, root: Path, files: di
     (root / ".env").write_text(deploymod.render_env(values, files)) if values and not (root / ".env").exists() else None
     # errors in the visitors' browsers come back to Tably, which hands them to the builder (see incidents.py)
     incidentsmod.inject_reporter(root, f"{public_url()}/api/app-errors/{slug}/reporter.js")
+    icons = await identitymod.raster_icons(root)  # the PNG sizes phones and link previews ask for, from the app's icon.svg
+    if icons:
+        await log_(f"· generé los íconos de la app ({', '.join(p.rsplit('/', 1)[-1] for p in icons)}) a partir de su icon.svg")
     # nothing with a key written in its code goes out: the builder moves it to a variable and it is published again by itself
     keys = await leaksmod.scan(root, values)
     if keys:
