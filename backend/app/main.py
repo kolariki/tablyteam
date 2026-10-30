@@ -205,6 +205,52 @@ def me(user: User = CurrentUser):
     return {"user": user}
 
 
+def _my_photo(user: User):
+    return next((p for p in auth.user_dir(user.id).glob("me-photo.*") if p.suffix in (".jpg", ".png", ".webp")), None)
+
+
+@app.get("/api/me/photo")
+def my_photo(user: User = CurrentUser):
+    """The user's own photo (their seat «Vos» at the team table, their chip): a data URL, or null."""
+    import base64
+
+    p = _my_photo(user)
+    if not p:
+        return {"image": None}
+    kind = {".jpg": "jpeg", ".png": "png", ".webp": "webp"}[p.suffix]
+    return {"image": f"data:image/{kind};base64," + base64.b64encode(p.read_bytes()).decode()}
+
+
+@app.put("/api/me/photo")
+def my_photo_set(body: dict, user: User = CurrentUser):
+    """Body {image: data URL}: the browser already cropped it square and made it small."""
+    import base64
+
+    m = re.match(r"^data:image/(jpeg|png|webp);base64,(.+)$", str(body.get("image") or ""), re.S)
+    if not m:
+        raise HTTPException(400, "Mandá una imagen JPG, PNG o WebP")
+    try:
+        data = base64.b64decode(m.group(2), validate=True)
+    except ValueError:
+        raise HTTPException(400, "La imagen llegó dañada")
+    if len(data) > 600_000:
+        raise HTTPException(400, "La imagen es muy grande (máximo 600 KB)")
+    old = _my_photo(user)
+    if old:
+        old.unlink(missing_ok=True)
+    ext = {"jpeg": "jpg", "png": "png", "webp": "webp"}[m.group(1)]
+    (auth.user_dir(user.id) / f"me-photo.{ext}").write_bytes(data)
+    return my_photo(user)
+
+
+@app.delete("/api/me/photo")
+def my_photo_delete(user: User = CurrentUser):
+    p = _my_photo(user)
+    if p:
+        p.unlink(missing_ok=True)
+    return {"image": None}
+
+
 @app.get("/api/auth/config")
 def auth_config():
     return {"allow_signup": auth.ALLOW_SIGNUP}

@@ -14,7 +14,9 @@ import { toast } from './Toast'
  * The user's team: every role used in a project is saved as an employee (in the database) with its own prompt, memory, score
  * and knowledge base. Feeding a role (notes, documents, web pages) is a small RAG: the backend picks what matters for each topic.
  */
-export const useEmployees = create<{ list: Employee[] | null; set: (list: Employee[]) => void }>((set) => ({ list: null, set: (list) => set({ list }) }))
+export const useEmployees = create<{ list: Employee[] | null; set: (list: Employee[]) => void; focus: string | null }>((set) => ({ list: null, set: (list) => set({ list }), focus: null }))
+/** Opens «Mi equipo» on this employee (from a seat of the team table on the home). */
+export const focusEmployee = (id: string | null) => useEmployees.setState({ focus: id })
 export const loadEmployees = () => api.employees().then((d) => {
   useEmployees.getState().set(d.employees)
   useAvatars.getState().set(Object.fromEntries(d.employees.filter((e) => e.avatar).map((e) => [e.key, e.avatar!])))
@@ -34,10 +36,12 @@ const kb = (n: number) => (n >= 1000 ? `${Math.round(n / 100) / 10}k` : String(n
 export function Employees() {
   const T = useT()
   const list = useEmployees((s) => s.list)
-  const [sel, setSel] = useState<string | null>(null)
+  const [sel, setSel] = useState<string | null>(() => useEmployees.getState().focus)
   const [roles, setRoles] = useState<Role[]>([])
   const [adding, setAdding] = useState(false)
   useEffect(() => { loadEmployees(); api.roles().then((r) => setRoles(r.roles)).catch(() => {}) }, [])
+  const focus = useEmployees((s) => s.focus)
+  useEffect(() => { if (focus && list?.some((e) => e.id === focus)) { setSel(focus); useEmployees.setState({ focus: null }) } }, [focus, list])
   useEffect(() => { if (list?.length && !list.some((e) => e.id === sel)) setSel(list[0].id) }, [list, sel])
   const current = list?.find((e) => e.id === sel) ?? null
   const add = async (roleId: string) => {

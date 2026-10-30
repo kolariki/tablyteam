@@ -30,6 +30,7 @@ import { api, auth, connect, connectBuild, replay } from './lib/api'
 import { tr, useT } from './lib/i18n'
 import { downloadBlob, requestTabStream, slug, startRecording } from './lib/recorder'
 import { setSfx, sfx, sfxEnabled } from './lib/sfx'
+import { NEW_LOOK_AVAILABLE, newLookOn, setBuilderLook, setNewLook } from './lib/look'
 import { setReconnectBuild, useBuild } from './buildStore'
 import { useArena } from './store'
 import type { ArenaEvent, SessionConfig } from './types'
@@ -68,6 +69,7 @@ function OfflineBanner() {
 function AppInner() {
   const T = useT()
   const view = useArena((s) => s.view)
+  useEffect(() => { setBuilderLook(view === 'builder') }, [view])
   const layout = useArena((s) => s.layout)
   const recMode = useArena((s) => s.recMode)
   const agentCount = useArena((s) => s.config?.agents.length ?? 4)
@@ -636,8 +638,26 @@ export default function App() {
   return (
     <ErrorBoundary onReset={() => { history.replaceState(null, '', location.pathname); location.reload() }}>
       <AppInner />
+      <LookSwitch />
       <TeamMemoryWatcher />
       <Toaster />
     </ErrorBoundary>
+  )
+}
+
+
+/** Development only: compare the new identity with the current one (tablyteam.com keeps the current one). */
+function LookSwitch() {
+  const [on, setOn] = useState(newLookOn())
+  if (!NEW_LOOK_AVAILABLE) return null
+  const flip = () => {
+    setNewLook(!on)
+    setOn(!on)
+    setBuilderLook(useArena.getState().view === 'builder')
+  }
+  return (
+    <button onClick={flip} title="Solo en desarrollo" className="fixed bottom-3 left-3 z-[400] rounded-full border border-line bg-surface px-3 py-1.5 text-[12px] font-medium text-ink-2 shadow-md transition hover:text-ink">
+      Identidad: <b className="text-ink">{on ? 'nueva' : 'actual'}</b>
+    </button>
   )
 }

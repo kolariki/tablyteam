@@ -1,3 +1,6 @@
+import TeamTable from './TeamTable'
+import { loadMyPhoto, useMyPhoto } from '../lib/myPhoto'
+import { newLookOn } from '../lib/look'
 import { useArena } from '../store'
 import { TeamMemoryButton } from './TeamMemory'
 import { EmployeePicker, employeeToAgent } from './MyTeam'
@@ -99,6 +102,8 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
     return () => window.removeEventListener('keydown', onKey)
   }, [chooser])
   const lang = useLang()
+  const myPhoto = useMyPhoto((s) => s.url)
+  useEffect(() => { loadMyPhoto() }, [])
   const [providers, setProviders] = useState<Provider[]>(() => visibleProviders(readCache<Provider[]>('providers') ?? []))
   const trialProvider = providers.find((x) => x.id === 'baseten' && x.source === 'trial')
   const apiProviders = providers.filter((p) => p.id !== 'mock' || !providers.some((x) => x.configured && x.id !== 'mock'))
@@ -568,7 +573,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
             <img src="/icon.svg" alt="" aria-hidden className="h-9 w-9 rounded-xl shadow-sm" draggable={false} />
             <span className="serif text-xl">Tably <em className="text-accent">Team</em></span>
           </span>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2 whitespace-nowrap">
             <LangSwitch />
             <button onClick={onAudit} title={T('Subí un proyecto existente y el equipo lo revisa desde cada rol', 'Upload an existing project and the team reviews it from every role')} className="flex h-10 items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-md transition hover:brightness-110 hover:shadow-lg">
               <Gavel size={16} /> {T('Auditar un proyecto', 'Audit a project')}
@@ -590,7 +595,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
               <Settings2 size={16} /> {T('Modelos y API keys', 'Models & API keys')}
             </button>
             <div className="flex h-10 items-center gap-2 rounded-full border border-line bg-surface py-1 pl-1 pr-1.5 text-sm shadow-sm">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-[13px] font-semibold uppercase text-white">{user.name.slice(0, 1)}</span>
+              {myPhoto ? <img src={myPhoto} alt="" className="h-8 w-8 rounded-full object-cover" /> : <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-[13px] font-semibold uppercase text-white">{user.name.slice(0, 1)}</span>}
               <span className="max-w-[140px] truncate font-medium text-ink">{user.name}</span>
               <button onClick={onLogout} className="ml-1 flex h-8 w-8 items-center justify-center rounded-full text-ink-3 transition hover:bg-danger/10 hover:text-danger" title={T('Cerrar sesión', 'Log out')} aria-label={T('Cerrar sesión', 'Log out')}><LogOut size={15} /></button>
             </div>
@@ -622,6 +627,8 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
             )}
           </AnimatePresence>
         </motion.div>
+
+        {newLookOn() && <TeamTable />}
 
         {/* the two ways in: the builder alone (one good prompt) or the whole team (council first) */}
         {HACKATHON_MODE ? null : lane === null ? (

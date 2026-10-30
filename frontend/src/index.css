@@ -171,3 +171,68 @@ input[type="color"] { border: 1px solid var(--color-line); padding: 2px; }
   animation: muse-spin 6s linear infinite; }
 @keyframes muse-spin { to { --muse-angle: 360deg; } }
 @media (prefers-reduced-motion: reduce) { .muse-ring::before, .muse-ring::after { animation: none; } }
+
+
+/* ============================================================================================================
+   New identity, tried in development only (see lib/look.ts): «Equipo» everywhere, the dark «Taller» in the builder.
+   It overrides the theme variables, so every screen follows without touching its components.
+   ============================================================================================================ */
+.look-equipo {
+  --font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --color-paper: #F6F8F7;
+  --color-surface: #FFFFFF;
+  --color-surface-2: #F1F4F2;
+  --color-line: #E1E7E4;
+  --color-ink: #17302A;
+  --color-ink-2: #4A5D57;
+  --color-ink-3: #6A7C76;
+  --color-ink-4: #9DADA7;
+  --color-accent: #6A4BE8;
+  --color-accent-soft: #EFEAFE;
+  --color-gold: #A06E12;
+  --color-danger: #B0473B;
+  --color-ok: #2E7D5B;
+  --color-reason: #50708C;
+}
+.look-equipo h1, .look-equipo h2, .look-equipo .serif { font-weight: 800; letter-spacing: -0.03em; }
+/* the generated-page tells of the current look: tracked caps eyebrows, the dotted backdrop */
+.look-equipo .uppercase { text-transform: none; }
+.look-equipo [class*="tracking-[0."], .look-equipo .tracking-widest, .look-equipo .tracking-wider { letter-spacing: 0; }
+.look-equipo .arena-bg { background-image: none; background-color: var(--color-paper); }
+.look-equipo .panel { box-shadow: none; border-radius: 22px; }
+.look-equipo ::selection { background: #E4F1EC; }
+
+.look-equipo.look-taller {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --color-paper: #182230;
+  --color-surface: #1E2938;
+  --color-surface-2: #22313F;
+  --color-line: #2E3A4C;
+  --color-ink: #E9EDF2;
+  --color-ink-2: #C9D2DC;
+  --color-ink-3: #A9B4C2;
+  --color-ink-4: #7E8A99;
+  --color-accent: #F5A524;
+  --color-accent-soft: #3A3322;
+  --color-gold: #F5C46B;
+  --color-danger: #F28B82;
+  --color-ok: #8FD3A8;
+  --color-reason: #9DB8D6;
+  color-scheme: dark;
+}
+.look-equipo.look-taller h1, .look-equipo.look-taller h2, .look-equipo.look-taller .serif { font-weight: 700; letter-spacing: -0.01em; }
+/* text on the amber accent stays dark (the components say text-white for the green one) */
+.look-equipo.look-taller .bg-accent.text-white, .look-equipo.look-taller .bg-accent .text-white { color: #182230; }
+.look-equipo.look-taller .bg-white { background-color: #FFFFFF; }
+.look-equipo.look-taller .scroll-thin::-webkit-scrollbar-thumb { background: #3A4659; }
+.look-equipo.look-taller ::selection { background: #4A3B17; }
+/* the typed code chips of the chat, on the dark builder */
+.look-equipo.look-taller .md code.tok-path { color: #9CC3FF; background: #1F2D44; border-color: #2E4366; }
+.look-equipo.look-taller .md code.tok-path:hover { background: #26375280; }
+.look-equipo.look-taller .md code.tok-cmd { color: #E9EDF2; background: #121A25; border-color: #2E3A4C; }
+.look-equipo.look-taller .md code.tok-num { color: #F5C46B; background: #3A3322; border-color: #4A4026; }
+.look-equipo.look-taller .md code.tok-hash { color: #C9B6FF; background: #2C2547; border-color: #3E3463; }
+.look-equipo.look-taller .md pre { background: #121A25; border: 1px solid #2E3A4C; }
