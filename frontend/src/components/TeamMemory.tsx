@@ -166,7 +166,7 @@ function TeamMemoryModal() {
               <button onClick={close} className="rounded-full p-1.5 text-ink-3 hover:bg-surface-2 hover:text-ink" aria-label={T('Cerrar', 'Close')}><X size={18} /></button>
             </div>
             <div className="px-6 pt-3"><TeamTabs /></div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4"><TeamContent /></div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-6 py-4"><TeamContent /></div>
           </motion.div>
         </motion.div>
       )}

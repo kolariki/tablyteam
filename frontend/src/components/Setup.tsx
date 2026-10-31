@@ -762,9 +762,9 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                 ]).map((o) => {
                   const on = (cfg.platform ?? 'web') === o.id
                   return (
-                    <button key={o.id} type="button" onClick={() => setCfg((c) => ({ ...c, platform: o.id }))} className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 text-left transition ${on ? 'border-accent bg-accent-soft shadow-[0_0_0_3px_rgba(47,107,93,.12)]' : 'border-line bg-surface hover:border-accent hover:bg-accent-soft'}`}>
+                    <button key={o.id} type="button" onClick={() => setCfg((c) => ({ ...c, platform: o.id }))} className={`flex min-w-0 flex-col items-start gap-1.5 rounded-xl border px-2.5 py-2.5 text-left transition sm:flex-row sm:gap-2.5 sm:px-3 ${on ? 'border-accent bg-accent-soft shadow-[0_0_0_3px_rgba(47,107,93,.12)]' : 'border-line bg-surface hover:border-accent hover:bg-accent-soft'}`}>
                       <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${on ? 'bg-accent text-white' : 'bg-surface-2 text-ink-3'}`}>{o.icon}</span>
-                      <span className="min-w-0"><span className={`block text-[13px] font-semibold ${on ? 'text-accent' : 'text-ink'}`}>{o.title}</span><span className="block text-[11px] leading-snug text-ink-3">{o.text}</span></span>
+                      <span className="min-w-0 break-words"><span className={`block text-[13px] font-semibold ${on ? 'text-accent' : 'text-ink'}`}>{o.title}</span><span className="block text-[11px] leading-snug text-ink-3">{o.text}</span></span>
                     </button>
                   )
                 })}
@@ -807,14 +807,14 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
               </div>
               <p className="mt-2 text-xs text-ink-3">{pick(MODE_INFO[cfg.mode], 'desc')}</p>
             </div>
-            <div className="team-only grid grid-cols-2 gap-4">
+            <div className="team-only grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Range label={T('Turnos máx.', 'Max turns')} help={T('Cantidad máxima de intervenciones en total. Al llegar, el debate termina aunque nadie haya dicho FIN.', 'Maximum number of interventions overall. When reached, the debate ends even if nobody said END.')} value={cfg.max_turns} min={2} max={40} onChange={(v) => setCfg({ ...cfg, max_turns: v })} />
               <Range label={T('Turnos mín. antes de FIN', 'Min turns before END')} help={T('Antes de este turno ningún agente puede cerrar el debate: garantiza un mínimo de discusión.', 'Before this turn no agent can close the debate: it guarantees a minimum of discussion.')} value={cfg.min_turns} min={1} max={20} onChange={(v) => setCfg({ ...cfg, min_turns: v })} />
               <Range label={T('Pausa entre turnos', 'Pause between turns')} help={T('Espera entre una intervención y la siguiente, para que la cámara y el espectador puedan seguir el ritmo. No afecta el costo.', 'Wait between one intervention and the next, so the camera and the viewer can follow. Does not affect cost.')} value={cfg.pace_ms} min={0} max={3000} step={100} fmt={(v) => `${v}ms`} onChange={(v) => setCfg({ ...cfg, pace_ms: v })} />
               <Range label={T('Tokens máx. por turno', 'Max tokens per turn')} help={T('Largo máximo de cada intervención (≈ 1 token por cada 3-4 caracteres). Más tokens: respuestas más largas y más costo por turno.', 'Maximum length of each intervention (≈ 1 token per 3-4 characters). More tokens: longer answers and more cost per turn.')} value={cfg.max_tokens} min={300} max={6000} step={100} onChange={(v) => setCfg({ ...cfg, max_tokens: v })} />
             </div>
             <div className="team-only"><CostEstimate cfg={cfg} align="left" /></div>
-            <div className="grid grid-cols-2 gap-4 items-end">
+            <div className="grid grid-cols-1 gap-4 items-end sm:grid-cols-2">
               <label className="block">
                 <span className="flex items-center gap-1 text-xs uppercase tracking-widest text-ink-3">{T('Idioma', 'Language')} <Hint text={T('El idioma en el que van a hablar los agentes del consejo durante el debate y en el brief. Es independiente del idioma de esta interfaz.', 'The language the council agents will speak in during the debate and in the brief. Independent from the language of this interface.')} /></span>
                 <select className={`${input} mt-1`} value={cfg.language} onChange={(e) => setCfg({ ...cfg, language: e.target.value })}>
@@ -827,7 +827,7 @@ export default function Setup({ user, onLogout, onSettings, onAudit, onStart, on
                   { key: 'final_vote', checked: cfg.final_vote, label: T('Votación final', 'Final vote'), help: T('Cada agente vota quién aportó el argumento más sólido y el juez explica el veredicto. Si lo apagás, el debate termina sin ganador.', 'Each agent votes for who made the strongest argument and the judge explains the verdict. Turn it off and the debate ends without a winner.'), set: (v: boolean) => setCfg({ ...cfg, final_vote: v }) },
                   { key: 'auto_skills', checked: cfg.auto_skills ?? false, label: T('El consejo elige skills', 'The council picks skills'), help: T('Antes de arrancar, cada rol recibe las skills del catálogo que mejor encajan con la tarea. Se suman a las que elegiste; nunca las reemplazan.', 'Before starting, each role gets the catalog skills that best fit the task. They are added to the ones you chose; never replaced.'), set: (v: boolean) => setCfg({ ...cfg, auto_skills: v }) },
                 ] as const).map((o) => (
-                  <label key={o.key} className="flex h-7 items-center gap-2 text-sm leading-none whitespace-nowrap">
+                  <label key={o.key} className="flex min-h-7 items-center gap-2 text-sm leading-tight sm:whitespace-nowrap">
                     <input type="checkbox" checked={o.checked} onChange={(e) => o.set(e.target.checked)} className="accent-accent h-4 w-4 shrink-0" />
                     <span>{o.label}</span>
                     <Hint text={o.help} />

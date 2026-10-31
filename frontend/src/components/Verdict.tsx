@@ -128,7 +128,7 @@ export default function Verdict({ onRedebate, onRerun }: { onRedebate?: (note: s
           <button onClick={() => set({ showVerdict: false })} className="self-start rounded-full p-1.5 text-ink-3 transition hover:bg-surface-2 hover:text-ink" aria-label={T('Cerrar', 'Close')}><X size={18} strokeWidth={2.5} /></button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto scroll-thin px-7 py-6">
+        <div className="min-h-0 flex-1 overflow-y-auto scroll-thin px-4 sm:px-7 py-6">
           <div className="grid gap-6 @3xl:grid-cols-[1.15fr_1fr]">
             {/* why */}
             <div className="rounded-2xl border border-line bg-paper p-6 shadow-[0_12px_28px_-18px_rgba(30,38,34,.4)]" style={{ borderTop: `3px solid ${wColor}` }}>
@@ -231,7 +231,7 @@ export default function Verdict({ onRedebate, onRerun }: { onRedebate?: (note: s
                 {text?.headline && <div className="serif mt-2 text-[22px] leading-snug text-ink">{text.headline}</div>}
                 {text?.why && <p className="mt-1.5 max-w-4xl text-[13.5px] leading-relaxed text-ink-2">{text.why}</p>}
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto scroll-thin px-6 py-4">
+              <div className="min-h-0 flex-1 overflow-y-auto scroll-thin px-4 sm:px-6 py-4">
                 <DecisionList decisions={decisions} editing={editing} edits={edits} setEdits={setEdits} colorOf={colorOf} big />
               </div>
               <div className="flex items-center gap-2 border-t border-line px-6 py-3">

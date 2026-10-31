@@ -357,12 +357,12 @@ export default function AppRunner({ autoStart = false }: { autoStart?: boolean }
             <div className="mt-1 text-[12px] text-ink-3">{run.status === 'installing' ? T('La primera vez puede tardar unos minutos.', 'The first time may take a few minutes.') : T('Esperando a que el servidor responda en el puerto asignado…', 'Waiting for the server to respond on the assigned port…')}</div>
           </div>
         ) : services && services.length > 0 ? (
-          <div className="flex flex-1 items-center justify-center p-6">
-            <div className="w-full max-w-lg rounded-2xl border border-line bg-paper p-6 text-center shadow-[0_14px_30px_-18px_rgba(30,38,34,.4)]">
+          <div className="flex flex-1 items-center justify-center p-3 sm:p-6">
+            <div className="w-full max-w-lg rounded-2xl border border-line bg-paper p-4 text-center sm:p-6 shadow-[0_14px_30px_-18px_rgba(30,38,34,.4)]">
               <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft text-accent"><MonitorPlay size={22} /></span>
               <div className="mt-3 text-[17px] font-semibold text-ink">{T('Corré la app real acá adentro', 'Run the real app right here')}</div>
               <div className="mx-auto mt-1.5 max-w-md text-[12.5px] leading-relaxed text-ink-3">{T('Se instala lo que falte, se levanta el servidor de desarrollo en un puerto libre de esta máquina y la app se muestra en este panel. Las variables de «Servicios» se cargan como ', 'What is missing is installed, the dev server starts on a free port on this machine and the app shows in this panel. The variables from "Services" are loaded as ')}<code className="font-mono">.env</code>.</div>
-              <ol className="mx-auto mt-4 grid max-w-md grid-cols-3 gap-2 text-left text-[11.5px] text-ink-2">
+              <ol className="mx-auto mt-4 grid max-w-md grid-cols-1 gap-2 text-left sm:grid-cols-3 text-[11.5px] text-ink-2">
                 {[T('Instala dependencias', 'Installs dependencies'), T('Levanta el servidor', 'Starts the server'), T('La muestra acá', 'Shows it here')].map((t, i) => (
                   <li key={t} className="flex items-center gap-2 rounded-lg border border-line bg-surface px-2.5 py-2"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">{i + 1}</span>{t}</li>
                 ))}

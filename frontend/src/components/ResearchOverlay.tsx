@@ -132,9 +132,9 @@ export default function ResearchOverlay({ demo = false, hiddenDemo = false, onCl
       <motion.div className="mx-auto flex min-h-full w-full max-w-6xl flex-col px-4 py-6 sm:px-8 sm:py-10" animate={{ opacity: fuse ? 0 : 1, y: fuse ? 16 : 0 }} transition={{ duration: 0.5 }}>
         {/* header */}
         <div className="flex flex-wrap items-end gap-4">
-          <div className="min-w-0 flex-1">
+          <div className="min-w-[min(100%,260px)] flex-1">
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.35em] text-accent"><span className="h-2 w-2 rounded-full bg-accent animate-pulse" /> {T('Reverse engineering · antes del consejo', 'Reverse engineering · before the council')}</div>
-            <h2 className="mt-1.5 text-[34px] leading-tight">{r?.finished ? T('Listo: abriendo el consejo…', 'Done: opening the council…') : hidden ? T('Analizando modelos de referencia', 'Analysing reference models') : T('El equipo está investigando las referencias', 'The team is researching the references')}</h2>
+            <h2 className="mt-1.5 text-[26px] leading-tight sm:text-[34px]">{r?.finished ? T('Listo: abriendo el consejo…', 'Done: opening the council…') : hidden ? T('Analizando modelos de referencia', 'Analysing reference models') : T('El equipo está investigando las referencias', 'The team is researching the references')}</h2>
             <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-ink-2">{hidden ? T('El equipo estudia los mejores productos de la categoría: estructura, jerarquía, flujos y estados. Con eso como vara, el consejo revisa tu proyecto. Quedate acá: se abre solo al terminar.', 'The team studies the best products in the category: structure, hierarchy, flows and states. With that as the bar, the council reviews your project. Stay here: it opens by itself when done.') : T('Entra a cada app, saca capturas y anota qué emular y qué evitar. Con eso en la mano, el consejo revisa tu proyecto. Quedate acá: se abre solo al terminar.', 'It visits each app, takes screenshots and notes what to emulate and avoid. With that in hand the council reviews your project. Stay here: it opens by itself when done.')}</p>
           </div>
           <div className="grid grid-cols-3 gap-2">
@@ -145,7 +145,7 @@ export default function ResearchOverlay({ demo = false, hiddenDemo = false, onCl
         </div>
 
         {/* the phases */}
-        <ol className="mt-6 grid grid-cols-4 gap-2">
+        <ol className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {STEPS.map((st) => {
             const Icon = st.icon
             const state = st.n - 1 < phase ? 'done' : st.n - 1 === phase ? 'active' : 'next'

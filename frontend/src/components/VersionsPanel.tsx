@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { CheckCircle2, ChevronDown, Circle, FileDiff, GitBranch, ListChecks, MessageSquareText, MinusCircle, Rocket, Users } from 'lucide-react'
+import { CheckCircle2, ChevronDown, Circle, FileDiff, GitBranch, ListChecks, MessageSquareText, MinusCircle, Rocket, Users, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useBuild, type BuildVersion } from '../buildStore'
 import { api } from '../lib/api'
@@ -75,9 +75,9 @@ export default function VersionsPanel() {
   const stats = diff?.text ? { add: diff.text.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).length, del: diff.text.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---')).length } : null
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[minmax(min(100%,380px),1fr)_minmax(0,1.15fr)] bg-surface">
+    <div className="grid min-h-0 flex-1 grid-cols-1 bg-surface md:grid-cols-[minmax(min(100%,380px),1fr)_minmax(0,1.15fr)]">
       {/* timeline */}
-      <div className="min-h-0 overflow-y-auto scroll-thin border-r border-line p-5">
+      <div className="min-h-0 overflow-y-auto scroll-thin border-line p-3 sm:p-5 md:border-r">
         <div className="text-[10.5px] uppercase tracking-[0.3em] text-accent">{T('Historial', 'History')}</div>
         <div className="mt-1 flex items-end gap-3">
           <h3 className="text-[22px] leading-tight">{versions.length} {versions.length === 1 ? T('versión', 'version') : T('versiones', 'versions')}</h3>
@@ -95,11 +95,11 @@ export default function VersionsPanel() {
             return (
               <motion.div key={v.n} layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className={`relative rounded-2xl border bg-paper shadow-[0_12px_28px_-18px_rgba(30,38,34,.4)] ${isOpen ? 'border-accent' : 'border-line'}`}>
                 <span className={`absolute -left-5 top-5 h-3 w-3 -translate-x-1/2 rounded-full border-2 border-paper ${isLatest ? 'bg-accent' : 'bg-ink-4'}`} aria-hidden />
-                <button onClick={() => setOpen(isOpen ? null : v.n)} className="flex w-full items-center gap-3 px-4 py-3.5 text-left">
+                <button onClick={() => setOpen(isOpen ? null : v.n)} className="flex w-full items-center gap-3 px-3 py-3.5 text-left sm:px-4">
                   <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-mono text-[12.5px] font-bold ${isLatest ? 'bg-accent text-white' : 'bg-surface-2 text-ink'}`}>{v.tag}</span>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-[14px] font-semibold">{trigger[v.trigger] ?? v.trigger}</span>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span className="text-[14px] font-semibold sm:truncate">{trigger[v.trigger] ?? v.trigger}</span>
                       {isLatest && <span className="rounded-full border border-accent/30 bg-accent-soft px-1.5 py-0.5 text-[9.5px] font-bold uppercase text-accent">{T('actual', 'current')}</span>}
                     </div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-ink-3">
@@ -107,9 +107,12 @@ export default function VersionsPanel() {
                       <span>·</span><span>{v.files} {T('archivos', 'files')}</span>
                       <span>·</span><span className="font-mono"><span className="text-ok">+{v.stats.insertions}</span> <span className="text-danger">−{v.stats.deletions}</span></span>
                       {v.commit && <><span>·</span><span className="font-mono">{v.commit}</span></>}
+                      {/* on a phone the verdict goes in this line instead of its own column */}
+                      <span className="sm:hidden">·</span>
+                      <span className="sm:hidden" style={v.readiness != null ? { color: readinessColor(v.readiness) } : undefined}>{v.readiness != null ? `${v.readiness}% ${v.verdict?.approved ? T('aprobada', 'approved') : T('listo para prod', 'production-ready')}` : T('sin revisar', 'not reviewed')}</span>
                     </div>
                   </div>
-                  <div className="shrink-0 text-right">
+                  <div className="hidden shrink-0 text-right sm:block">
                     {v.readiness != null ? (
                       <div className="font-mono text-xl font-bold leading-none" style={{ color: readinessColor(v.readiness) }}>{v.readiness}%</div>
                     ) : (
@@ -194,9 +197,10 @@ export default function VersionsPanel() {
         </div>
       </div>
 
-      {/* diff */}
-      <div className="flex min-h-0 flex-col bg-[#1E2622]">
+      {/* diff (on a phone it opens over the list when a file is picked) */}
+      <div className={`${diff ? 'fixed inset-0 z-[80] flex md:static md:z-auto' : 'hidden md:flex'} min-h-0 flex-col bg-[#1E2622]`}>
         <div className="flex h-10 shrink-0 items-center gap-2 border-b border-white/10 px-3 font-mono text-[11.5px] text-[#B9C4BE]">
+          {diff && <button onClick={() => setDiff(null)} className="-ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white hover:bg-white/10 md:hidden" aria-label={T('Cerrar', 'Close')}><X size={15} /></button>}
           <FileDiff size={13} className="text-[#8FD3B0]" />
           {diff ? (
             <>

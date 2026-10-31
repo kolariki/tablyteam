@@ -607,8 +607,10 @@ function AppInner() {
           <div className="relative flex-1 min-h-0">
             <ArenaGraph />
             <div className="absolute left-3 right-3 top-3 md:left-4 md:right-auto md:w-[520px] md:max-w-[60%]"><StatTiles /></div>
-            <div className="absolute bottom-3 inset-x-0 px-3 md:px-6"><Captions big={recMode} /></div>
+            <div className="absolute bottom-3 inset-x-0 hidden px-3 md:block md:px-6"><Captions big={recMode} /></div>
           </div>
+          {/* on a phone the caption goes under the graph: over it, it covered the roles at the bottom of the tree */}
+          <div className="shrink-0 px-3 pb-1 md:hidden"><Captions big={recMode} /></div>
           <div className="shrink-0 px-4 pb-3 space-y-2">
             <Timeline />
             {/* the three analytics cards stay under the graph in focus mode too (a bit shorter, so the stage keeps the room); only a recording hides them */}

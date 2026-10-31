@@ -276,13 +276,13 @@ export default function Intake({ idea, onIdea, providers, onPrompt, promptActive
 
       {/* generate */}
       {!busy && !waiting && !(st?.status === 'done' && st.prompt && promptActive) && (
-        <div className="flex flex-nowrap items-center gap-2">
-          <button type="button" onClick={() => run()} disabled={!idea.trim() || !provider || uploading} style={{ background: theme.accent }} className="flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-110 disabled:opacity-40">
+        <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+          <button type="button" onClick={() => run()} disabled={!idea.trim() || !provider || uploading} style={{ background: theme.accent }} className="flex max-w-full shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-110 disabled:opacity-40">
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white"><ProviderLogo provider={provider} size={15} /></span>
             {promptActive ? tr('Regenerar prompt engineering', 'Regenerate prompt engineering') : tr('Generar prompt engineering a mi texto', 'Prompt-engineer my text')}
           </button>
           {usable.length > 0 ? (
-            <div className="flex min-w-0 flex-1 items-center gap-1.5 text-[12px] text-ink-3">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-[12px] text-ink-3 sm:flex-nowrap">
               <span className="shrink-0">{T('con', 'with')}</span>
               <select value={provider} onChange={(e) => { const p = usable.find((x) => x.id === e.target.value)!; setProvider(p.id); setModel(p.default_model) }} className="min-w-0 max-w-[150px] truncate rounded-lg border border-line bg-surface px-2 py-1 text-[12px] text-ink outline-none">
                 {usable.map((p) => <option key={p.id} value={p.id}>{p.label.split(' · ')[0]}</option>)}

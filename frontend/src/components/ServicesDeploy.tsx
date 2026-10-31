@@ -108,15 +108,15 @@ export default function ServicesDeploy({ onOpenSettings }: { onOpenSettings: () 
         </div>
         <div className="mt-3 space-y-2">
           {g.vars.map((v) => (
-            <div key={v.var} className="grid grid-cols-[minmax(150px,1fr)_1.3fr_auto] items-center gap-2">
-              <div className="min-w-0">
+            <div key={v.var} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 sm:grid-cols-[minmax(150px,1fr)_1.3fr_auto]">
+              <div className="min-w-0 sm:col-auto">
                 <div className="truncate font-mono text-[12px] font-semibold" title={v.var}>{v.var}</div>
                 {(v.note || v.cost) && <div className="truncate text-[11px] text-ink-3" title={v.note ?? ''}>{v.note}{v.cost ? ` · ${v.cost}` : ''}</div>}
               </div>
               <input type={v.secret ? 'password' : 'text'} autoComplete="off" placeholder={v.configured ? T('•••••••• (guardada)', '•••••••• (saved)') : v.example || (v.required ? T('requerida', 'required') : T('opcional', 'optional'))}
                 value={values[v.var] ?? ''} onChange={(e) => setValues({ ...values, [v.var]: e.target.value })}
-                className="rounded-lg border border-line bg-surface px-2.5 py-1.5 font-mono text-[12px] shadow-sm outline-none transition focus:border-accent" />
-              <span className="flex w-5 justify-center">{v.configured || values[v.var] ? <CheckCircle2 size={15} className="text-ok" /> : v.required ? <XCircle size={15} className="text-gold" /> : <span className="text-[10px] text-ink-4">{T('opc.', 'opt.')}</span>}</span>
+                className="col-span-2 row-start-2 min-w-0 rounded-lg border border-line bg-surface px-2.5 py-1.5 font-mono text-[12px] shadow-sm outline-none transition focus:border-accent sm:col-span-1 sm:row-start-auto" />
+              <span className="col-start-2 row-start-1 flex w-5 justify-center sm:col-start-auto sm:row-start-auto">{v.configured || values[v.var] ? <CheckCircle2 size={15} className="text-ok" /> : v.required ? <XCircle size={15} className="text-gold" /> : <span className="text-[10px] text-ink-4">{T('opc.', 'opt.')}</span>}</span>
             </div>
           ))}
         </div>
@@ -137,7 +137,7 @@ export default function ServicesDeploy({ onOpenSettings }: { onOpenSettings: () 
   const lastDeploy = [...(b.deploys ?? [])].reverse()[0]
 
   return (
-    <div className="h-full overflow-y-auto scroll-thin p-5 space-y-6 bg-surface">
+    <div className="h-full overflow-y-auto scroll-thin p-3 space-y-6 bg-surface sm:p-5">
       {/* ---------- services: what the app needs, what Tably solves by itself, what is optional */}
       <section>
         <div className="text-[11px] uppercase tracking-[0.3em] text-accent">{T('Servicios', 'Services')}</div>
@@ -185,7 +185,7 @@ export default function ServicesDeploy({ onOpenSettings }: { onOpenSettings: () 
 
         {auto.length > 0 && (
           <details className="group mt-6 rounded-2xl border border-line bg-paper px-4 py-3">
-            <summary className="flex cursor-pointer list-none items-center gap-2 text-[13.5px] font-semibold text-ink">
+            <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-0.5 text-[13.5px] font-semibold text-ink">
               <CheckCircle2 size={15} className="text-ok" /> {T('De esto se encarga Tably', 'Tably takes care of this')} <span className="font-normal text-ink-3">· {auto.length} {T('cosas que no tenés que configurar', 'things you don’t have to set up')}</span>
               <ChevronDown size={14} className="ml-auto text-ink-3 transition group-open:rotate-180" />
             </summary>
@@ -210,29 +210,29 @@ export default function ServicesDeploy({ onOpenSettings }: { onOpenSettings: () 
       </AnimatePresence>
 
       {/* ---------- deploy to the user's own account: advanced, folded */}
-      <details className="group rounded-2xl border border-line bg-paper px-4 py-3">
+      <details className="group rounded-2xl border border-line bg-paper px-3 py-3 sm:px-4">
         <summary className="flex cursor-pointer list-none items-center gap-2 text-[13px] text-ink-2">
-          <Rocket size={14} className="text-ink-3" /> {T('Avanzado: subir la app a tu propia cuenta de Vercel o Railway', 'Advanced: deploy the app to your own Vercel or Railway account')}
-          <ChevronDown size={14} className="ml-auto text-ink-3 transition group-open:rotate-180" />
+          <Rocket size={14} className="shrink-0 text-ink-3" /> {T('Avanzado: subir la app a tu propia cuenta de Vercel o Railway', 'Advanced: deploy the app to your own Vercel or Railway account')}
+          <ChevronDown size={14} className="ml-auto shrink-0 text-ink-3 transition group-open:rotate-180" />
         </summary>
-      <section className="mt-3 rounded-2xl border border-line bg-paper p-5 shadow-[0_12px_28px_-18px_rgba(30,38,34,.45)]">
+      <section className="mt-3 rounded-2xl border border-line bg-paper p-3 sm:p-5 shadow-[0_12px_28px_-18px_rgba(30,38,34,.45)]">
         <div className="text-[11px] uppercase tracking-[0.3em] text-accent">{T('Publicar', 'Publish')}</div>
-        <div className="mt-1 flex items-center gap-2">
-          <Rocket size={18} className="text-accent" />
-          <h3 className="text-2xl">{T('Deploy automático', 'Automatic deploy')}</h3>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <Rocket size={18} className="shrink-0 text-accent" />
+          <h3 className="text-xl sm:text-2xl">{T('Deploy automático', 'Automatic deploy')}</h3>
           {info.stack.length > 0 && <span className="ml-auto font-mono text-[11px] text-ink-3">{info.stack.join(' · ')}</span>}
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="mt-3 grid grid-cols-1 gap-2 min-[440px]:grid-cols-2">
           {info.deploy_targets.map((t) => (
             <button key={t.id} onClick={() => setTarget(t.id)} className={`rounded-xl border p-3 text-left transition ${target === t.id ? 'border-accent bg-accent-soft' : 'border-line hover:bg-surface-2'}`}>
-              <div className="flex items-center gap-2 font-semibold">{t.label}{info.recommended_target === t.id && <span className="rounded-full bg-accent text-white px-1.5 py-0.5 text-[9px] uppercase">{T('recomendado', 'recommended')}</span>}</div>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold">{t.label}{info.recommended_target === t.id && <span className="rounded-full bg-accent text-white px-1.5 py-0.5 text-[9px] uppercase">{T('recomendado', 'recommended')}</span>}</div>
               <div className="text-[11.5px] text-ink-3">{t.good_for}</div>
               <div className={`mt-1.5 text-[11px] font-medium ${t.ok ? 'text-ok' : 'text-gold'}`}>{t.ok ? (t.token ? T('✓ token cargado', '✓ token set') : T('✓ CLI logueado', '✓ CLI logged in')) : t.installed ? T('sin login / token', 'no login / token') : T('CLI no instalado', 'CLI not installed')}</div>
             </button>
           ))}
         </div>
         {tgt && !tgt.ok && (
-          <div className="mt-2 text-[12px] text-ink-2">
+          <div className="mt-2 break-words text-[12px] text-ink-2">
             {tgt.hint} {tgt.installed && <button onClick={onOpenSettings} className="text-accent underline">{T('Abrir Configuración', 'Open Settings')}</button>}
             {tgt.token_help && <> · <a href={tgt.token_help} target="_blank" rel="noreferrer" className="text-accent underline">{T('crear token', 'create token')}</a></>}
           </div>

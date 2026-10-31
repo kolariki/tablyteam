@@ -243,11 +243,11 @@ function LangfuseSettings() {
       <p className="mt-1 text-[13px] text-ink-2">{T('Cada llamada a un modelo (debates, briefs, construcciones, revisiones) queda registrada con latencia, tokens y costo.', 'Every model call (debates, briefs, builds, reviews) is recorded with latency, tokens and cost.')}</p>
       <div className="relative mt-3 overflow-hidden rounded-2xl border p-5 shadow-[0_14px_30px_-18px_rgba(30,38,34,.45)]" style={{ background: brandTheme('langfuse').bg, borderColor: h?.langfuse ? brandTheme('langfuse').accent : brandTheme('langfuse').border }}>
         <LogoWatermark provider="langfuse" opacity={0.1} />
-        <div className="relative flex items-center gap-4">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface shadow-sm" style={{ border: `1.5px solid ${brandTheme('langfuse').accent}` }}>
+        <div className="relative flex flex-wrap items-center gap-x-4 gap-y-2">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-surface shadow-sm" style={{ border: `1.5px solid ${brandTheme('langfuse').accent}` }}>
             <ProviderLogo provider="langfuse" size={28} />
           </span>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-[140px] flex-1">
             <div className="text-[15px] font-semibold">Langfuse</div>
             <div className="truncate font-mono text-[12px] text-ink-3">{h?.langfuse_host || T('sin servidor configurado', 'no server configured')}</div>
           </div>

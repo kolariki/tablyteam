@@ -93,17 +93,17 @@ export default function FdeModal({ onClose, prefill = '', initialPackage = 'laun
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[125] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-[2px]" onClick={onClose}>
       <motion.div initial={{ opacity: 0, y: 18, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 30 }} className="relative flex w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-[0_30px_80px_-30px_rgba(30,38,34,.6)]" style={{ maxHeight: 'calc(100vh - 32px)' }} onClick={(e) => e.stopPropagation()}>
         {/* header */}
-        <div className="relative flex items-start gap-4 border-b border-line px-7 py-6">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-accent text-white shadow-[0_10px_24px_-10px_rgba(47,107,93,.7)]"><HardHat size={24} /></span>
+        <div className="relative flex items-start gap-3 border-b border-line px-4 py-4 sm:gap-4 sm:px-4 sm:px-7 sm:py-6">
+          <span className="hidden h-12 w-12 shrink-0 sm:flex items-center justify-center rounded-2xl bg-accent text-white shadow-[0_10px_24px_-10px_rgba(47,107,93,.7)]"><HardHat size={24} /></span>
           <div className="min-w-0 flex-1">
             <div className="text-[11px] uppercase tracking-[0.3em] text-accent">{T('Developer a pedido', 'Developer on demand')}</div>
-            <h3 className="mt-0.5 text-[32px] leading-tight">{T('Un ingeniero nuestro lo sube por vos', 'One of our engineers ships it for you')}</h3>
+            <h3 className="mt-0.5 text-[24px] leading-tight sm:text-[32px]">{T('Un ingeniero nuestro lo sube por vos', 'One of our engineers ships it for you')}</h3>
             <p className="mt-1.5 max-w-3xl text-[13.5px] leading-relaxed text-ink-2">{T('Precio fijo, plazo fijo, alcance cerrado. Recibe tu proyecto con todo el contexto: ', 'Fixed price, fixed deadline, closed scope. They get your project with full context: ')}{latest ? `${latest.tag}${latest.readiness != null ? ` (${latest.readiness}% ${T('listo', 'ready')})` : ''}, ` : ''}{T('los bloqueantes del consejo y los servicios que faltan. Trabaja sobre tu repo y te entrega un acta.', 'the council blockers and the missing services. They work on your repo and hand you a delivery report.')}</p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
             <button onClick={onClose} className="rounded-full p-1.5 text-ink-3 transition hover:bg-surface-2 hover:text-ink" aria-label={T('Cerrar', 'Close')}><X size={18} strokeWidth={2.5} /></button>
             {stripe && (
-              <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10.5px] font-semibold ${canPay ? 'border-ok/30 bg-ok/10 text-ok' : 'border-line bg-paper text-ink-3'}`}>
+              <span className={`hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10.5px] font-semibold sm:inline-flex ${canPay ? 'border-ok/30 bg-ok/10 text-ok' : 'border-line bg-paper text-ink-3'}`}>
                 <Lock size={10} /> {canPay ? `${T('Pago seguro con Stripe', 'Secure payment with Stripe')}${stripe.mode === 'test' ? ' · test' : ''}` : T('Pago a coordinar por email', 'Payment arranged by email')}
               </span>
             )}
@@ -112,7 +112,7 @@ export default function FdeModal({ onClose, prefill = '', initialPackage = 'laun
 
         <div className="min-h-0 flex-1 overflow-y-auto scroll-thin">
           {done ? (
-            <div className="px-7 py-6">
+            <div className="px-4 sm:px-7 py-6">
               <div className="rounded-2xl border border-ok/40 bg-ok/5 px-6 py-5">
                 <div className="flex items-center gap-2.5 text-lg font-semibold"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-ok text-white"><Check size={16} strokeWidth={3} /></span> {T('Pedido', 'Request')} {done.id} {T('recibido', 'received')} · {packages.find((p) => p.id === done.package)?.name}</div>
                 <p className="mt-2 text-[13.5px] text-ink-2">{T('Armamos el ticket con el estado real del proyecto. Te contactamos a tu email para coordinar el pago y el inicio.', 'We built the ticket with the real state of the project. We will email you to arrange payment and the start.')}</p>
@@ -126,7 +126,7 @@ export default function FdeModal({ onClose, prefill = '', initialPackage = 'laun
           ) : (
             <>
               {/* packages */}
-              <div className="grid gap-3 px-7 pt-6 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-3 px-4 sm:px-7 pt-6 sm:grid-cols-2 lg:grid-cols-4">
                 {packages.map((p) => {
                   const on = selected === p.id
                   return (
@@ -148,7 +148,7 @@ export default function FdeModal({ onClose, prefill = '', initialPackage = 'laun
               {/* detail + form */}
               {pkg && (
                 <AnimatePresence mode="wait" initial={false}>
-                  <motion.div key={pkg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.18 }} className="grid gap-4 px-7 pt-5 md:grid-cols-[1.05fr_1fr]">
+                  <motion.div key={pkg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.18 }} className="grid gap-4 px-4 sm:px-7 pt-5 md:grid-cols-[1.05fr_1fr]">
                     <div className="rounded-2xl border border-line bg-paper p-5 text-[13px] shadow-[0_12px_28px_-18px_rgba(30,38,34,.35)]">
                       <div className={label}>{T('Incluye', 'Includes')}</div>
                       <ul className="mt-2 space-y-1.5">{pkg.includes.map((x) => <li key={x} className="flex gap-2"><CheckCircle2 size={15} className="mt-0.5 shrink-0 text-ok" /> <span>{x}</span></li>)}</ul>
@@ -191,7 +191,7 @@ export default function FdeModal({ onClose, prefill = '', initialPackage = 'laun
 
               {/* previous requests */}
               {mine.length > 0 && (
-                <div className="px-7 pb-2 pt-6">
+                <div className="px-4 sm:px-7 pb-2 pt-6">
                   <div className={label}>{T('Tus pedidos para este proyecto', 'Your requests for this project')}</div>
                   <div className="mt-2 overflow-hidden rounded-2xl border border-line bg-paper">
                     {mine.map((r, i) => (

@@ -499,7 +499,7 @@ export function Timeline() {
             key={i}
             title={t ? `#${t.turn} ${a?.name} · ${STANCE[t.stance].label} · ${fmtMs(t.metrics.latency_ms)}` : undefined}
             className="flex-1 rounded-md flex items-center justify-center text-[11px] overflow-hidden"
-            style={{ background: a ? `${color}${t ? '30' : '18'}` : '#E6EAE7', border: isLive ? `1px solid ${color}` : '1px solid transparent', opacity: a ? spot.dim(a.id) : 1 }}
+            style={{ background: a ? `${color}${t ? '30' : '18'}` : 'var(--color-surface-2)', border: isLive ? `1px solid ${color}` : '1px solid transparent', opacity: a ? spot.dim(a.id) : 1 }}
             animate={isLive ? { opacity: [0.5, 1, 0.5] } : { opacity: a ? spot.dim(a.id) : 1 }}
             transition={isLive ? { repeat: Infinity, duration: 1.2 } : undefined}
             {...(a ? spot.bind(a.id) : {})}

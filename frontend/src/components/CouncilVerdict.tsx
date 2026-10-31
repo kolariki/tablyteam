@@ -135,7 +135,7 @@ export default function CouncilVerdict() {
           <button onClick={() => set({ showVerdict: false })} className="rounded-full p-1.5 text-ink-3 transition hover:bg-surface-2 hover:text-ink" aria-label={T('Cerrar', 'Close')}><X size={18} strokeWidth={2.5} /></button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto scroll-thin px-7 py-6">
+        <div className="min-h-0 flex-1 overflow-y-auto scroll-thin px-4 sm:px-7 py-6">
           <div className="grid gap-6 @3xl:grid-cols-[1.2fr_1fr]">
             {/* the consolidated verdict + change list */}
             <div className="rounded-2xl border border-line bg-paper p-6 shadow-[0_12px_28px_-18px_rgba(30,38,34,.4)]" style={{ borderTop: `3px solid ${tone}` }}>

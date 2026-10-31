@@ -2,7 +2,7 @@ import DOMPurify from 'dompurify'
 import { openTeam } from './TeamMemory'
 import { srv } from '../lib/serverText'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AlertTriangle, Hammer, ArrowLeft, ArrowRight, CheckCircle2, Trophy, FlaskConical, Gauge, Home, ListChecks, Search, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2, CloudUpload, Clock3, Menu, Users, Languages } from 'lucide-react'
+import { AlertTriangle, Hammer, X, ArrowLeft, ArrowRight, CheckCircle2, Trophy, FlaskConical, Gauge, Home, ListChecks, Search, ShieldCheck, ChevronDown, ChevronLeft, Circle, Copy, CreditCard, Download, Maximize2, Minimize2, GitBranch, HardHat, MonitorPlay, Palette, PanelRightClose, ExternalLink, Eye, FileCode2, FileText, Folder, Gavel, KeyRound, Play, RefreshCw, Send, Square, TerminalSquare, Sparkles, Loader2, CloudUpload, Clock3, Menu, Users, Languages } from 'lucide-react'
 import { marked } from 'marked'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { reconnectBuild, useBuild, type Activity, type ChatItem, type Todo } from '../buildStore'
@@ -508,8 +508,11 @@ export default function Builder({ onBack, onHome }: { onBack: () => void; onHome
           <div className="absolute inset-y-0 right-0 flex min-h-0" style={{ width: paneW }}>
             {/* file tree: only next to the code, sliding in and out with the same spring */}
             <motion.div initial={false} animate={{ width: b.pane === 'code' && (!phone || treeOpen) ? (phone ? paneW : 232) : 0 }} transition={{ type: 'spring', stiffness: 230, damping: 30, mass: 0.9 }} className="min-h-0 shrink-0 overflow-hidden border-r border-line bg-surface">
-              <div className="h-full w-[232px] overflow-y-auto scroll-thin">
-                <div className="sticky top-0 border-b border-line bg-surface px-3 py-2 text-[11px] uppercase tracking-widest text-ink-3">{T('Archivos', 'Files')}</div>
+              <div className="h-full overflow-y-auto scroll-thin" style={{ width: phone ? paneW : 232 }}>
+                <div className="sticky top-0 flex items-center border-b border-line bg-surface px-3 py-2 text-[11px] uppercase tracking-widest text-ink-3">
+                  {T('Archivos', 'Files')}
+                  {phone && <button type="button" onClick={() => setTreeOpen(false)} className="ml-auto flex h-7 items-center gap-1 rounded-md border border-line px-2 text-[11px] normal-case tracking-normal text-ink" aria-label={T('Cerrar la lista de archivos', 'Close the file list')}><X size={12} /> {T('Cerrar', 'Close')}</button>}
+                </div>
                 <div className="py-1 font-mono text-[13px]">
                   {tree.length === 0 && <div className="px-3 py-3 font-sans text-xs text-ink-4">{T('Todavía no hay archivos.', 'No files yet.')}</div>}
                   {tree.map((n) => <TreeNode key={n.path} node={n} depth={0} selected={b.selected} live={b.liveFile?.path ?? null} onSelect={(p) => { useBuild.getState().set({ selected: p }); setTreeOpen(false) }} />)}
@@ -873,9 +876,9 @@ function AppNotice({ c }: { c: ChatItem }) {
     : c.tone === 'attention' ? { box: 'border-gold/50 bg-gold/10', icon: <AlertTriangle size={18} className="text-gold" />, label: check ? T('Verificación de entrega', 'Delivery check') : T('Necesita tu atención', 'Needs your attention') }
     : { box: 'border-accent/40 bg-accent-soft/60', icon: <Loader2 size={18} className="animate-spin text-accent" />, label: check ? T('Completando la entrega', 'Completing the delivery') : T('Arreglando la app', 'Fixing the app') }
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`mx-auto flex w-full max-w-3xl gap-3 rounded-2xl border-2 px-4 py-3 ${tone.box}`}>
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`mx-auto flex w-full max-w-3xl flex-wrap gap-3 rounded-2xl border-2 px-4 py-3 ${tone.box}`}>
       <span className="mt-0.5 shrink-0">{tone.icon}</span>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 basis-[220px]">
         <div className="text-[10.5px] font-bold uppercase tracking-[0.2em] text-ink-3">Tably · {tone.label}</div>
         <div className="mt-0.5 text-[14.5px] font-medium text-ink">{c.text}</div>
         {c.checks && c.checks.length > 0 && (
@@ -893,7 +896,7 @@ function AppNotice({ c }: { c: ChatItem }) {
           : <button onClick={() => setMore(true)} className="mt-1 text-[11.5px] text-ink-3 underline-offset-2 hover:underline">{T('Ver el detalle técnico', 'See the technical detail')}</button>)}
       </div>
       {(c.run || c.link || c.go || (c.checks && c.tone === 'attention')) && (
-        <div className="flex shrink-0 flex-col items-stretch gap-1.5 self-center">
+        <div className="flex w-full shrink-0 flex-wrap items-stretch gap-1.5 self-center pl-9 sm:w-auto sm:flex-col sm:pl-0">
           {c.checks && c.tone === 'attention' && <button onClick={completeDelivery} disabled={busy} className={NOTICE_BTN}>{busy ? <Loader2 size={13} className="animate-spin" /> : <Hammer size={13} />} {T('Completar lo que falta', 'Complete what is missing')}</button>}
           {c.link && <a href={c.link.url} target="_blank" rel="noreferrer" className={NOTICE_BTN}><ExternalLink size={13} /> {c.link.label}</a>}
           {c.go && <button onClick={() => useBuild.getState().set({ paneOpen: true, pane: c.go! })} className={NOTICE_BTN}><CloudUpload size={13} /> {c.go === 'cloud' ? T('Ir a Publicar', 'Go to Publish') : T('Abrir', 'Open')}</button>}

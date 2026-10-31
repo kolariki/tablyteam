@@ -8,9 +8,9 @@ import { toast } from './Toast'
 import { useArena } from '../store'
 import { PanelLoader } from './HomeLoader'
 
-const CARD = 'rounded-2xl border border-line bg-surface p-5 shadow-[0_1px_2px_rgba(30,38,34,.04),0_8px_24px_-16px_rgba(30,38,34,.18)]'
-const PILL = 'flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-[13px] text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent disabled:opacity-40'
-const PRIMARY = 'flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40'
+const CARD = 'rounded-2xl border border-line bg-surface p-4 sm:p-5 shadow-[0_1px_2px_rgba(30,38,34,.04),0_8px_24px_-16px_rgba(30,38,34,.18)]'
+const PILL = 'flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-surface px-3.5 text-[13px] text-ink-2 shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent disabled:opacity-40'
+const PRIMARY = 'flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full bg-accent px-4 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40'
 
 export const LEVEL_COLORS = ['#9aa39e', '#0082FB', '#7c3aed', '#d97706', '#059669']
 
@@ -19,7 +19,7 @@ export function LevelBadge({ level, pct, next, compact = false }: { level: numbe
   const T = useT()
   const color = LEVEL_COLORS[Math.min(level, LEVEL_COLORS.length - 1)]
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold" style={{ borderColor: `${color}55`, background: `${color}14`, color }} title={next ? T(`${pct}% para llegar al nivel ${next}`, `${pct}% towards level ${next}`) : T('Nivel máximo', 'Top level')}>
+    <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-bold" style={{ borderColor: `${color}55`, background: `${color}14`, color }} title={next ? T(`${pct}% para llegar al nivel ${next}`, `${pct}% towards level ${next}`) : T('Nivel máximo', 'Top level')}>
       <Trophy size={11} /> {compact ? `N${level}` : `${T('Nivel', 'Level')} ${level}`}
       {next && (
         <span className="flex items-center gap-1 font-mono font-semibold opacity-90">
@@ -152,13 +152,13 @@ export default function LevelsPanel() {
   const maxDay = Math.max(1, ...(an?.days ?? []).map((d) => d.n))
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto scroll-thin bg-paper px-6 py-5">
+    <div className="flex-1 min-h-0 overflow-y-auto scroll-thin bg-paper px-3 py-4 sm:px-6 sm:py-5">
       <div className="mx-auto flex max-w-[980px] flex-col gap-4">
         {/* the ladder */}
         <div className={CARD}>
           <div className="flex flex-wrap items-center gap-3">
             <LevelBadge level={lv.level} pct={lv.pct} next={lv.next} />
-            <div className="min-w-0 flex-1 text-sm text-ink-2">
+            <div className="min-w-[220px] flex-1 text-sm text-ink-2">
               {next ? (
                 <>{T('Para subir al nivel', 'To reach level')} <b className="text-ink">{next.n} · {en ? next.label_en : next.label}</b>: {en ? next.goal_en : next.goal}</>
               ) : (
@@ -166,7 +166,7 @@ export default function LevelsPanel() {
               )}
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-4 gap-2">
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {lv.levels.map((l) => {
               const reached = lv.level >= l.n
               const climbing = lv.next === l.n
@@ -191,7 +191,7 @@ export default function LevelsPanel() {
           <div className={CARD}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="flex items-center gap-2 text-[15px] font-semibold text-ink"><Trophy size={15} style={{ color: LEVEL_COLORS[next.n] }} /> {T('Qué falta para el nivel', 'What level')} {next.n} {T('', 'needs')} · {next.pct}%</h3>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {teamPending.length > 0 && (
                   <button onClick={buildPending} disabled={running || !!busy} className={PRIMARY} title={T('El constructor aplica los pendientes del equipo, en orden, y después el consejo verifica', 'The builder applies the team items, in order, and then the council verifies')}>
                     {busy === 'build' ? <Loader2 size={14} className="animate-spin" /> : <HardHat size={14} />} {T('Construir lo pendiente', 'Build what is pending')}
@@ -253,7 +253,7 @@ export default function LevelsPanel() {
           {an?.site ? (
             <>
               <LiveNow n={an.live} pages={an.live_pages} last30={an.last_30m} />
-              <div className="mt-3 grid grid-cols-3 gap-2">
+              <div className="mt-3 grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
                 {[[T('Páginas vistas', 'Page views'), an.pageviews], [T('Eventos', 'Events'), an.events], [T('Errores', 'Errors'), an.errors]].map(([l, v]) => (
                   <div key={String(l)} className="rounded-xl border border-line bg-surface-2 px-3 py-2"><div className="text-[11px] text-ink-3">{l}</div><div className="font-mono text-xl font-semibold text-ink">{v}</div></div>
                 ))}

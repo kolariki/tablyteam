@@ -44,9 +44,9 @@ function CopyBtn({ text, label }: { text: string; label?: string }) {
 function Section({ icon, title, hint, right, children }: { icon: ReactNode; title: string; hint?: string; right?: ReactNode; children: ReactNode }) {
   return (
     <section className={CARD}>
-      <div className="flex items-start gap-3">
+      <div className="flex flex-wrap items-start gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent">{icon}</span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[180px] flex-1">
           <div className="text-[15px] font-semibold leading-tight">{title}</div>
           {hint && <div className="mt-0.5 text-[12.5px] leading-snug text-ink-3">{hint}</div>}
         </div>
@@ -132,7 +132,7 @@ export default function CloudPanel() {
   const cloneUrlTok = cloneUrl && getToken() ? cloneUrl.replace('://', `://token:${getToken()}@`) : cloneUrl
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto scroll-thin bg-paper/40 px-6 py-5">
+    <div className="flex-1 min-h-0 overflow-y-auto scroll-thin bg-paper/40 px-3 py-4 sm:px-6 sm:py-5">
       <div className="mx-auto max-w-[760px] space-y-4">
         <div className="flex items-start gap-4">
           <div className="min-w-0 flex-1">
@@ -264,8 +264,8 @@ export default function CloudPanel() {
         >
           {info?.git && (
             <>
-              <div className="flex items-center gap-2 rounded-xl border border-line bg-paper px-3 py-2">
-                <code className="min-w-0 flex-1 truncate font-mono text-[12px] text-ink-2">git clone {cloneWithToken ? cloneUrlTok : cloneUrl}</code>
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-paper px-3 py-2">
+                <code className="min-w-0 basis-full truncate font-mono text-[12px] text-ink-2 sm:basis-auto sm:flex-1">git clone {cloneWithToken ? cloneUrlTok : cloneUrl}</code>
                 <button onClick={() => setCloneWithToken((v) => !v)} className={`${PILL} h-7 px-2.5 text-[11px]`} title={T('Incluir tu token en la URL (no la compartas)', 'Include your token in the URL (do not share it)')}><Lock size={11} /> {cloneWithToken ? T('sin token', 'without token') : T('con token', 'with token')}</button>
                 <CopyBtn text={`git clone ${cloneWithToken ? cloneUrlTok : cloneUrl}`} />
               </div>

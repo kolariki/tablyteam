@@ -134,7 +134,7 @@ export default function AgentDrawer() {
       <motion.aside
         key="panel"
         className="fixed inset-y-0 right-0 z-[141] flex flex-col overflow-hidden border-l shadow-2xl"
-        style={{ width: 460, maxWidth: '100vw', background: '#FFFFFF', borderColor: theme.accent }}
+        style={{ width: 460, maxWidth: '100vw', background: 'var(--color-surface)', borderColor: theme.accent }}
         initial={{ x: 60, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 60, opacity: 0 }} transition={{ type: 'spring', stiffness: 320, damping: 32 }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -156,7 +156,7 @@ export default function AgentDrawer() {
           </div>
         </div>
 
-        <div className="relative min-h-0 flex-1 overflow-y-auto scroll-thin px-5 pb-10">
+        <div className="relative min-h-0 flex-1 overflow-y-auto scroll-thin px-4 sm:px-5 pb-10">
           {section(T('En este debate', 'In this debate'))}
           {stats.turns === 0 ? <div className="text-[12px] text-ink-4">{T('Todavía no habló.', 'Has not spoken yet.')}</div> : (
             <>

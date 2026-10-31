@@ -102,7 +102,7 @@ export default function Login({ onAuthed, onBack, initialMode = 'login' }: { onA
 
   return (
     <div className="relative h-full arena-bg flex flex-col overflow-hidden">
-      <TeamBackdrop blur={9} opacity={0.5} />
+      <div className="hidden md:contents"><TeamBackdrop blur={9} opacity={0.5} /></div>
       <header className="relative z-20 flex h-14 shrink-0 items-center gap-3 border-b border-line bg-paper/80 px-6 backdrop-blur">
         <button type="button" onClick={onBack} className="flex items-center gap-3 rounded-lg transition hover:opacity-80" title={T('Volver a la presentación', 'Back to the intro')}>
           <img src="/icon.svg" alt="" aria-hidden className="h-7 w-7 rounded-lg shadow-sm" draggable={false} />

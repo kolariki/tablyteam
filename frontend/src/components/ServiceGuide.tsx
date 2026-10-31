@@ -113,7 +113,7 @@ export default function ServiceGuide({ group, sessionId, buildId, onClose, onSav
         style={{ maxHeight: 'calc(100vh - 48px)' }}
       >
         {/* header */}
-        <div className="flex items-start gap-4 border-b border-line px-6 py-5">
+        <div className="flex items-start gap-4 border-b border-line px-4 py-4 sm:px-6 sm:py-5">
           <div className="min-w-0 flex-1">
             <div className="text-[11px] uppercase tracking-[0.3em] text-accent">{T('Cómo conseguirlo', 'How to get it')}</div>
             <h3 className="mt-1 truncate text-2xl">{group.service}</h3>
@@ -128,7 +128,7 @@ export default function ServiceGuide({ group, sessionId, buildId, onClose, onSav
 
         {/* progress */}
         {data && (
-          <div className="flex items-center gap-1.5 px-6 pt-4">
+          <div className="flex items-center gap-1.5 px-4 pt-4 sm:px-6">
             {Array.from({ length: total }).map((_, k) => (
               <button key={k} onClick={() => go(k)} className="h-1.5 flex-1 overflow-hidden rounded-full bg-line" aria-label={`${T('Paso', 'Step')} ${k + 1}`}>
                 <motion.span className="block h-full bg-accent" initial={false} animate={{ scaleX: k <= i ? 1 : 0 }} style={{ transformOrigin: 'left' }} transition={{ type: 'spring', stiffness: 260, damping: 28 }} />
@@ -139,7 +139,7 @@ export default function ServiceGuide({ group, sessionId, buildId, onClose, onSav
         )}
 
         {/* body */}
-        <div className="min-h-0 flex-1 overflow-y-auto scroll-thin px-6 py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto scroll-thin px-4 sm:px-6 py-5">
           {!data && !error && (
             <div className="flex items-center gap-3 rounded-2xl border border-line bg-paper px-4 py-6 text-sm text-ink-2">
               <Loader2 size={18} className="animate-spin text-accent" /> {T('Un modelo está escribiendo la guía para este servicio…', 'A model is writing the guide for this service…')}
@@ -204,12 +204,12 @@ export default function ServiceGuide({ group, sessionId, buildId, onClose, onSav
         </div>
 
         {/* footer */}
-        <div className="flex items-center gap-2 border-t border-line bg-paper px-6 py-4">
-          <button onClick={() => { onClose(); useBuild.getState().set({ fdeOrder: { pkg: 'service_setup', notes: `${T('Configurar', 'Set up')} ${group.service} (${group.vars.map((v) => v.var).join(', ')})` } }) }} className="flex h-10 items-center gap-1.5 rounded-full border border-gold/50 bg-gold/10 px-4 text-[12.5px] font-semibold text-ink shadow-sm transition hover:bg-gold/20" title={T('Un experto de Tably lo configura por vos', 'A Tably expert sets it up for you')}>
+        <div className="flex flex-wrap items-center gap-2 border-t border-line bg-paper px-4 py-3 sm:px-6 sm:py-4">
+          <button onClick={() => { onClose(); useBuild.getState().set({ fdeOrder: { pkg: 'service_setup', notes: `${T('Configurar', 'Set up')} ${group.service} (${group.vars.map((v) => v.var).join(', ')})` } }) }} className="flex h-10 items-center gap-1.5 whitespace-nowrap rounded-full border border-gold/50 bg-gold/10 px-4 text-[12.5px] font-semibold text-ink shadow-sm transition hover:bg-gold/20" title={T('Un experto de Tably lo configura por vos', 'A Tably expert sets it up for you')}>
             <HardHat size={14} className="text-gold" /> {T('Que lo haga un experto · USD 49', 'Have an expert do it · USD 49')}
           </button>
           {data && !data.curated && (
-            <button onClick={() => load(true)} className="flex items-center gap-1.5 text-[12px] text-ink-3 transition hover:text-ink" title={T('Volver a escribir la guía', 'Rewrite the guide')}>
+            <button onClick={() => load(true)} className="order-last flex basis-full items-center gap-1.5 text-[12px] text-ink-3 sm:order-none sm:basis-auto transition hover:text-ink" title={T('Volver a escribir la guía', 'Rewrite the guide')}>
               <RefreshCw size={12} /> {data.generated ? data.model : T('guía genérica (sin API key para escribirla)', 'generic guide (no API key to write it)')}
             </button>
           )}

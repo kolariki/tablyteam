@@ -218,7 +218,7 @@ export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refres
                     ) : (
                       <div className="font-medium truncate">{s.title || s.topic}</div>
                     )}
-                    <div className="mt-1 flex items-center gap-2 text-[11.5px]">
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px]">
                       <span className={`rounded-full px-2 py-0.5 font-sans font-semibold ${st.cls}`}>{st.label}</span>
                       {latest?.version ? <span className="rounded-full border border-line bg-surface px-2 py-0.5 font-sans font-semibold text-ink">v{latest.version}</span> : null}
                       {latest?.level != null && <LevelBadge level={latest.level} pct={latest.level_pct ?? 0} next={latest.level_next ?? null} />}
@@ -232,7 +232,7 @@ export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refres
                   <div className="hidden md:block w-[34%] max-w-[420px] shrink-0 self-stretch min-h-[44px]">
                     <BrandLogoRow providers={providers} compact />
                   </div>
-                  <div className="flex w-full flex-wrap items-center justify-end gap-1.5 sm:w-auto sm:shrink-0">
+                  <div className="flex w-full flex-wrap items-center justify-start gap-1.5 sm:w-auto sm:shrink-0 sm:justify-end">
                     {isAudit ? (
                       <button onClick={() => go(s.id, 'builder')} disabled={!!busyAct} className={ACT_PRIMARY} title={T('Abrir el informe de auditoría', 'Open the audit report')}>{actLabel(s.id, 'builder', <HardHat size={13} />, T('Abrir', 'Open'))}</button>
                     ) : (
@@ -275,7 +275,7 @@ export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refres
                   </div>
                 </div>
                 {expanded && (
-                  <motion.ol initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-3 ml-14 grid gap-1 text-[12.5px] sm:grid-cols-2">
+                  <motion.ol initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-3 grid gap-1 sm:ml-14 text-[12.5px] sm:grid-cols-2">
                     {info.map((it, k) => (
                       <li key={k} className="flex gap-2 rounded-lg bg-surface/70 px-2.5 py-1.5">
                         <span className="font-mono text-ink-3 shrink-0">{k + 1}.</span>
@@ -286,7 +286,7 @@ export default function Dashboard({ onOpen, onCouncil, onReplay, onAudit, refres
                   </motion.ol>
                 )}
                 {expanded && !isAudit && (
-                  <div className="mt-3 ml-14"><TeamEditor sessionId={s.id} onSaved={load} /></div>
+                  <div className="mt-3 sm:ml-14"><TeamEditor sessionId={s.id} onSaved={load} /></div>
                 )}
               </div>
             </motion.div>

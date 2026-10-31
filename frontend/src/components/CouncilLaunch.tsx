@@ -53,7 +53,7 @@ export default function CouncilLaunch({ team, onLaunch, onClose, defaultRounds =
           <button onClick={onClose} className="rounded-full p-1.5 text-ink-3 transition hover:bg-surface-2 hover:text-ink" aria-label={T('Cerrar', 'Close')}><X size={18} strokeWidth={2.5} /></button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto scroll-thin px-7 py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto scroll-thin px-4 sm:px-7 py-5">
           {/* what kind of round */}
           <div className={label}>{T('Enfoque de la ronda', 'Round focus')}</div>
           <div className="mt-1.5 grid grid-cols-2 gap-2">

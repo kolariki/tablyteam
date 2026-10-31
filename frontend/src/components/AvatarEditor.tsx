@@ -66,7 +66,7 @@ export default function AvatarEditor({ employeeId, value, onSave, onReset, onClo
           <div className="serif flex-1 text-[22px]">{T('Elegí su cara', 'Pick their face')}</div>
           <button onClick={onClose} className="rounded-full p-1.5 text-ink-3 hover:bg-surface-2" aria-label={T('Cerrar', 'Close')}><X size={18} /></button>
         </div>
-        <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto px-6 py-5 md:grid-cols-[220px_1fr]">
+        <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto px-4 sm:px-6 py-5 md:grid-cols-[220px_1fr]">
           <div className="flex flex-col items-center gap-3 md:sticky md:top-0 md:self-start">
             <div className="h-48 w-48 overflow-hidden rounded-full border border-line bg-surface-2">
               {busy ? <div className="flex h-full items-center justify-center text-ink-3"><Loader2 size={22} className="animate-spin" /></div> : cur ? <img src={avatarSrc(cur)} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center px-6 text-center text-[12.5px] text-ink-4">{T('Elegí una cara', 'Pick a face')}</div>}
@@ -75,8 +75,8 @@ export default function AvatarEditor({ employeeId, value, onSave, onReset, onClo
             <button onClick={onReset} className="flex items-center gap-1.5 text-[12.5px] text-ink-3 hover:text-accent"><RotateCcw size={13} /> {T('Volver al retrato original', 'Back to the original portrait')}</button>
           </div>
           <div>
-            <div className="flex gap-1">
-              {(['gallery', 'photo', 'create'] as const).map((k) => <button key={k} onClick={() => { setTab(k); setError(null) }} className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${tab === k ? 'bg-accent text-white' : 'text-ink-2 hover:bg-surface-2'}`}>{k === 'create' && <Sparkles size={13} />}{k === 'photo' && <Camera size={13} />}{k === 'gallery' ? T('24 personas', '24 people') : k === 'photo' ? T('Desde tu foto', 'From your photo') : T('Crear con IA', 'Create with AI')}</button>)}
+            <div className="flex flex-wrap gap-1">
+              {(['gallery', 'photo', 'create'] as const).map((k) => <button key={k} onClick={() => { setTab(k); setError(null) }} className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[13px] font-medium transition sm:px-3.5 ${tab === k ? 'bg-accent text-white' : 'text-ink-2 hover:bg-surface-2'}`}>{k === 'create' && <Sparkles size={13} />}{k === 'photo' && <Camera size={13} />}{k === 'gallery' ? T('24 personas', '24 people') : k === 'photo' ? T('Desde tu foto', 'From your photo') : T('Crear con IA', 'Create with AI')}</button>)}
             </div>
             {tab === 'gallery' ? (
               <div className="mt-4 grid grid-cols-4 gap-2.5 sm:grid-cols-6">

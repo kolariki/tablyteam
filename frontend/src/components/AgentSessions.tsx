@@ -181,7 +181,7 @@ function Conversation({ engine, id, onClose }: { engine: Engine; id: string; onC
         </div>
       </div>
       {/* messages */}
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto scroll-thin bg-paper/40 px-6 py-6">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto scroll-thin bg-paper/40 px-4 sm:px-6 py-6">
         <div className="mx-auto max-w-[860px] space-y-5">
           {d.truncated && <div className="rounded-xl border border-gold/40 bg-gold/10 px-3 py-2 text-[12px]">{T('Conversación muy larga: se muestran los primeros 2500 mensajes.', 'Very long conversation: the first 2500 messages are shown.')}</div>}
           {d.items.map((it, i) =>

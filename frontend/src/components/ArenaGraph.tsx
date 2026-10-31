@@ -124,10 +124,10 @@ function AgentNode({ data }: NodeProps<Node<AgentData>>) {
             initial={{ opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.25 } }}
-            className="absolute w-[300px] rounded-2xl px-4 py-3 text-[13.5px] leading-snug text-ink z-10"
+            className="absolute w-[min(300px,78vw)] rounded-2xl px-4 py-3 text-[13.5px] leading-snug text-ink z-10"
             style={{
               ...bubblePos(side),
-              background: '#FFFFFF',
+              background: 'var(--color-surface)',
               border: '1px solid var(--color-line)',
               borderTop: `3px solid ${color}`,
               boxShadow: '0 12px 32px -14px rgba(30,38,34,.35)',

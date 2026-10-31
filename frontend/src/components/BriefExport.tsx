@@ -227,7 +227,7 @@ export default function BriefExport({ onClose, onBuild, onOpenBuild }: { onClose
 
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           {/* -------- options */}
-          <div className="shrink-0 overflow-y-auto scroll-thin border-b border-line bg-paper/60 px-6 py-5 md:w-[380px] md:border-b-0 md:border-r">
+          <div className="shrink-0 overflow-y-auto scroll-thin border-b border-line bg-paper/60 px-4 sm:px-6 py-5 md:w-[380px] md:border-b-0 md:border-r">
             <div className={LABEL}>{T('Lo escribe', 'Written by')}</div>
             <div className="mt-2 grid grid-cols-1 gap-2">
               <div className="relative">
