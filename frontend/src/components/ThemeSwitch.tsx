@@ -3,14 +3,15 @@ import { setTheme, useTheme, type Theme } from '../lib/look'
 import { useT } from '../lib/i18n'
 
 /** Light / dark / automatic (the computer's setting). Remembered on this browser. */
-export default function ThemeSwitch({ className = 'h-10' }: { className?: string }) {
+export default function ThemeSwitch({ className = 'h-10', auto = true }: { className?: string; auto?: boolean }) {
   const T = useT()
   const theme = useTheme((s) => s.theme)
-  const opts: [Theme, typeof Sun, string][] = [
+  const all: [Theme, typeof Sun, string][] = [
     ['light', Sun, T('Claro', 'Light')],
     ['dark', Moon, T('Oscuro', 'Dark')],
     ['auto', Monitor, T('Automático: como tu compu (el constructor, oscuro)', 'Automatic: like your computer (the builder, dark)')],
   ]
+  const opts = all.filter(([id]) => auto || id !== 'auto')
   return (
     <div role="radiogroup" aria-label={T('Tema', 'Theme')} className={`flex items-center rounded-full border border-line bg-surface p-1 shadow-sm ${className}`}>
       {opts.map(([id, Icon, label]) => (

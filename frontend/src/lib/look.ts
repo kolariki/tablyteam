@@ -4,7 +4,8 @@ import { create } from 'zustand'
  * Tably's identity («Equipo», with the dark «Taller» builder), live everywhere since 2026-10-30, and the theme the user picks:
  * - light: everything light, the builder included
  * - dark: everything dark («Taller» tokens), the home included
- * - auto (default): the computer's setting; in light mode the home stays light and the builder is the dark «Taller»
+ * - auto: the computer's setting; in light mode the home stays light and the builder is the dark «Taller»
+ * Dark is the default for everyone until they pick another one (the landing page has the light/dark switch too).
  * In development a switch (bottom left) still compares the identity with the previous look; VITE_NEW_LOOK=0 builds the previous look.
  */
 const KEY = 'tably.look'
@@ -19,8 +20,8 @@ export const useTheme = create<{ theme: Theme }>(() => ({ theme: readTheme() }))
 function readTheme(): Theme {
   try {
     const t = localStorage.getItem(THEME_KEY)
-    return t === 'light' || t === 'dark' ? t : 'auto'
-  } catch { return 'auto' }
+    return t === 'light' || t === 'auto' ? t : 'dark'  // everyone starts dark until they pick another theme
+  } catch { return 'dark' }
 }
 
 export function newLookOn(): boolean {

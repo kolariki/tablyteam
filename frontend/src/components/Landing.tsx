@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { countTo, gsap, heroIntro, sceneIn, scrollReveal, useGSAP } from '../lib/anim'
 import { useLang, useT } from '../lib/i18n'
 import LangSwitch from './LangSwitch'
+import ThemeSwitch from './ThemeSwitch'
 import { HACKATHON_MODE } from '../lib/flags'
 import AgentAvatar from './AgentAvatar'
 import TeamBackdrop from './TeamBackdrop'
@@ -115,15 +116,16 @@ export default function Landing({ onLogin, onSignup }: { onLogin: () => void; on
       {/* everything else sits above the backdrop (positioned, so the fixed scene never paints over cards or buttons) */}
       <div className="relative z-10">
       {/* header */}
-      <header className="sticky top-0 z-20 flex items-center gap-3 px-6 h-14 border-b border-line bg-paper/80 backdrop-blur">
-        <img data-brand-icon src="/icon.svg" alt="" aria-hidden className="h-7 w-7 rounded-lg shadow-sm" draggable={false} />
-        <span className="serif text-lg"><span data-brand-text>Tably</span> <em data-brand-text className="text-accent">Team</em></span>
-        <div className="ml-auto flex items-center gap-2">
-          <LangSwitch className="mr-1" />
+      <header className="sticky top-0 z-20 flex items-center gap-2 px-3 h-14 border-b border-line bg-paper/80 backdrop-blur sm:gap-3 sm:px-6">
+        <img data-brand-icon src="/icon.svg" alt="" aria-hidden className="h-7 w-7 shrink-0 rounded-lg shadow-sm" draggable={false} />
+        <span className="serif hidden whitespace-nowrap text-lg min-[480px]:inline"><span data-brand-text>Tably</span> <em data-brand-text className="text-accent">Team</em></span>
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+          <ThemeSwitch className="h-8" auto={false} />
+          <LangSwitch className="sm:mr-1" />
           {!HACKATHON_MODE && <a href={`${prefix}/blog`} className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-2 hover:text-ink sm:inline">{T('Blog', 'Blog')}</a>}
           {!HACKATHON_MODE && <a href={`${prefix}/faq`} className="hidden rounded-lg px-3 py-1.5 text-sm text-ink-2 hover:text-ink sm:inline">{T('Preguntas frecuentes', 'FAQ')}</a>}
-          <button onClick={onLogin} className="rounded-lg px-3 py-1.5 text-sm text-ink-2 hover:text-ink">{T('Iniciar sesión', 'Sign in')}</button>
-          <button onClick={onSignup} className="rounded-lg bg-accent text-white px-3.5 py-1.5 text-sm font-medium hover:brightness-110">{T('Crear cuenta', 'Create account')}</button>
+          <button onClick={onLogin} className="whitespace-nowrap rounded-lg px-1.5 py-1.5 text-sm text-ink-2 hover:text-ink sm:px-3"><span className="sm:hidden">{T('Entrar', 'Sign in')}</span><span className="hidden sm:inline">{T('Iniciar sesión', 'Sign in')}</span></button>
+          <button onClick={onSignup} className="whitespace-nowrap rounded-lg bg-accent text-white px-3 py-1.5 text-sm font-medium hover:brightness-110 sm:px-3.5">{T('Crear cuenta', 'Create account')}</button>
         </div>
       </header>
 

@@ -5,6 +5,7 @@ import { api, auth, type User } from '../lib/api'
 import TeamBackdrop from './TeamBackdrop'
 import { useT } from '../lib/i18n'
 import LangSwitch from './LangSwitch'
+import ThemeSwitch from './ThemeSwitch'
 import { MuseBadge } from './Landing'
 import { MadeWith } from './Landing'
 
@@ -108,7 +109,8 @@ export default function Login({ onAuthed, onBack, initialMode = 'login' }: { onA
           <img src="/icon.svg" alt="" aria-hidden className="h-7 w-7 rounded-lg shadow-sm" draggable={false} />
           <span className="serif text-lg">Tably <em className="text-accent">Team</em></span>
         </button>
-        <LangSwitch className="ml-auto" />
+        <ThemeSwitch className="ml-auto h-8" auto={false} />
+        <LangSwitch />
       </header>
       <div className="relative z-10 flex-1 min-h-0 flex items-center justify-center p-6">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-6xl grid md:grid-cols-[1fr_1.15fr] gap-12 items-center">
